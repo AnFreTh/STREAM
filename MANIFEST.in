@@ -1,0 +1,3 @@
+recursive-exclude notebooks *
+recursive-include ExpandedTM/preprocessed_datasets *
+recursive-include ExpandedTM/pre_embedded_datasets *

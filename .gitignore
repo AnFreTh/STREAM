@@ -1,0 +1,12 @@
+examples/lightning_logs/
+*.ckpt
+*.yaml
+
+# Additional files and directories to ignore
+__pycache__/
+*.pyc
+*.pyo
+*.json
+model_head.pkl
+model.safetensors
+vocab.txt
