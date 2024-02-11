@@ -9,16 +9,14 @@
 Available Models
 =================
 
-| **Name**                                                                                                                                      | **Implementation**                                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [WordCluTM](https://arxiv.org/abs/2004.14914)                                                                                                 | Tired of topic models?                                                  |
-| [CEDC](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)     | Topics in the Haystack                                                  |
-| [DCTE](https://arxiv.org/pdf/2212.09422.pdf)                                                                                                  | Human in the Loop                                                       |
-| [KMeansTM](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Simple Kmeans followed by c-tfidf                                       |
-| [SomTM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54)                              | Self organizing map followed by c-tfidf                                 |
-| [CBC](https://ieeexplore.ieee.org/abstract/document/10066754)                                                                                 | Coherence based document clustering                                     |
-| TNTM_bow                                                                                                                                      | Transformer-Representation Neural Topic Model using bag-of-words        |
-| TNTM_SentenceTransformer                                                                                                                      | Transformer-Representation Neural Topic Model using SentenceTransformer |
+| **Name**                                                                                                                                      | **Implementation**                      |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| [WordCluTM](https://arxiv.org/abs/2004.14914)                                                                                                 | Tired of topic models?                  |
+| [CEDC](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)     | Topics in the Haystack                  |
+| [DCTE](https://arxiv.org/pdf/2212.09422.pdf)                                                                                                  | Human in the Loop                       |
+| [KMeansTM](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Simple Kmeans followed by c-tfidf       |
+| [SomTM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54)                              | Self organizing map followed by c-tfidf |
+| [CBC](https://ieeexplore.ieee.org/abstract/document/10066754)                                                                                 | Coherence based document clustering     |
 
 Available (Additional) Metrics
 =================
