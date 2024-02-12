@@ -69,8 +69,8 @@ To use these models, follow the steps below:
 1. Import the necessary modules:
 
     ```python
-    from ExpandedTM.models import CEDC, KmeansTM, DCTE
-    from ExpandedTM.data_utils import TMDataset
+    from STREAM.models import CEDC, KmeansTM, DCTE
+    from STREAM.data_utils import TMDataset
     ```
 
 2. Get your dataset and data directory:
@@ -91,7 +91,7 @@ To use these models, follow the steps below:
 4. Evaluate the model using either Octis evaluation metrics or newly defined ones such as INT or ISIM:
 
     ```python
-    from ExpandedTM.metrics import ISIM, INT
+    from STREAM.metrics import ISIM, INT
 
     metric = ISIM(dataset)
     metric.score(output)
@@ -106,7 +106,7 @@ To use these models, follow the steps below:
 
 6. Visualize the results:
     ```python
-    from ExpandedTM.visuals import visualize_topic_model, visualize_topics
+    from STREAM.visuals import visualize_topic_model, visualize_topics
 
     visualize_topic_model(
         model, 
