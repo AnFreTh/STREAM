@@ -1,7 +1,12 @@
 # STREAM
 We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
 
+#### OCtis
 The core of the STREAM package is built on top of the [OCTIS](https://aclanthology.org/2021.eacl-demos.31.pdf) framework and allows seamless integration of all of OCTIS' multitude of models, datasets, evaluation metrics and hyperparameter optimization techniques. See the [Octis Github](https://github.com/MIND-Lab/OCTIS) repository for an overview.
+
+#### Speed
+Since most of STREAMs models are centered around Document embeddings, STREAM comes alsong with a set of pre-embedded datasets.
+Additionally, once a user fits a model that leverages document embeddings, the embeddings are saved and automatically loaded the next time the user wants to fit any model with the same set of embeddings.
 
 <div style="text-align: center;">
     <img src="model_plot.png" alt="Figure Description" width="600"/>
@@ -40,9 +45,6 @@ Available (Additional) Metrics
 | [Embedding Topic Diversity](https://link.springer.com/chapter/10.1007/978-3-030-80599-9_4)                                                               | Topic diversity in the embedding space                                                                                                                                 |
 | [Embedding Coherence](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Cosine similarity between the centroid of the embeddings of the stopwords and the centroid of the topic.                                                               |
 | [NPMI](https://aclanthology.org/E14-1056.pdf)                                                                                                            | Classical NPMi coherence computed on the scource corpus.                                                                                                               |
-
-
-
 
 
 

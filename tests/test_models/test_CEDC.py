@@ -53,7 +53,7 @@ class TestCEDC(unittest.TestCase):
         self.model._clustering()
         self.assertIsNotNone(self.model.labels)
 
-    @patch("ExpandedTM.utils.embedder.BaseEmbedder.create_word_embeddings")
+    @patch("STREAM.utils.embedder.BaseEmbedder.create_word_embeddings")
     def test_train_model(self, mock_create_word_embeddings):
         # Mock embed_documents to return embeddings of shape (25, 384)
         mock_create_word_embeddings.return_value = np.random.rand(50, 128)
