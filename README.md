@@ -1,7 +1,7 @@
 # STREAM
 We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
 
-#### OCtis
+#### Octis
 The core of the STREAM package is built on top of the [OCTIS](https://aclanthology.org/2021.eacl-demos.31.pdf) framework and allows seamless integration of all of OCTIS' multitude of models, datasets, evaluation metrics and hyperparameter optimization techniques. See the [Octis Github](https://github.com/MIND-Lab/OCTIS) repository for an overview.
 
 #### Speed
