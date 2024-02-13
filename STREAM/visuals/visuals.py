@@ -36,7 +36,7 @@ def visualize_topics_as_wordclouds(model, max_words=100):
 
         # Create and display the word cloud
         wordcloud = WordCloud(
-            width=800, height=400, max_words=max_words
+            width=800, height=400, max_words=max_words, background_color="white"
         ).generate_from_frequencies(word_freq)
 
         plt.figure(figsize=(10, 5))

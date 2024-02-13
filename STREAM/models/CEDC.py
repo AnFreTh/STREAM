@@ -69,7 +69,7 @@ class CEDC(AbstractModel):
             if umap_args
             else {
                 "n_neighbors": 15,
-                "n_components": 15,
+                "n_components": 7,
                 "metric": "cosine",
             }
         )
