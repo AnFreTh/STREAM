@@ -25,7 +25,9 @@ def plot_with_plotly(feature_nn, feature_name, feature_values, y_min, y_max):
         x_tensor = torch.Tensor(x_simulated).unsqueeze(1)
 
         # Make predictions using the simulated 'x' values
-        predictions = feature_nn.forward(x_tensor).numpy().flatten()
+        feature_nn.eval()
+        with torch.no_grad():
+            predictions = feature_nn.forward(x_tensor).numpy().flatten()
 
         # Create a Plotly figure
         fig = go.Figure()
