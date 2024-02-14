@@ -1,8 +1,6 @@
 import unittest
-import pandas as pd
-import numpy as np
-from STREAM.models import WordCluTM
-from STREAM.data_utils import TMDataset
+from stream.models import WordCluTM
+from stream.data_utils import TMDataset
 
 
 class TestWordCluTM(unittest.TestCase):

@@ -3,8 +3,8 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 import random
 import string
-from STREAM.models.DCTE import DCTE
-from STREAM.data_utils.dataset import TMDataset
+from stream.models.DCTE import DCTE
+from stream.data_utils.dataset import TMDataset
 
 
 class TestDCTE(unittest.TestCase):
