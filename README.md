@@ -5,7 +5,7 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
 The core of the STREAM package is built on top of the [OCTIS](https://aclanthology.org/2021.eacl-demos.31.pdf) framework and allows seamless integration of all of OCTIS' multitude of models, datasets, evaluation metrics and hyperparameter optimization techniques. See the [Octis Github](https://github.com/MIND-Lab/OCTIS) repository for an overview.
 
 #### Speed
-Since most of STREAMs models are centered around Document embeddings, STREAM comes alsong with a set of pre-embedded datasets.
+Since most of STREAMs models are centered around Document embeddings, STREAM comes along with a set of pre-embedded datasets.
 Additionally, once a user fits a model that leverages document embeddings, the embeddings are saved and automatically loaded the next time the user wants to fit any model with the same set of embeddings.
 
 <div style="text-align: center;">
@@ -20,6 +20,12 @@ Since we are currently under review and wish to maintain anonymity, STREAM is no
 pip install git+https://github.com/AnFreTh/STREAM.git
 ```
 
+Make additionally sure to download the necessary [nltk](https://www.nltk.org/) ressources, e.g. via:
+
+```python
+import nltk
+nltk.download('averaged_perceptron_tagger')
+```
 
 Available Models
 =================
@@ -78,9 +84,9 @@ To use these models, follow the steps below:
 2. Get your dataset and data directory:
 
     ```python
-    data = TMDataset()
+    dataset = TMDataset()
 
-    data.fetch_dataset("20NewsGroup")
+    dataset.fetch_dataset("20NewsGroup")
     ```
 
 3. Choose the model you want to use and train it:

@@ -414,7 +414,6 @@ class DownstreamModel(pl.LightningModule):
         ]
 
         combined_df = combined_df.dropna()
-        print(combined_df.head())
 
         return combined_df
 
@@ -440,8 +439,6 @@ class DownstreamModel(pl.LightningModule):
         ).columns
         numerical_cols = features.select_dtypes(include=["int64", "float64"]).columns
 
-        print("num", numerical_cols)
-        print("cat", categorical_cols)
         transformers = []
 
         if len(numerical_cols) > 0:
