@@ -40,7 +40,7 @@ class TMDataset(OCTISDataset):
 
         if os.path.exists(dataset_path):
             # If the dataset exists in the package, load it from there
-            super().load_custom_dataset_from_folder(dataset_path)
+            super().load_custom_dataset_from_folder(os.path.join(dataset_path, name))
         else:
             # Otherwise, load it from the given path
             super().fetch_dataset(name)
