@@ -19,5 +19,5 @@ setup(
     author="Anonymous",
     author_email="Anonymous",
     url="https://github.com/AnFreTh/STREAM",
-    python_requires=">=3.6, <=3.12",
+    python_requires=">=3.6, <=3.10",
 )
