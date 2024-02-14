@@ -29,7 +29,7 @@ To load one of the already preprocessed datasets as follows:
 
 
 ```python
-    from STREAM.data_utils import TMDataset
+    from stream.data_utils import TMDataset
    
    dataset = TMDataset()
    dataset.fetch_dataset("Spotify")
@@ -44,7 +44,7 @@ Load a custom preprocessed dataset
 Otherwise, you can load a custom preprocessed dataset in the following way, by simply using a pandas dataframe:
 
 ```python
-   from STREAM.data_utils import TMDataset
+   from stream.data_utils import TMDataset
 
    dataset = TMDataset()
    dataset = dataset.create_load_save_dataset(my_data, "test",

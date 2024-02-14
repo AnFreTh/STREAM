@@ -77,8 +77,8 @@ To use these models, follow the steps below:
 1. Import the necessary modules:
 
     ```python
-    from STREAM.models import CEDC, KmeansTM, DCTE
-    from STREAM.data_utils import TMDataset
+    from stream.models import CEDC, KmeansTM, DCTE
+    from stream.data_utils import TMDataset
     ```
 
 2. Get your dataset and data directory:
@@ -99,7 +99,7 @@ To use these models, follow the steps below:
 4. Evaluate the model using either Octis evaluation metrics or newly defined ones such as INT or ISIM:
 
     ```python
-    from STREAM.metrics import ISIM, INT
+    from stream.metrics import ISIM, INT
 
     metric = ISIM(dataset)
     metric.score(output)
@@ -114,7 +114,7 @@ To use these models, follow the steps below:
 
 6. Visualize the results:
     ```python
-    from STREAM.visuals import visualize_topic_model, visualize_topics
+    from stream.visuals import visualize_topic_model, visualize_topics
 
     visualize_topic_model(
         model, 
@@ -159,7 +159,7 @@ Fitting a downstream model with a pre-trained topic model is straightforward usi
 
 ```python
 from pytorch_lightning import Trainer
-from STREAM.NAM import DownstreamModel
+from stream.NAM import DownstreamModel
 
 # Instantiate the DownstreamModel
 downstream_model = DownstreamModel(
@@ -176,6 +176,6 @@ trainer = Trainer(max_epochs=10)
 trainer.fit(downstream_model)
 
 # Plotting
-from STREAM.visuals import plot_downstream_model
+from stream.visuals import plot_downstream_model
 plot_downstream_model(downstream_model)
 ```
