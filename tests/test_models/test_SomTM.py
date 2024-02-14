@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 import pandas as pd
 import numpy as np
-from STREAM.models import SOMTM
-from STREAM.data_utils import TMDataset
+from stream.models import SOMTM
+from stream.data_utils import TMDataset
 import random
 import string
 

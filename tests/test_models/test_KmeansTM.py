@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 import pandas as pd
 import numpy as np
-from STREAM.models.KmeansTM import KmeansTM
-from STREAM.data_utils.dataset import TMDataset
+from stream.models.KmeansTM import KmeansTM
+from stream.data_utils.dataset import TMDataset
 
 
 class TestKmeansTM(unittest.TestCase):

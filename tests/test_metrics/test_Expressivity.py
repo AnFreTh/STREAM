@@ -1,12 +1,11 @@
 import unittest
 import numpy as np
-import sys
 import random
 import string
 from unittest.mock import patch, MagicMock
 
-from STREAM.metrics.diversity_metrics import Expressivity
-from STREAM.data_utils.dataset import TMDataset
+from stream.metrics.diversity_metrics import Expressivity
+from stream.data_utils.dataset import TMDataset
 
 
 class TestExpressivity(unittest.TestCase):

@@ -8,7 +8,7 @@ def read_requirements():
 
 
 setup(
-    name="STREAM",
+    name="stream",
     version="0.1.0",
     packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
     install_requires=read_requirements(),

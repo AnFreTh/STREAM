@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 import random
 import string
-from STREAM.models.CEDC import CEDC
-from STREAM.data_utils.dataset import TMDataset
+from stream.models.CEDC import CEDC
+from stream.data_utils.dataset import TMDataset
 
 
 class TestCEDC(unittest.TestCase):
