@@ -12,10 +12,10 @@ setup(
     version="0.1.0",
     packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
     install_requires=read_requirements(),
-    include_package_data=True,  # This should be True to include files specified in MANIFEST.in
+    include_package_data=True,
     package_data={
-        # Adjust the paths to match your dataset and embeddings locations
-        "stream": ["preprocessed_datasets/*", "pre_embedded_datasets/*"],
+        # Use '**' to include all files within subdirectories recursively
+        "stream": ["preprocessed_datasets/**/*", "pre_embedded_datasets/**/*"],
     },
     description="A package for expanded topic modeling and metrics",
     long_description=open("README.md").read(),
