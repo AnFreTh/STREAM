@@ -58,10 +58,13 @@ class TMDataset(OCTISDataset):
     def get_package_dataset_path(name):
         # Get the directory of the current script
         script_dir = os.path.dirname(os.path.abspath(__file__))
+        print(f"script_dix: {script_dir}")
         # Go up one level to the 'MyPackage' directory
         my_package_dir = os.path.dirname(script_dir)
+        print(f"script_dix: {my_package_dir}")
         # Construct the path to the 'preprocessed_datasets' within 'MyPackage'
         dataset_path = os.path.join(my_package_dir, "preprocessed_datasets", name)
+        print(f"dataset_path: {dataset_path}")
         return dataset_path
 
     @staticmethod
