@@ -6,14 +6,21 @@ from ._interactive import (
     _visualize_topics_2d,
     _visualize_topics_3d,
 )
+from ._octis_visuals import OctisWrapperVisualModel
+from ..data_utils import TMDataset
 
 
-def visualize_topics_as_wordclouds(model, max_words=100):
+def visualize_topics_as_wordclouds(
+    model,
+    model_output: dict = None,
+    max_words=50,
+):
     """
     Visualize topics as word clouds.
 
     Args:
         model: Trained topic model.
+        model_output (dict, optional): If visualizing an OCTIS model, pass the model_output as arguments
         max_words (int, optional): Maximum number of words to display in each word cloud (default is 100).
 
     Raises:
@@ -23,6 +30,15 @@ def visualize_topics_as_wordclouds(model, max_words=100):
         None
             This function displays word clouds for each topic.
     """
+
+    if not hasattr(model, "output"):
+        if not model_output:
+            raise TypeError(
+                "If trying to visualize an Octis model, please pass the model_output"
+            )
+        print("--- Preparing Octis model for Visualizations ---")
+        model = OctisWrapperVisualModel(model, model_output)
+        model.get_topic_dict(top_words=max_words)
 
     assert (
         hasattr(model, "output") and "topic_dict" in model.output
@@ -47,22 +63,57 @@ def visualize_topics_as_wordclouds(model, max_words=100):
 
 
 def visualize_topic_model(
-    model, three_dim=False, reduce_first=False, reducer="umap", port=8050
+    model,
+    model_output: dict = None,
+    dataset: TMDataset = None,
+    three_dim: bool = False,
+    reduce_first: bool = False,
+    reducer: str = "umap",
+    port: int = 8050,
+    embedding_model_name: str = "all-MiniLM-L6-v2",
+    embeddings_folder_path: str = None,
+    embeddings_file_path: str = None,
 ):
     """
-    Visualize a topic model in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
+    Visualizes a topic model in 2D or 3D space, employing dimensionality reduction techniques such as UMAP, t-SNE, or PCA.
+    This function facilitates an interactive exploration of topics and their associated documents or words.
 
-    Args:
-        model (AbstractModel): Trained topic model.
-        three_dim (bool, optional): Whether to visualize in 3D or 2D (default is False).
-        reduce_first (bool, optional): Whether to reduce dimensions of embeddings first and then compute topical centroids (default is False).
-        reducer (str, optional): Dimensionality reduction technique to use, one of ['umap', 'tsne', 'pca'] (default is 'umap').
-        port (int, optional): Port number for running the visualization dashboard (default is 8050).
+    Parameters:
+        model (AbstractModel): The trained topic model instance.
+        model_output (dict, optional): The output of the topic model, typically including topic-word distributions and document-topic distributions. Required if the model does not have an 'output' attribute.
+        dataset (TMDataset, optional): The dataset used for training the topic model. Required if the model does not have an 'output' attribute.
+        three_dim (bool, optional): Flag to visualize in 3D if True, otherwise in 2D. Defaults to False.
+        reduce_first (bool, optional): Indicates whether to perform dimensionality reduction on embeddings before computing topic centroids. Defaults to False.
+        reducer (str, optional): Choice of dimensionality reduction technique. Supported values are 'umap', 'tsne', and 'pca'. Defaults to 'umap'.
+        port (int, optional): The port number on which the visualization dashboard will run. Defaults to 8050.
+        embedding_model_name (str, optional): Name of the embedding model used for generating document embeddings. Defaults to "all-MiniLM-L6-v2".
+        embeddings_folder_path (str, optional): Path to the folder containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
+        embeddings_file_path (str, optional): Path to the file containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
 
     Returns:
-        None
-            The function launches a Dash server to visualize the topic model.
+        None: Launches a Dash server that hosts the visualization dashboard, facilitating interactive exploration of the topic model.
     """
+
+    if not hasattr(model, "output"):
+        if not model_output:
+            raise TypeError(
+                "If trying to visualize an Octis model, please pass the model_output as well as the Dataset"
+            )
+        if not dataset:
+            raise TypeError(
+                "If trying to visualize an Octis model, please pass the model_output as well as the Dataset"
+            )
+        print("--- Preparing Octis model for Visualizations ---")
+        model = OctisWrapperVisualModel(
+            model,
+            model_output,
+            embedding_model_name,
+            embeddings_folder_path,
+            embeddings_file_path,
+        )
+        model.get_topic_dict(top_words=30)
+        model.get_embeddings(dataset)
+
     assert (
         model.trained
     ), "Be sure to only pass a trained model to the visualization function"
@@ -73,20 +124,55 @@ def visualize_topic_model(
         _visualize_topic_model_2d(model, reduce_first, reducer, port)
 
 
-def visualize_topics(model, three_dim=False, reducer="umap", port=8050):
+def visualize_topics(
+    model,
+    model_output: dict = None,
+    dataset: TMDataset = None,
+    three_dim: bool = False,
+    reducer: str = "umap",
+    port: int = 8050,
+    embedding_model_name: str = "all-MiniLM-L6-v2",
+    embeddings_folder_path: str = None,
+    embeddings_file_path: str = None,
+):
     """
-    Visualize topics in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
+        Visualize topics in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
-    Args:
-        model (AbstractModel): Trained topic model.
-        three_dim (bool, optional): Whether to visualize in 3D or 2D (default is False).
-        reducer (str, optional): Dimensionality reduction technique to use, one of ['umap', 'tsne', 'pca'] (default is 'umap').
-        port (int, optional): Port number for running the visualization dashboard (default is 8050).
+        Args:
+    model (AbstractModel): The trained topic model instance.
+            model_output (dict, optional): The output of the topic model, typically including topic-word distributions and document-topic distributions. Required if the model does not have an 'output' attribute.
+            dataset (TMDataset, optional): The dataset used for training the topic model. Required if the model does not have an 'output' attribute.
+            three_dim (bool, optional): Flag to visualize in 3D if True, otherwise in 2D. Defaults to False.
+            reduce_first (bool, optional): Indicates whether to perform dimensionality reduction on embeddings before computing topic centroids. Defaults to False.
+            reducer (str, optional): Choice of dimensionality reduction technique. Supported values are 'umap', 'tsne', and 'pca'. Defaults to 'umap'.
+            port (int, optional): The port number on which the visualization dashboard will run. Defaults to 8050.
+            embedding_model_name (str, optional): Name of the embedding model used for generating document embeddings. Defaults to "all-MiniLM-L6-v2".
+            embeddings_folder_path (str, optional): Path to the folder containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
+            embeddings_file_path (str, optional): Path to the file containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
 
-    Returns:
-        None
-            The function launches a Dash server to visualize the topic model.
+        Returns:
+            None
+                The function launches a Dash server to visualize the topic model.
     """
+    if not hasattr(model, "output"):
+        if not model_output:
+            raise TypeError(
+                "If trying to visualize an Octis model, please pass the model_output as well as the Dataset"
+            )
+        if not dataset:
+            raise TypeError(
+                "If trying to visualize an Octis model, please pass the model_output as well as the Dataset"
+            )
+        print("--- Preparing Octis model for Visualizations ---")
+        model = OctisWrapperVisualModel(
+            model,
+            model_output,
+            embedding_model_name,
+            embeddings_folder_path,
+            embeddings_file_path,
+        )
+        model.get_topic_dict(top_words=30)
+        model.get_embeddings(dataset)
 
     assert (
         model.trained
