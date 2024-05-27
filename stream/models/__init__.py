@@ -4,3 +4,5 @@ from .KmeansTM import KmeansTM
 from .som import SOMTM
 from .cbc import CBC
 from .WordCluTM import WordCluTM
+from .bertopicTM import BERTopicTM
+from .ctmneg import CTMN

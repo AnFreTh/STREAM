@@ -145,6 +145,24 @@ class CEDC(AbstractModel):
         # Safely get the topic-document matrix with a default value of None if not found
         return self.output.get("topic-document-matrix", None)
 
+    def _get_topic_word_matrix(self, topic_dict):
+        # Extract all unique words and sort them
+        all_words = set(word for topic in topic_dict.values() for word, _ in topic)
+        sorted_words = sorted(all_words)
+
+        # Create an empty DataFrame with sorted words as rows and topics as columns
+        topic_word_matrix = pd.DataFrame(
+            index=sorted_words, columns=sorted(topic_dict.keys()), data=0.0
+        )
+
+        # Populate the DataFrame with prevalences
+        for topic, words in topic_dict.items():
+            for word, prevalence in words:
+                if word in topic_word_matrix.index:
+                    topic_word_matrix.at[word, topic] = prevalence
+
+        return np.array(topic_word_matrix).T
+
     def train_model(
         self,
         dataset,
@@ -231,7 +249,7 @@ class CEDC(AbstractModel):
 
         self.output = {}
         self.output["topics"] = words_list
-        self.output["topic-word-matrix"] = None
+        self.output["topic-word-matrix"] = self._get_topic_word_matrix(topics)
         self.output["topic_dict"] = topics
         self.output["topic-document-matrix"] = np.array(self.soft_labels.T)
 
