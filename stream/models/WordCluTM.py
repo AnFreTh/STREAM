@@ -281,7 +281,7 @@ class WordCluTM(AbstractModel):
 
         self.output = {}
         self.output["topics"] = words_list
-        self.output["topic-word-matrix"] = self.labels
+        self.output["topic-word-matrix"] = self.labels.T
         self.output["topic_dict"] = topics
         self.output["topic-document-matrix"] = final_scores
 

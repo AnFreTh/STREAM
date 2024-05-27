@@ -45,7 +45,6 @@ class NPMI(AbstractMetric):
         self,
         dataset,
         stopwords=stopwords,
-        n_topics=20,
     ):
         """
         Initializes the NPMI object with a dataset, stopwords, and a specified number of topics.
@@ -56,7 +55,6 @@ class NPMI(AbstractMetric):
             n_topics (int, optional): The number of topics to evaluate. Defaults to 20.
         """
         self.stopwords = stopwords
-        self.ntopics = n_topics
         self.dataset = dataset
 
         files = self.dataset.get_corpus()
@@ -153,6 +151,7 @@ class NPMI(AbstractMetric):
             float: The average NPMI score for the topics.
         """
         topic_words = model_output["topics"]
+        self.ntopics = len(topic_words)
         (
             word_doc_counts,
             dev_word_to_file_mult,

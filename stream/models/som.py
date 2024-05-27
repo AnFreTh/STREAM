@@ -14,8 +14,8 @@ from sklearn.preprocessing import OneHotEncoder
 class SOMTM(AbstractModel):
     def __init__(
         self,
-        m: int = None,
-        n: int = None,
+        m: int,
+        n: int,
         dim: int = None,
         embedding_model_name: str = "all-MiniLM-L6-v2",
         n_iterations: int = 100,
@@ -33,8 +33,8 @@ class SOMTM(AbstractModel):
         Initialize the Self-Organizing Map for Topic modeling (SOMTM) model.
 
         Parameters:
-            m (int, optional): Number of rows in the SOM grid (default is None).
-            n (int, optional): Number of columns in the SOM grid (default is None).
+            m (int): Number of rows in the SOM grid (default is None).
+            n (int): Number of columns in the SOM grid (default is None).
             dim (int, optional): Dimensionality of the training inputs (default is None).
             embedding_model_name (str, optional): Name of the SentenceTransformer embedding model (default is "all-MiniLM-L6-v2").
             n_iterations (int, optional): Number of iterations for training (default is 100).

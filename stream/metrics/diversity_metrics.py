@@ -139,7 +139,9 @@ class Embedding_Topic_Diversity(AbstractMetric):
             :, : self.n_words
         ]  # select the weights of the top words size: (n_topics, n_topwords)
 
-        topic_weights = topic_weights / np.sum(topic_weights, axis=1).reshape(
+        topic_weights = topic_weights / np.nansum(
+            topic_weights, axis=1, keepdims=True
+        ).reshape(
             -1, 1
         )  # normalize the weights such that they sum up to one
 
@@ -295,7 +297,9 @@ class Expressivity(AbstractMetric):
             :, : self.n_words
         ]  # select the weights of the top words
 
-        topic_weights = topic_weights / np.sum(topic_weights, axis=1).reshape(
+        topic_weights = topic_weights / np.nansum(
+            topic_weights, axis=1, keepdims=True
+        ).reshape(
             -1, 1
         )  # normalize the weights such that they sum up to one
 
