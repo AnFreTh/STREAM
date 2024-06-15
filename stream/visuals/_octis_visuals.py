@@ -75,7 +75,8 @@ class OctisWrapperVisualModel:
                 top_k_words = list(reversed([self._model.id2word[i] for i in top_k]))
                 topics_output.append(top_k_words)
                 result[idx] = [(word, val) for word, val in zip(top_k_words, vals)]
-        self.output["topic_dict"] = result
+        self.topic_dict = result
+        self.trained = True
 
     def get_embeddings(self, dataset):
         """
@@ -106,3 +107,6 @@ class OctisWrapperVisualModel:
             self.embeddings = self.embedding_model.encode(
                 self.dataframe["text"], show_progress_bar=False
             )
+
+    def get_topics(self):
+        return self.output["topics"]
