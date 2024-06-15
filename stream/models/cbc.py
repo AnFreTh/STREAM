@@ -1,4 +1,3 @@
-from octis.models.model import AbstractModel
 from ..data_utils.dataset import TMDataset
 import networkx as nx
 import community as community_louvain
@@ -6,10 +5,12 @@ from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
 from ..utils.tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.cbc_utils import DocumentCoherence, get_top_tfidf_words_per_document
+from .abstract_model import BaseModel
+import numpy as np
 
 
-class CBC(AbstractModel):
-    def __init__(self, max_topics: int = 20):
+class CBC(BaseModel):
+    def __init__(self):
         """
         Initializes the DocumentClusterer with a DataFrame of coherence scores.
 
@@ -17,12 +18,30 @@ class CBC(AbstractModel):
             coherence_scores (DataFrame): DataFrame containing coherence scores between documents.
         """
         self.trained = False
-        self.max_topics = max_topics
+
+    def get_info(self):
+        """
+        Get information about the model.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including model name
+        """
+        info = {
+            "model_name": "CBC",
+            "trained": self.trained,
+        }
+        return info
 
     def _create_coherence_graph(self):
         """
-        Creates a graph from the coherence scores where nodes represent documents
-        and edges represent coherence scores.
+        Initializes the CBC model.
+
+        Attributes
+        ----------
+        trained : bool
+            Indicator whether the model has been trained.
         """
         G = nx.Graph()
         for i in self.coherence_scores.index:
@@ -36,8 +55,10 @@ class CBC(AbstractModel):
         """
         Clusters documents based on coherence scores.
 
-        Returns:
-            dict: A dictionary mapping cluster labels to lists of document indices.
+        Returns
+        -------
+        dict
+            A dictionary mapping cluster labels to lists of document indices.
         """
         G = self._create_coherence_graph()
         partition = community_louvain.best_partition(G, weight="weight")
@@ -52,12 +73,17 @@ class CBC(AbstractModel):
         """
         Combines documents within each cluster.
 
-        Parameters:
-            documents (DataFrame): Original DataFrame of documents.
-            clusters (dict): Dictionary of document clusters.
+        Parameters
+        ----------
+        documents : DataFrame
+            Original DataFrame of documents.
+        clusters : dict
+            Dictionary of document clusters.
 
-        Returns:
-            DataFrame: New DataFrame with combined documents.
+        Returns
+        -------
+        DataFrame
+            New DataFrame with combined documents.
         """
         combined_docs = []
         for cluster_id, doc_indices in clusters.items():
@@ -70,43 +96,128 @@ class CBC(AbstractModel):
 
         return pd.DataFrame(combined_docs)
 
-    def _prepare_data(self):
+    def _prepare_data(
+        self,
+        dataset,
+        remove_stopwords,
+        lowercase,
+        remove_punctuation,
+        remove_numbers,
+        lemmatize,
+        stem,
+        expand_contractions,
+        remove_html_tags,
+        remove_special_chars,
+        remove_accents,
+        custom_stopwords,
+        detokenize,
+    ):
         """
         Prepares the dataset for clustering.
 
+        Parameters
+        ----------
+        dataset : TMDataset
+            Dataset containing the documents.
         """
 
-        self.dataset.get_dataframe()
-        self.dataframe = self.dataset.dataframe
+        current_steps = {
+            "remove_stopwords": remove_stopwords,
+            "lowercase": lowercase,
+            "remove_punctuation": remove_punctuation,
+            "remove_numbers": remove_numbers,
+            "lemmatize": lemmatize,
+            "stem": stem,
+            "expand_contractions": expand_contractions,
+            "remove_html_tags": remove_html_tags,
+            "remove_special_chars": remove_special_chars,
+            "remove_accents": remove_accents,
+            "custom_stopwords": custom_stopwords,
+            "detokenize": detokenize,
+        }
+
+        # Check if the preprocessing steps are already applied
+        previous_steps = dataset.info.get("preprocessing_steps", {})
+
+        # Filter out steps that have already been applied
+        filtered_steps = {
+            key: (
+                False
+                if key in previous_steps and previous_steps[key] == value
+                else value
+            )
+            for key, value in current_steps.items()
+        }
+
+        if custom_stopwords:
+            filtered_steps["remove_stopwords"] = True
+
+        # Only preprocess if there are steps that need to be applied
+        if filtered_steps:
+            dataset.preprocess(**filtered_steps)
+
+        self.dataframe = dataset.dataframe
         self.dataframe["tfidf_top_words"] = get_top_tfidf_words_per_document(
             self.dataframe["text"]
         )
 
-    def _get_topic_document_matrix(self):
-        assert (
-            self.trained
-        ), "Model must be trained before accessing the topic-document matrix."
-        # Safely get the topic-document matrix with a default value of None if not found
-        return self.output.get("topic-document-matrix", None)
-
-    def train_model(self, dataset):
+    def fit(
+        self,
+        dataset: TMDataset = None,
+        max_topics: int = 20,
+        max_iterations: int = 20,
+        remove_stopwords: bool = True,
+        lowercase: bool = False,
+        remove_punctuation: bool = True,
+        remove_numbers: bool = True,
+        lemmatize: bool = True,
+        stem: bool = False,
+        expand_contractions: bool = True,
+        remove_html_tags: bool = True,
+        remove_special_chars: bool = True,
+        remove_accents: bool = True,
+        custom_stopwords=[],
+        detokenize: bool = True,
+    ):
         """
         Clusters documents based on coherence scores until the number of clusters is
         within a specified threshold.
 
-        Parameters:
-            documents (DataFrame): DataFrame containing the documents.
-            threshold (int): Maximum acceptable number of clusters.
+        Parameters
+        ----------
+        dataset : TMDataset, optional
+            Dataset containing the documents.
+        max_topics : int, optional
+            Maximum acceptable number of clusters.
+        max_iterations : int, optional
+            Maximum number of iterations for clustering.
 
-        Returns:
-            DataFrame: DataFrame containing the final combined documents in each cluster.
+        Raises
+        ------
+        AssertionError
+            If the dataset is not an instance of TMDataset.
         """
+        self.max_topics = max_topics
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
-        self.dataset = dataset
+
         print("--- preparing the dataset ---")
-        self._prepare_data()
+        self._prepare_data(
+            dataset,
+            remove_stopwords,
+            lowercase,
+            remove_punctuation,
+            remove_numbers,
+            lemmatize,
+            stem,
+            expand_contractions,
+            remove_html_tags,
+            remove_special_chars,
+            remove_accents,
+            custom_stopwords,
+            detokenize,
+        )
 
         iteration = 0
         current_documents = self.dataframe.copy()
@@ -151,24 +262,31 @@ class CBC(AbstractModel):
                 break
 
             # Stop if too many iterations to prevent infinite loop
-            if iteration > 20:  # You can adjust this limit
+            if iteration > max_iterations:  # You can adjust this limit
                 print("Maximum iterations reached. Stopping clustering process.")
                 break
 
-        self.trained = True
-        self.labels = {}
+        labels = {}
         for cluster_label, doc_indices_group in enumerate(document_indices):
             for doc_indices in doc_indices_group:
                 for index in doc_indices:
-                    self.labels[index] = cluster_label
+                    labels[index] = cluster_label
 
-        self.dataframe["predictions"] = self.dataframe.index.map(self.labels)
+        self.dataframe["predictions"] = self.dataframe.index.map(labels)
+        self.labels = np.array(self.dataframe["predictions"])
+        if np.isnan(self.labels).sum() > 0:
+            self.dropped_indices = np.where(np.isnan(self.labels))[0]
+            self.labels = self.labels[~np.isnan(self.labels)]
+            self.dataframe = self.dataframe.dropna(subset=["predictions"])
+            print("--- dropping NaN values from topics ---")
+            print("--- dropped indices stored in self.dropped_indices ---")
+
         docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
         print("--- Extracting the Topics ---")
         tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        topics = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
+        self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(
             sparse=False
@@ -177,14 +295,96 @@ class CBC(AbstractModel):
             self.dataframe[["predictions"]]
         )
 
-        # Transpose the one-hot encoded matrix to get shape (k, n)
-        topic_document_matrix = predictions_one_hot.T
-
-        self.output = {
-            "topics": [[word for word, _ in topics[key]] for key in topics],
-            "topic-word-matrix": tfidf.T,
-            "topic_dict": topics,
-            "topic-document-matrix": topic_document_matrix,  # Include the transposed one-hot encoded matrix
-        }
+        self.topic_word_distribution = tfidf.T
+        self.document_topic_distribution = predictions_one_hot.T
         self.trained = True
-        return self.output
+
+    def predict(self, texts):
+        """
+        Predict topics for new documents.
+
+        Parameters
+        ----------
+        texts : list of str
+            List of texts to predict topics for.
+
+        Returns
+        -------
+        list of int
+            List of predicted topic labels.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        embeddings = self.encode_documents(
+            texts, encoder_model=self.embedding_model_name, use_average=True
+        )
+        reduced_embeddings = self.reducer.transform(embeddings)
+        labels = self.clustering_model.predict(reduced_embeddings)
+        return labels
+
+    def get_topics(self, n_words=10):
+        """
+        Retrieve the top words for each topic.
+
+        Parameters
+        ----------
+        n_words : int
+            Number of top words to retrieve for each topic.
+
+        Returns
+        -------
+        list of list of str
+            List of topics with each topic represented as a list of top words.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        return [
+            [word for word, _ in self.topic_dict[key][:n_words]]
+            for key in self.topic_dict
+        ]
+
+    def get_topic_word_matrix(self):
+        """
+        Retrieve the topic-word distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-word distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        return self.topic_word_distribution
+
+    def get_topic_document_matrix(self):
+        """
+        Retrieve the topic-document distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-document distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        return self.topic_document_matrix
