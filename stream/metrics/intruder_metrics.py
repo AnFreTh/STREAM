@@ -7,9 +7,10 @@ from ._helper_funcs import (
 )
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from .abstract_metric import BaseMetric
 
 
-class ISIM(AbstractMetric):
+class ISIM(BaseMetric):
     """
     A metric class to calculate the Intruder Similarity Metric (ISIM) for topics. This metric evaluates
     the distinctiveness of topics by measuring the average cosine similarity between the top words of
@@ -71,8 +72,32 @@ class ISIM(AbstractMetric):
         self.corpus_dict = tw_emb
         self.n_words = n_words
         self.embeddings = None
+        self.metric_embedder = metric_embedder
 
-    def score_one_intr_per_topic(self, model_output, new_Embeddings=True):
+    def get_info(self):
+        """
+        Get information about the metric.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including metric name,
+            number of top words, number of intruders, embedding model name,
+            metric range and metric discription
+        """
+
+        info = {
+            "metric_name": "Intruder Similarity Metric (ISIM)",
+            "n_words": self.n_words,
+            "n_intruders": self.n_intruders,
+            "embedding_model_name": self.metric_embedder,
+            "metric_range": "0 to 1, smaller is better",
+            "description": " the average cosine similarity between every word in a topic and an intruder word.",
+        }
+
+        return info
+
+    def score_one_intr_per_topic(self, topics, new_Embeddings=True):
         """
         Calculates the ISIM score for each topic individually using only one intruder word.
 
@@ -90,11 +115,9 @@ class ISIM(AbstractMetric):
         if new_Embeddings:  # for this function, reuse embeddings per default
             self.embeddings = None
 
-        topics_tw = model_output["topics"]
-
         if self.embeddings is None:
             emb_tw = Embed_topic(
-                topics_tw, self.corpus_dict, self.n_words
+                topics, self.corpus_dict, self.n_words
             )  # embed the top words
             emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
                 :, : self.n_words, :
@@ -133,7 +156,7 @@ class ISIM(AbstractMetric):
 
         return np.array(avg_sim_topic_list)
 
-    def score_one_intr(self, model_output, new_Embeddings=True):
+    def score_one_intr(self, topics, new_Embeddings=True):
         """
         Calculates the overall ISIM score for all topics combined using only one intruder word.
 
@@ -150,9 +173,9 @@ class ISIM(AbstractMetric):
         """
         if new_Embeddings:
             self.embeddings = None
-        return np.mean(self.score_one_intr_per_topic(model_output, new_Embeddings))
+        return np.mean(self.score_one_intr_per_topic(topics, new_Embeddings))
 
-    def score_per_topic(self, model_output, new_Embeddings=True):
+    def score_per_topic(self, topics, new_Embeddings=True):
         """
         Calculates the ISIM scores for each topic individually using several intruder words.
 
@@ -172,7 +195,7 @@ class ISIM(AbstractMetric):
         score_lis = []
         for _ in range(self.n_intruders):  # iterate over the number of intruder words
             score_per_topic = self.score_one_intr_per_topic(
-                model_output, new_Embeddings=False
+                topics, new_Embeddings=False
             )  # calculate the intruder score, but re-use embeddings
             score_lis.append(score_per_topic)  # and append to list
 
@@ -181,8 +204,8 @@ class ISIM(AbstractMetric):
         ).T  # stack all scores and transpose to get a (n_topics, n_intruder words) matrix
 
         mean_scores = np.mean(res, axis=1)
-        ntopics = len(model_output["topics"])
-        topic_words = model_output["topics"]
+        ntopics = len(topics)
+        topic_words = topics
         results = {}
         for k in range(ntopics):
             half_topic_words = topic_words[k][
@@ -192,7 +215,7 @@ class ISIM(AbstractMetric):
 
         return results  # return the mean score for each topic
 
-    def score(self, model_output, new_Embeddings=True):
+    def score(self, topics, new_Embeddings=True):
         """
         Calculates the overall ISIM score for all topics combined using several intruder words.
 
@@ -209,11 +232,8 @@ class ISIM(AbstractMetric):
         """
         if new_Embeddings:
             self.embeddings = None
-        """
-        Calculate the score for all topics combined but only with several intruder words
-        """
 
-        return float(np.mean(list(self.score_per_topic(model_output).values())))
+        return float(np.mean(list(self.score_per_topic(topics).values())))
 
 
 class INT(AbstractMetric):

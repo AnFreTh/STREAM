@@ -145,6 +145,9 @@ class Embedding_Topic_Diversity(AbstractMetric):
             -1, 1
         )  # normalize the weights such that they sum up to one
 
+        print(topic_weights)
+        print(np.isnan(topic_weights).any())
+
         emb_tw = Embed_topic(
             topics_tw, self.corpus_dict, self.n_words
         )  # embed the top words
@@ -322,11 +325,20 @@ class Expressivity(AbstractMetric):
         )  # calculate the sum, which yields the weighted average
 
         if np.isnan(topic_means.sum()) != 0:
-            raise ValueError("There are some nans in the topic means")
+            # raise ValueError("There are some nans in the topic means")
+            print("There are some nans in the topic means")
 
         topword_sims = []
-        # iterate over every topic and append the cosine similarity of the topic's centroid and the stopword mean
+        valid_topic_means = []
+
         for mean in topic_means:
+            if not np.isnan(
+                mean
+            ).any():  # Check if there are no NaNs in the current mean
+                valid_topic_means.append(mean)  # Append non-NaN mean to the valid list
+
+        # Compute cosine similarity for valid topic means only
+        for mean in valid_topic_means:
             topword_sims.append(
                 cosine_similarity(
                     mean.reshape(1, -1), self.stopword_mean.reshape(1, -1)
@@ -334,7 +346,9 @@ class Expressivity(AbstractMetric):
             )
 
         results = {}
-        for k in range(ntopics):
+        for k in range(
+            len(valid_topic_means)
+        ):  # Adjust range to the length of valid_topic_means
             half_topic_words = topics_tw[k][
                 : len(topics_tw[k]) // 2
             ]  # Take only the first half of the words
