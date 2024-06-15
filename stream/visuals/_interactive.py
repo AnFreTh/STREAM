@@ -9,9 +9,10 @@ import numpy as np
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import cosine
+from ..utils.encoder import SentenceEncodingMixin
 
 
-def calculate_distances_to_other_topics(selected_topic_index, plot_df, model_output):
+def calculate_distances_to_other_topics(selected_topic_index, plot_df, model):
     """
     Calculate cosine distances between the selected topic and all other topics,
     along with their top 3 words.
@@ -22,7 +23,7 @@ def calculate_distances_to_other_topics(selected_topic_index, plot_df, model_out
         Index of the selected topic.
     plot_df : pandas.DataFrame
         DataFrame containing the positions of topics on the plot, with 'x' and 'y' columns.
-    model_output : dict
+    model : model class of BaseModel
         Output dictionary from the topic modeling model, containing topic information.
 
     Returns:
@@ -41,7 +42,7 @@ def calculate_distances_to_other_topics(selected_topic_index, plot_df, model_out
                 selected_topic_position, other_topic_position
             )  # Cosine distance
             top_words = ", ".join(
-                [word for word, _ in model_output["topic_dict"][index][:3]]
+                [word for word, _ in model.topic_dict[index][:3]]
             )  # Top 3 words
             distances.append((index, distance, top_words))
 
@@ -50,7 +51,15 @@ def calculate_distances_to_other_topics(selected_topic_index, plot_df, model_out
     return distances
 
 
-def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=8050):
+def _visualize_topic_model_2d(
+    model,
+    reduce_first=False,
+    reducer="umap",
+    port=8050,
+    dataset=None,
+    encoder_model="paraphrase-MiniLM-L3-v2",
+    use_average=True,
+):
     """
     Visualize a topic model in 2D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
@@ -70,6 +79,15 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
     None
         The function launches a Dash server to visualize the topic model.
     """
+    if not hasattr(model, "embeddings"):
+        encoder = SentenceEncodingMixin()
+        embeddings = encoder.encode_documents(
+            dataset.texts, encoder_model=encoder_model, use_average=use_average
+        )
+    else:
+        embeddings = model.embeddings
+
+
     num_docs_per_topic = pd.Series(model.labels).value_counts().sort_index()
 
     # Extract top words for each topic with importance and format them vertically
@@ -77,7 +95,7 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
         topic: "<br>".join(
             [f"{word} ({importance:.2f})" for word, importance in words[:5]]
         )
-        for topic, words in model.output["topic_dict"].items()
+        for topic, words in model.topic_dict.items()
     }
 
     if reducer == "umap":
@@ -90,7 +108,7 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
         raise ValueError("reducer must be in ['umap', 'tnse', 'pca']")
 
     if reduce_first:
-        embeddings = reducer.fit_transform(model.embeddings)
+        embeddings = reducer.fit_transform(embeddings)
         topic_data = []
         # Iterate over unique labels and compute mean embedding for each
         for label in np.unique(model.labels):
@@ -108,7 +126,7 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
             # Iterate over unique labels and compute mean embedding for each
             for label in np.unique(model.labels):
                 # Find embeddings corresponding to the current label
-                label_embeddings = model.embeddings[model.labels == label]
+                label_embeddings = embeddings[model.labels == label]
                 # Compute mean embedding for the current label
                 mean_embedding = np.mean(label_embeddings, axis=0)
                 # Store the mean embedding in the dictionary
@@ -154,8 +172,8 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
         fig.update_layout(clickmode="event+select")
         return fig
 
-    def get_top_words_for_topic(topic_number, model_output):
-        return model_output["topic_dict"].get(topic_number, [])
+    def get_top_words_for_topic(topic_number, model):
+        return model.topic_dict.get(topic_number, [])
 
     @app.callback(
         Output("side-plot", "figure"),
@@ -167,7 +185,7 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
             selected_topic = point_index
 
             if side_option == "top_words":
-                top_words_data = get_top_words_for_topic(selected_topic, model.output)
+                top_words_data = get_top_words_for_topic(selected_topic, model)
                 words, scores = zip(*top_words_data)
                 fig = px.bar(
                     x=words, y=scores, title=f"Top Words for Topic {selected_topic}"
@@ -176,7 +194,7 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
 
             elif side_option == "topic_distances":
                 distances_data = calculate_distances_to_other_topics(
-                    point_index, plot_df, model.output
+                    point_index, plot_df, model
                 )
                 topics, distances, annotations = zip(*distances_data)
                 fig = px.bar(
@@ -222,7 +240,7 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
         if clickData:
             point_index = clickData["points"][0]["pointIndex"]
             selected_topic = point_index
-            top_words_data = get_top_words_for_topic(selected_topic, model.output)
+            top_words_data = get_top_words_for_topic(selected_topic, model)
             detailed_info = "Topic {}: ".format(selected_topic) + ", ".join(
                 [f"{word} ({score:.2f})" for word, score in top_words_data]
             )
@@ -232,7 +250,15 @@ def _visualize_topic_model_2d(model, reduce_first=False, reducer="umap", port=80
     app.run_server(debug=True, port=port)
 
 
-def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=8050):
+def _visualize_topic_model_3d(
+    model,
+    reduce_first=False,
+    reducer="umap",
+    port=8050,
+    dataset=None,
+    encoder_model="paraphrase-MiniLM-L3-v2",
+    use_average=True,
+):
     """
     Visualize a topic model in 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
@@ -252,6 +278,14 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
     None
         The function launches a Dash server to visualize the topic model.
     """
+    if not hasattr(model, "embeddings"):
+        encoder = SentenceEncodingMixin()
+        embeddings = encoder.encode_documents(
+            dataset.texts, encoder_model=encoder_model, use_average=use_average
+        )
+    else:
+        embeddings = model.embeddings
+
     num_docs_per_topic = pd.Series(model.labels).value_counts().sort_index()
 
     # Extract top words for each topic with importance and format them vertically
@@ -259,7 +293,7 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
         topic: "<br>".join(
             [f"{word} ({importance:.2f})" for word, importance in words[:5]]
         )
-        for topic, words in model.output["topic_dict"].items()
+        for topic, words in model.topic_dict.items()
     }
 
     if reducer == "umap":
@@ -272,7 +306,7 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
         raise ValueError("reducer must be in ['umap', 'tnse', 'pca']")
 
     if reduce_first:
-        embeddings = reducer.fit_transform(model.embeddings)
+        embeddings = reducer.fit_transform(embeddings)
         topic_data = []
         # Iterate over unique labels and compute mean embedding for each
         for label in np.unique(model.labels):
@@ -290,7 +324,7 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
             # Iterate over unique labels and compute mean embedding for each
             for label in np.unique(model.labels):
                 # Find embeddings corresponding to the current label
-                label_embeddings = model.embeddings[model.labels == label]
+                label_embeddings = embeddings[model.labels == label]
                 # Compute mean embedding for the current label
                 mean_embedding = np.mean(label_embeddings, axis=0)
                 # Store the mean embedding in the dictionary
@@ -338,8 +372,8 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
         fig.update_layout(clickmode="event+select")
         return fig
 
-    def get_top_words_for_topic(topic_number, model_output):
-        return model_output["topic_dict"].get(topic_number, [])
+    def get_top_words_for_topic(topic_number, model):
+        return model.topics_dict.get(topic_number, [])
 
     @app.callback(
         Output("side-plot", "figure"),
@@ -351,7 +385,7 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
             selected_topic = point_index
 
             if side_option == "top_words":
-                top_words_data = get_top_words_for_topic(selected_topic, model.output)
+                top_words_data = get_top_words_for_topic(selected_topic, model)
                 words, scores = zip(*top_words_data)
                 fig = px.bar(
                     x=words, y=scores, title=f"Top Words for Topic {selected_topic}"
@@ -360,7 +394,7 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
 
             elif side_option == "topic_distances":
                 distances_data = calculate_distances_to_other_topics(
-                    point_index, plot_df, model.output
+                    point_index, plot_df, model
                 )
                 topics, distances, annotations = zip(*distances_data)
                 fig = px.bar(
@@ -406,7 +440,7 @@ def _visualize_topic_model_3d(model, reduce_first=False, reducer="umap", port=80
         if clickData:
             point_index = clickData["points"][0]["pointNumber"]
             selected_topic = point_index
-            top_words_data = get_top_words_for_topic(selected_topic, model.output)
+            top_words_data = get_top_words_for_topic(selected_topic, model)
             detailed_info = "Topic {}: ".format(selected_topic) + ", ".join(
                 [f"{word} ({score:.2f})" for word, score in top_words_data]
             )
@@ -446,7 +480,7 @@ def get_top_tfidf_words_per_document(corpus, n=10):
     return top_words_per_document
 
 
-def _visualize_topics_2d(model, reducer="umap", port=8050):
+def _visualize_topics_2d(model, reducer="umap", port=8050, dataset=None, encoder_model="paraphrase-MiniLM-L3-v2", use_average=True):
     """
     Visualize topics in 2D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
@@ -464,7 +498,13 @@ def _visualize_topics_2d(model, reducer="umap", port=8050):
     None
         The function launches a Dash server to visualize the topic model.
     """
-    embeddings = model.embeddings
+    if not hasattr(model, "embeddings"):
+        encoder = SentenceEncodingMixin()
+        embeddings = encoder.encode_documents(
+            dataset.texts, encoder_model=encoder_model, use_average=use_average
+        )
+    else:
+        embeddings = model.embeddings
     labels = model.labels
     top_words_per_document = get_top_tfidf_words_per_document(model.dataframe["text"])
 
@@ -566,7 +606,7 @@ def _visualize_topics_2d(model, reducer="umap", port=8050):
     app.run_server(debug=True, port=port)
 
 
-def _visualize_topics_3d(model, reducer="umap", port=8050):
+def _visualize_topics_3d(model, reducer="umap", port=8050, dataset=None, encoder_model="paraphrase-MiniLM-L3-v2", use_average=True):
     """
     Visualize topics in 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
@@ -584,7 +624,13 @@ def _visualize_topics_3d(model, reducer="umap", port=8050):
     None
         The function launches a Dash server to visualize the topic model.
     """
-    embeddings = model.embeddings
+    if not hasattr(model, "embeddings"):
+        encoder = SentenceEncodingMixin()
+        embeddings = encoder.encode_documents(
+            dataset.texts, encoder_model=encoder_model, use_average=use_average
+        )
+    else:
+        embeddings = model.embeddings
     labels = model.labels
     top_words_per_document = get_top_tfidf_words_per_document(model.dataframe["text"])
 

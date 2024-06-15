@@ -8,6 +8,7 @@ from ._interactive import (
 )
 from ._octis_visuals import OctisWrapperVisualModel
 from ..data_utils import TMDataset
+from ..models.abstract_model import BaseModel
 
 
 def visualize_topics_as_wordclouds(
@@ -31,20 +32,20 @@ def visualize_topics_as_wordclouds(
             This function displays word clouds for each topic.
     """
 
-    if not hasattr(model, "output"):
+    if not isinstance(model, BaseModel):
         if not model_output:
             raise TypeError(
-                "If trying to visualize an Octis model, please pass the model_output"
+                "If trying to visualize a non-Octis model, please pass the model_output"
             )
         print("--- Preparing Octis model for Visualizations ---")
         model = OctisWrapperVisualModel(model, model_output)
         model.get_topic_dict(top_words=max_words)
 
     assert (
-        hasattr(model, "output") and "topic_dict" in model.output
+        hasattr(model, "topic_dict") and model.trained == True
     ), "Model must have been trained with topics extracted."
 
-    topics = model.output["topic_dict"]
+    topics = model.get_topics()
 
     for topic_id, topic_words in topics.items():
         # Generate a word frequency dictionary for the topic
@@ -73,6 +74,7 @@ def visualize_topic_model(
     embedding_model_name: str = "all-MiniLM-L6-v2",
     embeddings_folder_path: str = None,
     embeddings_file_path: str = None,
+    use_average: bool = True,
 ):
     """
     Visualizes a topic model in 2D or 3D space, employing dimensionality reduction techniques such as UMAP, t-SNE, or PCA.
@@ -94,7 +96,7 @@ def visualize_topic_model(
         None: Launches a Dash server that hosts the visualization dashboard, facilitating interactive exploration of the topic model.
     """
 
-    if not hasattr(model, "output"):
+    if not isinstance(model, BaseModel):
         if not model_output:
             raise TypeError(
                 "If trying to visualize an Octis model, please pass the model_output as well as the Dataset"
@@ -119,9 +121,25 @@ def visualize_topic_model(
     ), "Be sure to only pass a trained model to the visualization function"
 
     if three_dim:
-        _visualize_topic_model_3d(model, reduce_first, reducer, port)
+        _visualize_topic_model_3d(
+            model,
+            reduce_first,
+            reducer,
+            port,
+            dataset=dataset,
+            encoder_model=embedding_model_name,
+            use_average=use_average,
+        )
     else:
-        _visualize_topic_model_2d(model, reduce_first, reducer, port)
+        _visualize_topic_model_2d(
+            model,
+            reduce_first,
+            reducer,
+            port,
+            dataset=dataset,
+            encoder_model=embedding_model_name,
+            use_average=use_average,
+        )
 
 
 def visualize_topics(
@@ -134,6 +152,7 @@ def visualize_topics(
     embedding_model_name: str = "all-MiniLM-L6-v2",
     embeddings_folder_path: str = None,
     embeddings_file_path: str = None,
+    use_average: bool = True,
 ):
     """
         Visualize topics in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
@@ -154,7 +173,7 @@ def visualize_topics(
             None
                 The function launches a Dash server to visualize the topic model.
     """
-    if not hasattr(model, "output"):
+    if not isinstance(model, BaseModel):
         if not model_output:
             raise TypeError(
                 "If trying to visualize an Octis model, please pass the model_output as well as the Dataset"
@@ -179,6 +198,20 @@ def visualize_topics(
     ), "Be sure to only pass a trained model to the visualization function"
 
     if three_dim:
-        _visualize_topics_3d(model, reducer, port)
+        _visualize_topics_3d(
+            model,
+            reducer,
+            port,
+            dataset=dataset,
+            encoder_model=embedding_model_name,
+            use_average=use_average,
+        )
     else:
-        _visualize_topics_2d(model, reducer, port)
+        _visualize_topics_2d(
+            model,
+            reducer,
+            port,
+            dataset=dataset,
+            encoder_model=embedding_model_name,
+            use_average=use_average,
+        )
