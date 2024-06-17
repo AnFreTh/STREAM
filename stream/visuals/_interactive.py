@@ -59,6 +59,8 @@ def _visualize_topic_model_2d(
     dataset=None,
     encoder_model="paraphrase-MiniLM-L3-v2",
     use_average=True,
+    embeddings_path=None,
+    embeddings_file_path=None,
 ):
     """
     Visualize a topic model in 2D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
@@ -80,13 +82,18 @@ def _visualize_topic_model_2d(
         The function launches a Dash server to visualize the topic model.
     """
     if not hasattr(model, "embeddings"):
-        encoder = SentenceEncodingMixin()
-        embeddings = encoder.encode_documents(
-            dataset.texts, encoder_model=encoder_model, use_average=use_average
-        )
-    else:
-        embeddings = model.embeddings
+        if dataset.has_embeddings(encoder_model):
 
+            embeddings = dataset.get_embeddings(
+                encoder_model,
+                embeddings_path,
+                embeddings_file_path,
+            )
+        else:
+            encoder = SentenceEncodingMixin()
+            embeddings = encoder.encode_documents(
+                dataset.texts, encoder_model=encoder_model, use_average=use_average
+            )
 
     num_docs_per_topic = pd.Series(model.labels).value_counts().sort_index()
 
@@ -480,7 +487,16 @@ def get_top_tfidf_words_per_document(corpus, n=10):
     return top_words_per_document
 
 
-def _visualize_topics_2d(model, reducer="umap", port=8050, dataset=None, encoder_model="paraphrase-MiniLM-L3-v2", use_average=True):
+def _visualize_topics_2d(
+    model,
+    reducer="umap",
+    port=8050,
+    dataset=None,
+    encoder_model="paraphrase-MiniLM-L3-v2",
+    use_average=True,
+    embeddings_path=None,
+    embeddings_file_path=None,
+):
     """
     Visualize topics in 2D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
@@ -499,10 +515,18 @@ def _visualize_topics_2d(model, reducer="umap", port=8050, dataset=None, encoder
         The function launches a Dash server to visualize the topic model.
     """
     if not hasattr(model, "embeddings"):
-        encoder = SentenceEncodingMixin()
-        embeddings = encoder.encode_documents(
-            dataset.texts, encoder_model=encoder_model, use_average=use_average
-        )
+        if dataset.has_embeddings(encoder_model):
+
+            embeddings = dataset.get_embeddings(
+                encoder_model,
+                embeddings_path,
+                embeddings_file_path,
+            )
+        else:
+            encoder = SentenceEncodingMixin()
+            embeddings = encoder.encode_documents(
+                dataset.texts, encoder_model=encoder_model, use_average=use_average
+            )
     else:
         embeddings = model.embeddings
     labels = model.labels
@@ -606,7 +630,16 @@ def _visualize_topics_2d(model, reducer="umap", port=8050, dataset=None, encoder
     app.run_server(debug=True, port=port)
 
 
-def _visualize_topics_3d(model, reducer="umap", port=8050, dataset=None, encoder_model="paraphrase-MiniLM-L3-v2", use_average=True):
+def _visualize_topics_3d(
+    model,
+    reducer="umap",
+    port=8050,
+    dataset=None,
+    encoder_model="paraphrase-MiniLM-L3-v2",
+    use_average=True,
+    embeddings_path=None,
+    embeddings_file_path=None,
+):
     """
     Visualize topics in 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
@@ -625,10 +658,18 @@ def _visualize_topics_3d(model, reducer="umap", port=8050, dataset=None, encoder
         The function launches a Dash server to visualize the topic model.
     """
     if not hasattr(model, "embeddings"):
-        encoder = SentenceEncodingMixin()
-        embeddings = encoder.encode_documents(
-            dataset.texts, encoder_model=encoder_model, use_average=use_average
-        )
+        if dataset.has_embeddings(encoder_model):
+
+            embeddings = dataset.get_embeddings(
+                encoder_model,
+                embeddings_path,
+                embeddings_file_path,
+            )
+        else:
+            encoder = SentenceEncodingMixin()
+            embeddings = encoder.encode_documents(
+                dataset.texts, encoder_model=encoder_model, use_average=use_average
+            )
     else:
         embeddings = model.embeddings
     labels = model.labels
