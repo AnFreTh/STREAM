@@ -275,11 +275,20 @@ class CBC(BaseModel):
         self.dataframe["predictions"] = self.dataframe.index.map(labels)
         self.labels = np.array(self.dataframe["predictions"])
         if np.isnan(self.labels).sum() > 0:
+            # Store the indices of NaN values
             self.dropped_indices = np.where(np.isnan(self.labels))[0]
-            self.labels = self.labels[~np.isnan(self.labels)]
-            self.dataframe = self.dataframe.dropna(subset=["predictions"])
-            print("--- dropping NaN values from topics ---")
-            print("--- dropped indices stored in self.dropped_indices ---")
+
+            # Replace NaN values with -1 in self.labels
+            self.labels[np.isnan(self.labels)] = -1
+            self.labels += 1
+
+            # Update the 'predictions' column in the dataframe with -1 where NaN was present
+            self.dataframe["predictions"] = self.dataframe["predictions"].fillna(-1)
+            self.dataframe["predictions"] += 1
+            print("--- replaced NaN values with 0 in topics ---")
+            print(
+                "--- indices of original NaN values stored in self.dropped_indices ---"
+            )
 
         docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}

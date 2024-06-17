@@ -1,104 +1,172 @@
 import torch
 import numpy as np
-from tqdm import tqdm
-from octis.models.model import AbstractModel
-from sentence_transformers import SentenceTransformer
-from ..utils.tf_idf import c_tf_idf, extract_tfidf_topics
-from ..data_utils.dataset import TMDataset
-import numpy as np
 from itertools import product
 import umap.umap_ as umap
+from .abstract_model import BaseModel
+from ..utils.encoder import SentenceEncodingMixin
+from ..utils.tf_idf import c_tf_idf, extract_tfidf_topics
+from ..data_utils.dataset import TMDataset
+from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
 
 
-class SOMTM(AbstractModel):
+class SOMTM(BaseModel, SentenceEncodingMixin):
     def __init__(
         self,
         m: int,
         n: int,
-        dim: int = None,
-        embedding_model_name: str = "all-MiniLM-L6-v2",
-        n_iterations: int = 100,
-        batch_size: int = 128,
-        lr: float = None,
-        sigma: float = None,
+        umap_args: dict = {},
+        embedding_model_name: str = "paraphrase-MiniLM-L3-v2",
         embeddings_folder_path: str = None,
         embeddings_file_path: str = None,
+        save_embeddings: bool = False,
         reduce_dim: bool = True,
         reduced_dimension: int = 16,
-        umap_args: dict = {},
-        use_softmax: bool = True,
+        dim: int = None,
+        **kwargs,
     ):
         """
-        Initialize the Self-Organizing Map for Topic modeling (SOMTM) model.
+        Initialize the Self-Organizing Map for Topic Modeling (SOMTM) model.
 
-        Parameters:
-            m (int): Number of rows in the SOM grid (default is None).
-            n (int): Number of columns in the SOM grid (default is None).
-            dim (int, optional): Dimensionality of the training inputs (default is None).
-            embedding_model_name (str, optional): Name of the SentenceTransformer embedding model (default is "all-MiniLM-L6-v2").
-            n_iterations (int, optional): Number of iterations for training (default is 100).
-            batch_size (int, optional): Batch size for training (default is 128).
-            lr (float, optional): Initial learning rate (default is None, which sets it to 0.3).
-            sigma (float, optional): Initial neighborhood value (default is None, which sets it to max(m, n) / 2).
-            embeddings_folder_path (str, optional): Path to the folder containing precomputed embeddings (default is None).
-            embeddings_file_path (str, optional): Path to the precomputed embeddings file (default is None).
-            reduce_dim (bool, optional): Whether to reduce dimensionality (default is True).
-            reduced_dimension (int, optional): Reduced dimensionality (default is 16).
-            umap_args (dict, optional): Arguments for UMAP dimensionality reduction (default is {}).
-            use_softmax (bool, optional): Whether to use softmax for mapping (default is True).
-
+        Parameters
+        ----------
+        m : int
+            Number of rows in the SOM grid.
+        n : int
+            Number of columns in the SOM grid.
+        umap_args : dict, optional
+            Arguments for UMAP dimensionality reduction (default is {}).
+        embedding_model_name : str, optional
+            Name of the SentenceTransformer embedding model (default is "paraphrase-MiniLM-L3-v2").
+        embeddings_folder_path : str, optional
+            Path to the folder containing precomputed embeddings (default is None).
+        embeddings_file_path : str, optional
+            Path to the precomputed embeddings file (default is None).
+        save_embeddings : bool, optional
+            Whether to save embeddings (default is False).
+        reduce_dim : bool, optional
+            Whether to reduce dimensionality (default is True).
+        reduced_dimension : int, optional
+            Reduced dimensionality (default is 16).
+        dim : int, optional
+            Dimensionality of the training inputs (default is None).
+        kwargs : dict
+            Additional arguments.
         """
-
-        super().__init__()
-        self.trained = False
-        self.m = m
-        self.n = n
-        if reduce_dim:
-            self.dim = reduced_dimension
-        else:
-            self.dim = dim
-        self.n_iterations = n_iterations
-        self.alpha = lr if lr is not None else 0.3
-        self.sigma = sigma if sigma is not None else max(m, n) / 2
-        self.batch_size = batch_size
-        self.use_softmax = use_softmax
-
-        self.embedding_model = SentenceTransformer(embedding_model_name)
-        self.embedding_model_name = embedding_model_name
-        self.embeddings_path = embeddings_folder_path
-        self.embeddings_file_path = embeddings_file_path
-        self.reduce_dim = reduce_dim
-
-        # Initialize weight vectors for each neuron
-        self.weights = torch.randn(m * n, self.dim)
-        self.locations = torch.tensor(list(product(range(m), range(n))))
-        self.train_history = []
-
-        self.umap_args = (
-            umap_args
-            if umap_args
-            else {
-                "n_neighbors": 15,
-                "n_components": self.dim,
-                "metric": "cosine",
-            }
+        super().__init__(**kwargs)
+        self.save_hyperparameters(
+            ignore=[
+                "embeddings_file_path",
+                "embeddings_folder_path",
+                "random_state",
+                "save_embeddings",
+            ]
         )
 
-    def _prepare_data(self):
+        self.trained = False
+        self.m = self.hparams.get("m", m)
+        self.n = self.hparams.get("n", n)
+
+        self.embedding_model_name = self.hparams.get(
+            "embedding_model_name", embedding_model_name
+        )
+        self.embeddings_path = self.hparams.get(
+            "embeddings_folder_path", embeddings_folder_path
+        )
+        self.embeddings_file_path = self.hparams.get(
+            "embeddings_file_path", embeddings_file_path
+        )
+
+        # Initialize weight vectors for each neuron
+        self.reduce_dim = self.hparams.get("reduce_dim", reduce_dim)
+        self.dim = (
+            self.hparams.get("reduced_dimension", reduced_dimension)
+            if self.reduce_dim
+            else dim
+        )
+        self.weights = torch.randn(self.m * self.n, self.dim)
+        self.locations = torch.tensor(list(product(range(self.m), range(self.n))))
+        self.train_history = []
+
+        self.umap_args = self.hparams.get(
+            "umap_args",
+            umap_args
+            or {
+                "n_neighbors": 15,
+                "n_components": 15,
+                "metric": "cosine",
+            },
+        )
+
+        self.save_embeddings = save_embeddings
+
+    def get_info(self):
+        """
+        Get information about the model.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including model name,
+            number of topics, embedding model name, UMAP arguments,
+            K-Means arguments, and training status.
+        """
+        info = {
+            "model_name": "SOMTM",
+            "num_topics": np.round(self.m * self.n),
+            "embedding_model": self.embedding_model_name,
+            "umap_args": self.umap_args,
+            "trained": self.trained,
+            "hyperparameters": self.hparams,
+        }
+        return info
+
+    def _prepare_data(self, dataset):
         """
         Prepares the dataset for clustering.
 
+        Parameters
+        ----------
+        dataset : Dataset
+            The dataset to be used for clustering.
         """
 
-        self.embeddings = self.dataset.get_embeddings(
-            self.embedding_model_name, self.embeddings_path, self.embeddings_file_path
-        )
-        self.dataframe = self.dataset.dataframe
+        if dataset.has_embeddings(self.embedding_model_name):
+
+            self.embeddings = dataset.get_embeddings(
+                self.embedding_model_name,
+                self.embeddings_path,
+                self.embeddings_file_path,
+            )
+            self.dataframe = dataset.dataframe
+
+        else:
+            self.embeddings = self.encode_documents(
+                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
+            )
+
+            if self.save_embeddings:
+                dataset.save_embeddings(
+                    self.embeddings,
+                    self.embedding_model_name,
+                    self.embeddings_path,
+                    self.embeddings_file_path,
+                )
+        self.dataframe = dataset.dataframe
 
     def _find_bmu(self, x):
         """
-        Find the Best Matching Unit (BMU) for a given vector x
+        Find the Best Matching Unit (BMU) for a given vector.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input vector.
+
+        Returns
+        -------
+        int
+            Index of the BMU.
         """
         differences = self.weights - x
         distances = torch.sum(torch.pow(differences, 2), 1)
@@ -107,17 +175,49 @@ class SOMTM(AbstractModel):
 
     def _decay_learning_rate(self, iteration):
         """
-        Decay the learning rate over time
+        Decay the learning rate over time.
+
+        Parameters
+        ----------
+        iteration : int
+            Current iteration.
+
+        Returns
+        -------
+        float
+            Decayed learning rate.
         """
         return self.alpha * (1 - (iteration / self.n_iterations))
 
     def _decay_radius(self, iteration):
         """
-        Decay the neighborhood radius over time
+        Decay the neighborhood radius over time.
+
+        Parameters
+        ----------
+        iteration : int
+            Current iteration.
+
+        Returns
+        -------
+        float
+            Decayed neighborhood radius.
         """
         return self.sigma * np.exp(-iteration / self.n_iterations)
 
     def _update_weights_batch(self, batch, bmu_indices, iteration):
+        """
+        Update the weight vectors for a batch of data.
+
+        Parameters
+        ----------
+        batch : torch.Tensor
+            Batch of input vectors.
+        bmu_indices : list of int
+            List of BMU indices for the batch.
+        iteration : int
+            Current iteration.
+        """
         lr = self._decay_learning_rate(iteration)
         rad = self._decay_radius(iteration)
         rad_squared = rad**2
@@ -141,7 +241,15 @@ class SOMTM(AbstractModel):
     def _train_batch(self, data, batch_size):
         """
         Train the SOM using mini-batches.
+
+        Parameters
+        ----------
+        data : numpy.ndarray
+            Training data.
+        batch_size : int
+            Size of each mini-batch.
         """
+        print("--- start training ---")
         n_samples = len(data)
         for iteration in tqdm(range(self.n_iterations)):
             # Shuffle data at each epoch
@@ -159,8 +267,14 @@ class SOMTM(AbstractModel):
     def _dim_reduction(self):
         """
         Reduces the dimensionality of embeddings using UMAP.
+
+        Raises
+        ------
+        ValueError
+            If an error occurs during dimensionality reduction.
         """
         try:
+            print("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
@@ -168,15 +282,28 @@ class SOMTM(AbstractModel):
 
     def _get_weights(self):
         """
-        Get the trained weights of the SOM
+        Get the trained weights of the SOM.
+
+        Returns
+        -------
+        torch.Tensor
+            Trained weight vectors.
         """
         return self.weights
 
     def _get_cluster_labels(self, data):
         """
         Assigns each data point to the closest cluster (BMU).
-        :param data: Iterable of data points.
-        :return: List of cluster indices corresponding to each data point.
+
+        Parameters
+        ----------
+        data : numpy.ndarray
+            Input data points.
+
+        Returns
+        -------
+        list of int
+            List of cluster indices corresponding to each data point.
         """
         labels = []
         for x in data:
@@ -185,40 +312,59 @@ class SOMTM(AbstractModel):
             labels.append(bmu_index.item())  # Convert tensor to integer
         return labels
 
-    def _get_topic_document_matrix(self):
-        assert (
-            self.trained
-        ), "Model must be trained before accessing the topic-document matrix."
-        # Safely get the topic-document matrix with a default value of None if not found
-        return self.output.get("topic-document-matrix", None)
-
-    def train_model(self, dataset, n_top_words: int = 10):
+    def fit(
+        self,
+        dataset: TMDataset = None,
+        n_iterations: int = 100,
+        batch_size: int = 128,
+        lr: float = None,
+        sigma: float = None,
+        use_softmax: bool = True,
+    ):
         """
-        Trains the K-Means topic model on the provided dataset.
+        Fit the SOMTM model to the dataset.
 
-        Applies sentence embedding, UMAP dimensionality reduction, and K-Means clustering
-        to the dataset to identify distinct topics within the text data.
-
-        Parameters:
-            dataset: The dataset to train the model on. It should contain the text documents.
-
-        Returns:
-            dict: A dictionary containing the identified topics and the topic-word matrix.
+        Parameters
+        ----------
+        dataset : TMDataset, optional
+            The dataset to fit the model to.
+        n_iterations : int, optional
+            Number of iterations for training (default is 100).
+        batch_size : int, optional
+            Batch size for training (default is 128).
+        lr : float, optional
+            Initial learning rate (default is None, which sets it to 0.3).
+        sigma : float, optional
+            Initial neighborhood value (default is None, which sets it to max(m, n) / 2).
+        use_softmax : bool, optional
+            Whether to use softmax for mapping (default is True).
         """
+
+        self.n_iterations = n_iterations
+        self.alpha = lr if lr is not None else 0.3
+        self.sigma = sigma if sigma is not None else max(self.m, self.n) / 2
+        self.batch_size = batch_size
+        self.use_softmax = use_softmax
+
+        self.hparams.update(
+            {
+                "n_iterations": n_iterations,
+                "batch_size": batch_size,
+                "lr": self.alpha,
+                "sigma": self.sigma,
+                "use_softmax": use_softmax,
+            }
+        )
 
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
-        self.dataset = dataset
-        print("--- preparing the dataset ---")
-        self._prepare_data()
+
+        self._prepare_data(dataset)
         if self.reduce_dim:
-            print("--- Dimensionality Reduction ---")
             self._dim_reduction()
-            print("--- start training ---")
             self._train_batch(self.reduced_embeddings, self.batch_size)
         else:
-            print("--- start training ---")
             self._train_batch(self.embeddings, self.batch_size)
 
         self.dataframe["predictions"] = self.labels
@@ -226,25 +372,76 @@ class SOMTM(AbstractModel):
             {"text": " ".join}
         )
 
-        print("--- Extracting the Topics ---")
         tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        topics = extract_tfidf_topics(tfidf, count, docs_per_topic, n=n_top_words)
+        self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-        one_hot_encoder = OneHotEncoder(
-            sparse=False
-        )  # Use sparse=False to get a dense array
+        one_hot_encoder = OneHotEncoder(sparse=False)
         predictions_one_hot = one_hot_encoder.fit_transform(
             self.dataframe[["predictions"]]
         )
 
-        # Transpose the one-hot encoded matrix to get shape (k, n)
-        topic_document_matrix = predictions_one_hot.T
-
-        self.output = {
-            "topics": [[word for word, _ in topics[key]] for key in topics],
-            "topic-word-matrix": tfidf.T,
-            "topic_dict": topics,
-            "topic-document-matrix": topic_document_matrix,  # Include the transposed one-hot encoded matrix
-        }
+        self.topic_word_distribution = tfidf.T
+        self.document_topic_distribution = predictions_one_hot.T
         self.trained = True
-        return self.output
+
+    def get_topics(self, n_words=10):
+        """
+        Retrieve the top words for each topic.
+
+        Parameters
+        ----------
+        n_words : int
+            Number of top words to retrieve for each topic.
+
+        Returns
+        -------
+        list of list of str
+            List of topics with each topic represented as a list of top words.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        return [
+            [word for word, _ in self.topic_dict[key][:n_words]]
+            for key in self.topic_dict
+        ]
+
+    def get_topic_word_matrix(self):
+        """
+        Retrieve the topic-word distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-word distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        return self.topic_word_distribution
+
+    def get_topic_document_matrix(self):
+        """
+        Retrieve the topic-document distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-document distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if not self.trained:
+            raise ValueError("Model has not been trained yet.")
+        return self.topic_document_matrix
