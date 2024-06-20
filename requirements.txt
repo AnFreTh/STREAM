@@ -24,3 +24,4 @@ pytorch_lightning
 torch
 langdetect
 hdbscan
+loguru
