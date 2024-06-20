@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 
 # Function to read the contents of the requirements.txt file
@@ -9,8 +9,9 @@ def read_requirements():
 
 setup(
     name="stream",
-    version="0.1.0",
-    packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
+    version="0.1.0.9002",
+    packages=find_packages(
+        exclude=["examples", "examples.*", "tests", "tests.*"]),
     install_requires=read_requirements(),
     include_package_data=True,
     package_data={
