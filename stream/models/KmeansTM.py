@@ -1,12 +1,17 @@
 import numpy as np
 import umap.umap_ as umap
+from loguru import logger
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
-from .base import BaseModel
+from .base import BaseModel, TrainingStatus
 from .mixins import SentenceEncodingMixin
+
+MODEL_NAME = "KmeansTM"
+EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
+logger.add("{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class KmeansTM(BaseModel, SentenceEncodingMixin):
@@ -53,7 +58,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
 
     def __init__(
         self,
-        embedding_model_name: str = "paraphrase-MiniLM-L3-v2",
+        embedding_model_name: str = EMBEDDING_MODEL_NAME,
         umap_args: dict = {},
         kmeans_args: dict = {},
         random_state: int = None,
@@ -113,9 +118,10 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
 
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
-        self.trained = False
         self.save_embeddings = save_embeddings
         self.n_topics = None
+
+        self._status = TrainingStatus.NOT_STARTED
 
     def get_info(self):
         """
@@ -129,12 +135,12 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             K-Means arguments, and training status.
         """
         info = {
-            "model_name": "KmeansTM",
+            "model_name": MODEL_NAME,
             "num_topics": self.n_topics,
             "embedding_model": self.embedding_model_name,
             "umap_args": self.umap_args,
             "kmeans_args": self.kmeans_args,
-            "trained": self.trained,
+            "trained": self._status.name,
         }
         return info
 
@@ -171,6 +177,23 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 )
         self.dataframe = dataset.dataframe
 
+    def _dim_reduction(self):
+        """
+        Reduces the dimensionality of embeddings using UMAP.
+
+        Raises
+        ------
+        ValueError
+            If an error occurs during dimensionality reduction.
+        """
+        try:
+            logger.info("--- Reducing dimensions ---")
+            self.reducer = umap.UMAP(**self.umap_args)
+            self.reduced_embeddings = self.reducer.fit_transform(
+                self.embeddings)
+        except Exception as e:
+            raise RuntimeError(f"Error in dimensionality reduction: {e}")
+
     def _clustering(self):
         """
         Applies K-Means clustering to the reduced embeddings.
@@ -186,7 +209,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         ), "Reduced embeddings must be generated before clustering."
 
         try:
-            print("--- Creating document cluster ---")
+            logger.info("--- Creating document cluster ---")
             self.clustering_model = KMeans(
                 n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
@@ -201,24 +224,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 self.topic_centroids.append(mean_embedding)
 
         except Exception as e:
-            raise ValueError(f"Error in clustering: {e}")
-
-    def _dim_reduction(self):
-        """
-        Reduces the dimensionality of embeddings using UMAP.
-
-        Raises
-        ------
-        ValueError
-            If an error occurs during dimensionality reduction.
-        """
-        try:
-            print("--- Reducing dimensions ---")
-            self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(
-                self.embeddings)
-        except Exception as e:
-            raise ValueError(f"Error in dimensionality reduction: {e}")
+            raise RuntimeError(f"Error in clustering: {e}")
 
     def fit(self, dataset: TMDataset = None, n_topics: int = 20):
         """
@@ -243,28 +249,47 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
 
         self.n_topics = n_topics
 
-        self._prepare_data(dataset)
-        self._dim_reduction()
-        self._clustering()
+        if self.n_topics <= 0:
+            raise ValueError("Number of topics must be greater than 0.")
 
-        self.dataframe["predictions"] = self.labels
-        docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
-            {"text": " ".join}
-        )
+        self._status = TrainingStatus.INITIALIZED
 
-        tfidf, count = c_tf_idf(
-            docs_per_topic["text"].values, m=len(self.dataframe))
-        self.topic_dict = extract_tfidf_topics(
-            tfidf, count, docs_per_topic, n=100)
+        try:
+            logger.info("Training K-Means topic model.")
+            self._status = TrainingStatus.RUNNING
+            self._prepare_data(dataset)
+            self._dim_reduction()
+            self._clustering()
 
-        one_hot_encoder = OneHotEncoder(sparse=False)
-        predictions_one_hot = one_hot_encoder.fit_transform(
-            self.dataframe[["predictions"]]
-        )
+            self.dataframe["predictions"] = self.labels
+            docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
+                {"text": " ".join}
+            )
 
-        self.topic_word_distribution = tfidf.T
-        self.document_topic_distribution = predictions_one_hot.T
-        self.trained = True
+            tfidf, count = c_tf_idf(
+                docs_per_topic["text"].values, m=len(self.dataframe))
+            self.topic_dict = extract_tfidf_topics(
+                tfidf, count, docs_per_topic, n=100)
+
+            one_hot_encoder = OneHotEncoder(sparse=False)
+            predictions_one_hot = one_hot_encoder.fit_transform(
+                self.dataframe[["predictions"]]
+            )
+
+            self.topic_word_distribution = tfidf.T
+            self.document_topic_distribution = predictions_one_hot.T
+
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
+
+        logger.info("Training completed successfully.")
+        self._status = TrainingStatus.SUCCEEDED
 
     def predict(self, texts):
         """
@@ -285,8 +310,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         embeddings = self.encode_documents(
             texts, encoder_model=self.embedding_model_name, use_average=True
         )
@@ -313,8 +338,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return [
             [word for word, _ in self.topic_dict[key][:n_words]]
             for key in self.topic_dict
@@ -334,8 +359,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return self.topic_word_distribution
 
     def get_topic_document_matrix(self):
@@ -352,6 +377,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return self.topic_document_matrix
