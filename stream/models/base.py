@@ -2,6 +2,26 @@ import json
 import os
 import pickle
 from abc import ABC, abstractmethod
+from enum import Enum
+
+
+class TrainingStatus(str, Enum):
+    """
+    Represents the status of a training process.
+
+    Attributes:
+        INITIALIZED (str): The training process has been initialized.
+        RUNNING (str): The training process is currently running.
+        SUCCEEDED (str): The training process has successfully completed.
+        INTERRUPTED (str): The training process was interrupted.
+        FAILED (str): The training process has failed.
+    """
+    NOT_STARTED = 'empty'
+    INITIALIZED = 'initialized'
+    RUNNING = 'running'
+    SUCCEEDED = 'succeeded'
+    INTERRUPTED = 'interrupted'
+    FAILED = 'failed'
 
 
 class BaseModel(ABC):
