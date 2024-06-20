@@ -4,12 +4,12 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-from torch import nn
-from torch import optim
+from octis.models.early_stopping.pytorchtools import EarlyStopping
+from torch import nn, optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
+
 from .decoding_network import DecoderNetwork
-from octis.models.early_stopping.pytorchtools import EarlyStopping
 
 
 class CTMNModel(object):
@@ -66,8 +66,10 @@ class CTMNModel(object):
         assert (
             isinstance(num_topics, int) or isinstance(num_topics, np.int64)
         ) and num_topics > 0, "num_topics must by type int > 0."
-        assert model_type in ["LDA", "prodLDA"], "model must be 'LDA' or 'prodLDA'."
-        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert model_type in [
+            "LDA", "prodLDA"], "model must be 'LDA' or 'prodLDA'."
+        assert isinstance(
+            hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",
@@ -143,7 +145,8 @@ class CTMNModel(object):
             self.topic_prior_variance,
             topic_perturb=self.topic_perturb,
         )
-        self.early_stopping = EarlyStopping(patience=5, verbose=False, delta=-3)
+        self.early_stopping = EarlyStopping(
+            patience=5, verbose=False, delta=-3)
         # init optimizer
         if self.solver == "adam":
             self.optimizer = optim.Adam(
@@ -207,13 +210,15 @@ class CTMNModel(object):
         var_division = torch.sum(posterior_variance / prior_variance, dim=1)
         # diff means term
         diff_means = prior_mean - posterior_mean
-        diff_term = torch.sum((diff_means * diff_means) / prior_variance, dim=1)
+        diff_term = torch.sum(
+            (diff_means * diff_means) / prior_variance, dim=1)
         # logvar det division term
         logvar_det_division = prior_variance.log().sum() - posterior_log_variance.sum(
             dim=1
         )
         # combine terms
-        KL = 0.5 * (var_division + diff_term - self.num_topics + logvar_det_division)
+        KL = 0.5 * (var_division + diff_term -
+                    self.num_topics + logvar_det_division)
         # Reconstruction term
         RL = -torch.sum(inputs * torch.log(word_dists + 1e-10), dim=1)
 
@@ -391,7 +396,8 @@ class CTMNModel(object):
             self.nn_epoch = epoch
             # train epoch
             s = datetime.datetime.now()
-            sp, train_loss, topic_word, topic_document = self._train_epoch(train_loader)
+            sp, train_loss, topic_word, topic_document = self._train_epoch(
+                train_loader)
             samples_processed += sp
             e = datetime.datetime.now()
 
@@ -421,7 +427,8 @@ class CTMNModel(object):
                 )
                 # train epoch
                 s = datetime.datetime.now()
-                val_samples_processed, val_loss = self._validation(validation_loader)
+                val_samples_processed, val_loss = self._validation(
+                    validation_loader)
                 e = datetime.datetime.now()
 
                 if verbose:
@@ -477,7 +484,8 @@ class CTMNModel(object):
                 topic_document_mat.append(topic_document)
 
         results = self.get_info()
-        results["test-topic-document-matrix"] = np.asarray(self.get_thetas(dataset)).T
+        results["test-topic-document-matrix"] = np.asarray(
+            self.get_thetas(dataset)).T
 
         return results
 
@@ -519,7 +527,8 @@ class CTMNModel(object):
         topic_document_dist = self.get_topic_document_mat()
         info["topics"] = topic_word
 
-        info["topic-document-matrix"] = np.asarray(self.get_thetas(self.train_data)).T
+        info["topic-document-matrix"] = np.asarray(
+            self.get_thetas(self.train_data)).T
 
         info["topic-word-matrix"] = topic_word_dist
         return info

@@ -1,12 +1,13 @@
+import hdbscan
+import numpy as np
+import pandas as pd
 import umap.umap_ as umap
 from octis.models.model import AbstractModel
 from sentence_transformers import SentenceTransformer
-import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
-from ..utils.tf_idf import c_tf_idf, extract_tfidf_topics
-from ..data_utils.dataset import TMDataset
-import numpy as np
-import hdbscan
+
+from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..utils.dataset import TMDataset
 
 
 class BERTopicTM(AbstractModel):
@@ -111,7 +112,8 @@ class BERTopicTM(AbstractModel):
         """
         try:
             self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
+            self.reduced_embeddings = self.reducer.fit_transform(
+                self.embeddings)
         except Exception as e:
             raise ValueError(f"Error in dimensionality reduction: {e}")
 
@@ -162,7 +164,8 @@ class BERTopicTM(AbstractModel):
         )
 
         print("--- Extracting the Topics ---")
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
+        tfidf, count = c_tf_idf(
+            docs_per_topic["text"].values, m=len(self.dataframe))
         topics = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(
@@ -179,7 +182,8 @@ class BERTopicTM(AbstractModel):
             "topics": [[word for word, _ in topics[key]] for key in topics],
             "topic-word-matrix": tfidf.T,
             "topic_dict": topics,
-            "topic-document-matrix": topic_document_matrix,  # Include the transposed one-hot encoded matrix
+            # Include the transposed one-hot encoded matrix
+            "topic-document-matrix": topic_document_matrix,
         }
         self.trained = True
         return self.output

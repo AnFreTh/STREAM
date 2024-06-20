@@ -1,9 +1,10 @@
 """PyTorch class for feed foward inference network."""
 
 from collections import OrderedDict
-from torch import nn
-import torch
+
 import numpy as np
+import torch
+from torch import nn
 
 
 class ContextualInferenceNetwork(nn.Module):
@@ -31,7 +32,8 @@ class ContextualInferenceNetwork(nn.Module):
         super(ContextualInferenceNetwork, self).__init__()
         assert isinstance(input_size, int), "input_size must by type int."
         assert isinstance(output_size, int), "output_size must be type int."
-        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert isinstance(
+            hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",
@@ -134,7 +136,8 @@ class CombinedInferenceNetwork(nn.Module):
         assert isinstance(output_size, int) or isinstance(
             output_size, np.int64
         ), "output_size must be type int."
-        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert isinstance(
+            hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",

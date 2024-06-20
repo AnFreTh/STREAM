@@ -1,14 +1,12 @@
 """PyTorch class for feed foward AVITM network."""
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-import numpy as np
 
-from .encoding_network import (
-    CombinedInferenceNetwork,
-    ContextualInferenceNetwork,
-)
+from .encoding_network import (CombinedInferenceNetwork,
+                               ContextualInferenceNetwork)
 
 
 class DecoderNetwork(nn.Module):
@@ -47,8 +45,10 @@ class DecoderNetwork(nn.Module):
         assert (
             isinstance(n_components, int) or isinstance(n_components, np.int64)
         ) and n_components > 0, "n_components must be type int > 0."
-        assert model_type in ["prodLDA", "LDA"], "model type must be 'prodLDA' or 'LDA'"
-        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert model_type in ["prodLDA",
+                              "LDA"], "model type must be 'prodLDA' or 'LDA'"
+        assert isinstance(
+            hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",
@@ -109,7 +109,8 @@ class DecoderNetwork(nn.Module):
         # \alpha = 1 \forall \alpha
         if topic_prior_variance is None:
             topic_prior_variance = 1.0 - (1.0 / self.n_components)
-        self.prior_variance = torch.tensor([topic_prior_variance] * n_components)
+        self.prior_variance = torch.tensor(
+            [topic_prior_variance] * n_components)
         if torch.cuda.is_available():
             self.prior_variance = self.prior_variance.cuda()
         if self.learn_priors:
@@ -159,7 +160,8 @@ class DecoderNetwork(nn.Module):
         posterior_sigma = torch.exp(posterior_log_sigma)
 
         # generate samples from theta
-        theta = F.softmax(self.reparameterize(posterior_mu, posterior_log_sigma), dim=1)
+        theta = F.softmax(self.reparameterize(
+            posterior_mu, posterior_log_sigma), dim=1)
 
         topic_doc = theta
         # theta = self.drop_theta(theta)

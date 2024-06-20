@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
 import json
 import os
 import pickle
+from abc import ABC, abstractmethod
 
 
 class BaseModel(ABC):
@@ -137,7 +137,8 @@ class BaseModel(ABC):
         Parameters:
             ignore (list, optional): List of keys to ignore while saving hyperparameters. Defaults to [].
         """
-        self.hparams = {k: v for k, v in self.hparams.items() if k not in ignore}
+        self.hparams = {k: v for k, v in self.hparams.items()
+                        if k not in ignore}
         for key, value in self.hparams.items():
             setattr(self, key, value)
 
@@ -152,7 +153,8 @@ class BaseModel(ABC):
             with open(path, "r") as file:
                 self.hparams = json.load(file)
         else:
-            raise FileNotFoundError(f"Hyperparameters file not found at: {path}")
+            raise FileNotFoundError(
+                f"Hyperparameters file not found at: {path}")
 
     def get_hyperparameters(self):
         """

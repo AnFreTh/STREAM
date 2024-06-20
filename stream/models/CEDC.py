@@ -1,13 +1,14 @@
-import umap.umap_ as umap
-from .abstract_model import BaseModel
-from ..utils.encoder import SentenceEncodingMixin
-from ..utils.topic_extraction import TopicExtractor
-from ..utils.cleaning import clean_topics
-from ..data_utils.dataset import TMDataset
-import pandas as pd
 import numpy as np
-from sklearn.mixture import GaussianMixture
+import pandas as pd
+import umap.umap_ as umap
 from sentence_transformers import SentenceTransformer
+from sklearn.mixture import GaussianMixture
+
+from ..preprocessor._cleaning import clean_topics
+from ..preprocessor.topic_extraction import TopicExtractor
+from ..utils.dataset import TMDataset
+from .base import BaseModel
+from .mixins import SentenceEncodingMixin
 
 data_dir = "../preprocessed_datasets"
 
@@ -198,7 +199,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -228,7 +230,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             print("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
+            self.reduced_embeddings = self.reducer.fit_transform(
+                self.embeddings)
         except Exception as e:
             raise ValueError(f"Error in dimensionality reduction: {e}")
 
@@ -407,7 +410,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         if not self.trained:
             raise ValueError("Model has not been trained yet.")
         # Extract all unique words and sort them
-        all_words = set(word for topic in topic_dict.values() for word, _ in topic)
+        all_words = set(word for topic in topic_dict.values()
+                        for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns

@@ -1,13 +1,15 @@
-import torch
-import numpy as np
 from itertools import product
+
+import numpy as np
+import torch
 import umap.umap_ as umap
-from .abstract_model import BaseModel
-from ..utils.encoder import SentenceEncodingMixin
-from ..utils.tf_idf import c_tf_idf, extract_tfidf_topics
-from ..data_utils.dataset import TMDataset
-from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
+from tqdm import tqdm
+
+from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..utils.dataset import TMDataset
+from .base import BaseModel
+from .mixins import SentenceEncodingMixin
 
 
 class SOMTM(BaseModel, SentenceEncodingMixin):
@@ -85,7 +87,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             else dim
         )
         self.weights = torch.randn(self.m * self.n, self.dim)
-        self.locations = torch.tensor(list(product(range(self.m), range(self.n))))
+        self.locations = torch.tensor(
+            list(product(range(self.m), range(self.n))))
         self.train_history = []
 
         self.umap_args = self.hparams.get(
@@ -256,11 +259,12 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             np.random.shuffle(data)
 
             for i in range(0, n_samples, batch_size):
-                batch = data[i : i + batch_size]
+                batch = data[i: i + batch_size]
                 batch_tensor = torch.tensor(batch)
                 bmu_indices = [self._find_bmu(x) for x in batch_tensor]
 
-                self._update_weights_batch(batch_tensor, bmu_indices, iteration)
+                self._update_weights_batch(
+                    batch_tensor, bmu_indices, iteration)
 
         self.labels = self._get_cluster_labels(data)
 
@@ -276,7 +280,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         try:
             print("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
+            self.reduced_embeddings = self.reducer.fit_transform(
+                self.embeddings)
         except Exception as e:
             raise ValueError(f"Error in dimensionality reduction: {e}")
 
@@ -372,8 +377,10 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             {"text": " ".join}
         )
 
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+        tfidf, count = c_tf_idf(
+            docs_per_topic["text"].values, m=len(self.dataframe))
+        self.topic_dict = extract_tfidf_topics(
+            tfidf, count, docs_per_topic, n=100)
 
         one_hot_encoder = OneHotEncoder(sparse=False)
         predictions_one_hot = one_hot_encoder.fit_transform(

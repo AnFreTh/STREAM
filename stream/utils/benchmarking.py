@@ -1,7 +1,9 @@
-from typing import List, Dict, Any, Callable, Optional
 from inspect import signature
-from ..data_utils.dataset import TMDataset
+from typing import Any, Callable, Dict, List, Optional
+
 import numpy as np
+
+from .dataset import TMDataset
 
 
 def benchmarking(
@@ -47,7 +49,8 @@ def benchmarking(
             if "measure" in metric_params:
                 m_args.setdefault("measure", "u_mass")
             # Initialize metric with specific arguments
-            filtered_m_args = {k: v for k, v in m_args.items() if k in metric_params}
+            filtered_m_args = {k: v for k,
+                               v in m_args.items() if k in metric_params}
             metric_instances.append(metric(**filtered_m_args))
 
         except Exception as e:
@@ -77,7 +80,8 @@ def benchmarking(
 
         # Initialize model with specific arguments, using only keys that exist in model's constructor
         model_init_params = signature(model).parameters
-        filtered_args = {k: v for k, v in args.items() if k in model_init_params}
+        filtered_args = {k: v for k,
+                         v in args.items() if k in model_init_params}
         initialized_model = model(**filtered_args)
         output = initialized_model.train_model(dataset)
 

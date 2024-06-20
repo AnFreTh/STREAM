@@ -1,11 +1,12 @@
-import unittest
-import numpy as np
 import random
 import string
-from unittest.mock import patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, patch
+
+import numpy as np
 
 from stream.metrics.coherence_metrics import NPMI
-from stream.data_utils.dataset import TMDataset
+from stream.utils.dataset import TMDataset
 
 
 class TestNPMI(unittest.TestCase):
@@ -18,8 +19,10 @@ class TestNPMI(unittest.TestCase):
         self.mock_dataset = MagicMock(spec=TMDataset)
         text_data = [
             " ".join(
-                "".join(random.choices(string.ascii_lowercase, k=random.randint(1, 15)))
-                for _ in range(random.randint(5, 10))  # Each document has 5-10 words
+                "".join(random.choices(
+                    string.ascii_lowercase, k=random.randint(1, 15)))
+                # Each document has 5-10 words
+                for _ in range(random.randint(5, 10))
             )
             for _ in range(self.n_documents)  # 50 documents
         ]
@@ -29,16 +32,18 @@ class TestNPMI(unittest.TestCase):
             set(word for text in text_data for word in text.split())
         )
 
-        self.mock_dataset.get_corpus = lambda: [text.split() for text in text_data]
+        self.mock_dataset.get_corpus = lambda: [
+            text.split() for text in text_data]
 
-        unique_words = list(set(word for text in text_data for word in text.split()))
+        unique_words = list(
+            set(word for text in text_data for word in text.split()))
         random.shuffle(unique_words)
 
         # Creating mock model output with different topics
         self.mock_model_output = {
             "topics": [
                 unique_words[
-                    i * self.n_words_per_topic : (i + 1) * self.n_words_per_topic
+                    i * self.n_words_per_topic: (i + 1) * self.n_words_per_topic
                 ]
                 for i in range(self.n_topics)
             ],

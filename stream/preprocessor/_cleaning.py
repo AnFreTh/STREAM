@@ -1,7 +1,8 @@
-from .embedder import BaseEmbedder
 import numpy as np
-from tqdm import tqdm
 from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
+
+from ._embedder import BaseEmbedder
 
 
 def clean_topics(topics, embedding_model, similarity=0.75):
@@ -37,7 +38,8 @@ def clean_topics(topics, embedding_model, similarity=0.75):
     # iterate through every topic
     for topic in tqdm(range(len(topics))):
         # extract words from topics
-        keys = [word for t in topics[topic] for word in t if isinstance(word, str)]
+        keys = [word for t in topics[topic]
+                for word in t if isinstance(word, str)]
 
         keys_ = word_embedding_model.create_word_embeddings(keys)
 
@@ -68,13 +70,15 @@ def clean_topics(topics, embedding_model, similarity=0.75):
     topic_mean_embeddings = []
     for k in range(len(dict_tops)):
         temp = 0
-        words = [word for t in dict_tops[k] for word in t if isinstance(word, str)]
+        words = [word for t in dict_tops[k]
+                 for word in t if isinstance(word, str)]
         weights = [
             weight for t in dict_tops[k] for weight in t if isinstance(weight, float)
         ]
         weights = [weight / sum(weights) for weight in weights]
         for i in range(len(words)):
-            temp += word_embedding_model.create_word_embeddings(words[i]) * weights[i]
+            temp += word_embedding_model.create_word_embeddings(
+                words[i]) * weights[i]
         temp /= len(words)
         topic_mean_embeddings.append(temp)
 

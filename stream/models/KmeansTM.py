@@ -1,11 +1,12 @@
-from sklearn.cluster import KMeans
-from ..data_utils.dataset import TMDataset
-import umap.umap_ as umap
-from sklearn.preprocessing import OneHotEncoder
 import numpy as np
-from ..utils.tf_idf import c_tf_idf, extract_tfidf_topics
-from .abstract_model import BaseModel
-from ..utils.encoder import SentenceEncodingMixin
+import umap.umap_ as umap
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import OneHotEncoder
+
+from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..utils.dataset import TMDataset
+from .base import BaseModel
+from .mixins import SentenceEncodingMixin
 
 
 class KmeansTM(BaseModel, SentenceEncodingMixin):
@@ -180,12 +181,14 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
             print("--- Creating document cluster ---")
-            self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
+            self.clustering_model = KMeans(
+                n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
 
@@ -212,7 +215,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             print("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
+            self.reduced_embeddings = self.reducer.fit_transform(
+                self.embeddings)
         except Exception as e:
             raise ValueError(f"Error in dimensionality reduction: {e}")
 
@@ -248,8 +252,10 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             {"text": " ".join}
         )
 
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+        tfidf, count = c_tf_idf(
+            docs_per_topic["text"].values, m=len(self.dataframe))
+        self.topic_dict = extract_tfidf_topics(
+            tfidf, count, docs_per_topic, n=100)
 
         one_hot_encoder = OneHotEncoder(sparse=False)
         predictions_one_hot = one_hot_encoder.fit_transform(

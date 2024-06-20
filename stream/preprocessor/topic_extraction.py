@@ -1,14 +1,16 @@
-from octis.dataset.dataset import Dataset as OCDataset
-from .embedder import BaseEmbedder
+import re
+from itertools import compress
+
 import numpy as np
 import pandas as pd
-from nltk import pos_tag
-import re
-from nltk.corpus import words as eng_dict
-from nltk.corpus import brown as nltk_words
-from numpy.linalg import norm
-from itertools import compress
 from gensim.models.keyedvectors import Word2VecKeyedVectors
+from nltk import pos_tag
+from nltk.corpus import brown as nltk_words
+from nltk.corpus import words as eng_dict
+from numpy.linalg import norm
+from octis.dataset.dataset import Dataset as OCDataset
+
+from ._embedder import BaseEmbedder
 
 
 class TopicExtractor:
@@ -46,7 +48,7 @@ class TopicExtractor:
         """
 
         # define whether word is a noun
-        is_noun = lambda pos: pos[:2] == "NN"
+        def is_noun(pos): return pos[:2] == "NN"
 
         data_dir = "./preprocessed_datasets"
 
@@ -54,11 +56,13 @@ class TopicExtractor:
         if corpus == "brown":
             word_list = nltk_words.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word)
+                         for word in word_list]
         elif corpus == "words":
             word_list = eng_dict.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word)
+                         for word in word_list]
         elif corpus == "octis":
             data = OCDataset()
             data.fetch_dataset("20NewsGroup")
@@ -68,21 +72,23 @@ class TopicExtractor:
             data.fetch_dataset("BBC_News")
             word_list += data.get_vocabulary()
 
-            ############# include reuters etc datasets
+            # include reuters etc datasets
             # data.load_custom_dataset_from_folder(data_dir + "/GN")
             # word_list += data.get_vocabulary()
 
             word_list += self.dataset.get_vocabulary()
 
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word)
+                         for word in word_list]
         else:
             raise ValueError(
                 "There are no words to be extracted for the Topics: Please specify a corpus"
             )
 
         if only_nouns:
-            word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
+            word_list = [word for (word, pos) in pos_tag(
+                word_list) if is_noun(pos)]
         else:
             word_list = [word for (word, pos) in pos_tag(word_list)]
 

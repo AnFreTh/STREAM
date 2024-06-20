@@ -1,13 +1,14 @@
 import re
 import unicodedata
 from typing import List, Set
+
+import nltk
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer, PorterStemmer
 from nltk.tokenize.treebank import TreebankWordDetokenizer
-import nltk
 from tqdm import tqdm
 
 nltk.download("punkt")

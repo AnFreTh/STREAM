@@ -1,9 +1,11 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import pandas as pd
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pandas as pd
+
 from stream.models.KmeansTM import KmeansTM
-from stream.data_utils.dataset import TMDataset
+from stream.utils.dataset import TMDataset
 
 
 class TestKmeansTM(unittest.TestCase):
@@ -11,7 +13,8 @@ class TestKmeansTM(unittest.TestCase):
         # Mock the TMDataset with initial embeddings of shape (25, 128)
         self.mock_dataset = MagicMock(spec=TMDataset)
         self.mock_dataset.get_embeddings.return_value = np.random.rand(25, 128)
-        self.mock_dataset.dataframe = pd.DataFrame({"text": ["sample text"] * 25})
+        self.mock_dataset.dataframe = pd.DataFrame(
+            {"text": ["sample text"] * 25})
 
         # Initialize the KmeansTM model
         self.model = KmeansTM(num_topics=10)

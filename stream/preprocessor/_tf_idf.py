@@ -1,5 +1,5 @@
-from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 def c_tf_idf(documents, m, ngram_range=(1, 1)):
@@ -43,7 +43,8 @@ def extract_tfidf_topics(tf_idf, count, docs_per_topic, n=10):
     tf_idf_transposed = tf_idf.T
     indices = tf_idf_transposed.argsort()[:, -n:]
     top_n_words = {
-        label: [((words[j]), (tf_idf_transposed[i][j])) for j in indices[i]][::-1]
+        label: [((words[j]), (tf_idf_transposed[i][j]))
+                for j in indices[i]][::-1]
         for i, label in enumerate(labels)
     }
 
