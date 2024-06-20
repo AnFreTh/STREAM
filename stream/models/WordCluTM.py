@@ -1,11 +1,12 @@
-from gensim.models import Word2Vec
-import umap.umap_ as umap
-from octis.models.model import AbstractModel
 import numpy as np
-from ..data_utils.dataset import TMDataset
-from ..utils.embedder import BaseEmbedder, GensimBackend
-from sklearn.mixture import GaussianMixture
 import pandas as pd
+import umap.umap_ as umap
+from gensim.models import Word2Vec
+from octis.models.model import AbstractModel
+from sklearn.mixture import GaussianMixture
+
+from ..preprocessor._embedder import BaseEmbedder, GensimBackend
+from ..utils.dataset import TMDataset
 
 
 class WordCluTM(AbstractModel):
@@ -92,7 +93,8 @@ class WordCluTM(AbstractModel):
         )
 
         # Initialize BaseEmbedder with GensimBackend
-        self.base_embedder = BaseEmbedder(GensimBackend(self.word2vec_model.wv))
+        self.base_embedder = BaseEmbedder(
+            GensimBackend(self.word2vec_model.wv))
 
     def _clustering(self):
         """
@@ -102,7 +104,8 @@ class WordCluTM(AbstractModel):
             tuple: Soft labels and hard labels of the clusters.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
@@ -156,7 +159,8 @@ class WordCluTM(AbstractModel):
         self.train_word2vec(sentences, word2vec_epochs)  # Train Word2Vec model
 
         print("--- Compute Word Embeddings ---")
-        unique_words = list(set(word for sentence in sentences for word in sentence))
+        unique_words = list(
+            set(word for sentence in sentences for word in sentence))
         word_to_index = {word: i for i, word in enumerate(unique_words)}
         word_embeddings = np.array(
             [
@@ -259,7 +263,8 @@ class WordCluTM(AbstractModel):
             # Average the scores for each label and store them
             for label in doc_scores:
                 if doc_scores[label]:  # Check if there are any scores to average
-                    document_scores_per_label[label].append(np.mean(doc_scores[label]))
+                    document_scores_per_label[label].append(
+                        np.mean(doc_scores[label]))
                 else:
                     # If no scores for this label, you might want to set a default value
                     document_scores_per_label[label].append(0)

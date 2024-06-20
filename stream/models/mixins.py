@@ -1,6 +1,7 @@
 from typing import List
-from sentence_transformers import SentenceTransformer
+
 import numpy as np
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 
@@ -59,6 +60,6 @@ class SentenceEncodingMixin:
         """
         segments = []
         for start in range(0, len(document), max_length):
-            segment = document[start : start + max_length]
+            segment = document[start: start + max_length]
             segments.append(segment)
         return segments

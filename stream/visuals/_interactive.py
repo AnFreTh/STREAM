@@ -1,15 +1,16 @@
-import umap.umap_ as umap
-import plotly.express as px
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 import dash
-from dash import dcc, html, Input, Output
-import plotly.graph_objs as go
 import numpy as np
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objs as go
+import umap.umap_ as umap
+from dash import Input, Output, dcc, html
 from scipy.spatial.distance import cosine
-from ..utils.encoder import SentenceEncodingMixin
+from sklearn.decomposition import PCA
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.manifold import TSNE
+
+from ..models.mixins import SentenceEncodingMixin
 
 
 def calculate_distances_to_other_topics(selected_topic_index, plot_df, model):
@@ -530,7 +531,8 @@ def _visualize_topics_2d(
     else:
         embeddings = model.embeddings
     labels = model.labels
-    top_words_per_document = get_top_tfidf_words_per_document(model.dataframe["text"])
+    top_words_per_document = get_top_tfidf_words_per_document(
+        model.dataframe["text"])
 
     # Reduce embeddings to 2D for visualization
     if reducer == "umap":
@@ -582,7 +584,8 @@ def _visualize_topics_2d(
     # Callback for updating scatter plot
     @app.callback(
         Output("scatter-plot", "figure"),
-        [Input("num-top-words-slider", "value"), Input("topic-dropdown", "value")],
+        [Input("num-top-words-slider", "value"),
+         Input("topic-dropdown", "value")],
     )
     def update_plot(num_top_words, selected_topic):
         if selected_topic == "All":
@@ -599,7 +602,8 @@ def _visualize_topics_2d(
 
         plot_df["top_words"] = [
             "<br>".join(
-                [f"{word} ({score:.2f})" for word, score in words[:num_top_words]]
+                [f"{word} ({score:.2f})" for word,
+                 score in words[:num_top_words]]
             )
             for words in filtered_top_words
         ]
@@ -673,7 +677,8 @@ def _visualize_topics_3d(
     else:
         embeddings = model.embeddings
     labels = model.labels
-    top_words_per_document = get_top_tfidf_words_per_document(model.dataframe["text"])
+    top_words_per_document = get_top_tfidf_words_per_document(
+        model.dataframe["text"])
 
     # Reduce embeddings to 3D for visualization
     if reducer == "umap":
@@ -725,7 +730,8 @@ def _visualize_topics_3d(
     # Callback for updating scatter plot
     @app.callback(
         Output("scatter-plot", "figure"),
-        [Input("num-top-words-slider", "value"), Input("topic-dropdown", "value")],
+        [Input("num-top-words-slider", "value"),
+         Input("topic-dropdown", "value")],
     )
     def update_plot(num_top_words, selected_topic):
         if selected_topic == "All":
@@ -742,7 +748,8 @@ def _visualize_topics_3d(
 
         plot_df["top_words"] = [
             "<br>".join(
-                [f"{word} ({score:.2f})" for word, score in words[:num_top_words]]
+                [f"{word} ({score:.2f})" for word,
+                 score in words[:num_top_words]]
             )
             for words in filtered_top_words
         ]

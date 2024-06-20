@@ -1,9 +1,10 @@
-from typing import List
 import re
-import pandas as pd
 from collections.abc import Iterable
-from gensim.models.keyedvectors import Word2VecKeyedVectors
+from typing import List
+
 import numpy as np
+import pandas as pd
+from gensim.models.keyedvectors import Word2VecKeyedVectors
 from tqdm import tqdm
 
 
@@ -133,7 +134,8 @@ class BaseEmbedder:
         """
         if isinstance(documents, Iterable) and not isinstance(documents, str):
             if not any([isinstance(doc, str) for doc in documents]):
-                raise TypeError("Make sure that the iterable only contains strings.")
+                raise TypeError(
+                    "Make sure that the iterable only contains strings.")
 
         else:
             raise TypeError(
@@ -160,9 +162,12 @@ class BaseEmbedder:
             documents["docs"].loc[i] = re.compile(r"[/(){}\[\]\|@,;]").sub(
                 "", documents["docs"][i]
             )
-            documents["docs"].loc[i] = re.compile(r"\\").sub("", documents["docs"][i])
-            documents["docs"].loc[i] = re.compile("'").sub("", documents["docs"][i])
-            documents["docs"].loc[i] = re.compile("  ").sub(" ", documents["docs"][i])
+            documents["docs"].loc[i] = re.compile(
+                r"\\").sub("", documents["docs"][i])
+            documents["docs"].loc[i] = re.compile(
+                "'").sub("", documents["docs"][i])
+            documents["docs"].loc[i] = re.compile(
+                "  ").sub(" ", documents["docs"][i])
         documents["docs"] = documents["docs"].str.lower()
 
         return documents
