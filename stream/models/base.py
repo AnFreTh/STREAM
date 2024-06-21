@@ -4,24 +4,7 @@ import pickle
 from abc import ABC, abstractmethod
 from enum import Enum
 
-
-class TrainingStatus(str, Enum):
-    """
-    Represents the status of a training process.
-
-    Attributes:
-        INITIALIZED (str): The training process has been initialized.
-        RUNNING (str): The training process is currently running.
-        SUCCEEDED (str): The training process has successfully completed.
-        INTERRUPTED (str): The training process was interrupted.
-        FAILED (str): The training process has failed.
-    """
-    NOT_STARTED = 'empty'
-    INITIALIZED = 'initialized'
-    RUNNING = 'running'
-    SUCCEEDED = 'succeeded'
-    INTERRUPTED = 'interrupted'
-    FAILED = 'failed'
+from loguru import logger
 
 
 class BaseModel(ABC):
@@ -173,6 +156,7 @@ class BaseModel(ABC):
             with open(path, "r") as file:
                 self.hparams = json.load(file)
         else:
+            logger.error(f"Hyperparameters file not found at: {path}")
             raise FileNotFoundError(
                 f"Hyperparameters file not found at: {path}")
 
@@ -222,4 +206,24 @@ class BaseModel(ABC):
                 self.topic_word_distribution = model_state["topic_word_distribution"]
                 self.training_data = model_state["training_data"]
         else:
+            logger.error(f"Model file not found at: {path}")
             raise FileNotFoundError(f"Model file not found at: {path}")
+
+
+class TrainingStatus(str, Enum):
+    """
+    Represents the status of a training process.
+
+    Attributes:
+        INITIALIZED (str): The training process has been initialized.
+        RUNNING (str): The training process is currently running.
+        SUCCEEDED (str): The training process has successfully completed.
+        INTERRUPTED (str): The training process was interrupted.
+        FAILED (str): The training process has failed.
+    """
+    NOT_STARTED = 'empty'
+    INITIALIZED = 'initialized'
+    RUNNING = 'running'
+    SUCCEEDED = 'succeeded'
+    INTERRUPTED = 'interrupted'
+    FAILED = 'failed'

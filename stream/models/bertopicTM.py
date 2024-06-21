@@ -6,7 +6,7 @@ from octis.models.model import AbstractModel
 from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import OneHotEncoder
 
-from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 
 

@@ -1,25 +1,25 @@
-import numpy as np
-import nltk
 import re
-from octis.evaluation_metrics.metrics import AbstractMetric
-from ._helper_funcs import (
-    cos_sim_pw,
-    Embed_corpus,
-    Embed_topic,
-    Update_corpus_dic_list,
-)
+
+import gensim
+import nltk
+import numpy as np
+from nltk.corpus import stopwords
 from octis.dataset.dataset import Dataset
+from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+
+from ._helper_funcs import (Embed_corpus, Embed_topic, Update_corpus_dic_list,
+                            cos_sim_pw)
+from .constants import NLTK_STOPWORD_LANGUAGE
 
 nltk.download("stopwords")
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-import gensim
+
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 
 
-nltk_stopwords = stopwords.words("english")
+nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
 
 stopwords = list(
     set(nltk_stopwords + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS))
@@ -172,7 +172,8 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(
+                            w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -231,7 +232,8 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(
+                            w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -353,7 +355,8 @@ class Embedding_Coherence(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(np.array(topic_sims)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(
+                np.array(topic_sims)[k], 5)
 
         return results
 

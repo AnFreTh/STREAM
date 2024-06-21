@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
-from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.cbc_utils import (DocumentCoherence,
                                get_top_tfidf_words_per_document)
 from ..utils.dataset import TMDataset

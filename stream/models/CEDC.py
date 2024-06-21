@@ -4,13 +4,13 @@ import umap.umap_ as umap
 from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
 
-from ..preprocessor._cleaning import clean_topics
+from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
 from ..utils.dataset import TMDataset
 from .base import BaseModel
 from .mixins import SentenceEncodingMixin
 
-data_dir = "../preprocessed_datasets"
+DATADIR = "../datasets/preprocessed_datasets"
 
 
 class CEDC(BaseModel, SentenceEncodingMixin):

@@ -50,7 +50,7 @@ class TopicExtractor:
         # define whether word is a noun
         def is_noun(pos): return pos[:2] == "NN"
 
-        data_dir = "./preprocessed_datasets"
+        DATADIR = "../datasets/preprocessed_datasets"
 
         # extend the corpus
         if corpus == "brown":
@@ -73,7 +73,7 @@ class TopicExtractor:
             word_list += data.get_vocabulary()
 
             # include reuters etc datasets
-            # data.load_custom_dataset_from_folder(data_dir + "/GN")
+            # data.load_custom_dataset_from_folder(DATADIR + "/GN")
             # word_list += data.get_vocabulary()
 
             word_list += self.dataset.get_vocabulary()
