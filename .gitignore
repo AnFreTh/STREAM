@@ -165,7 +165,7 @@ docs/_build/*
 
 examples/lightning_logs/
 *.ckpt
-*.yaml
+# *.yaml
 
 # Additional files and directories to ignore
 __pycache__/
