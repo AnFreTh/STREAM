@@ -1,23 +1,21 @@
-from octis.evaluation_metrics.metrics import AbstractMetric
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from ._helper_funcs import (
-    cos_sim_pw,
-    Embed_topic,
-    Embed_corpus,
-    Update_corpus_dic_list,
-    Embed_stopwords,
-)
-from sentence_transformers import SentenceTransformer
+import gensim
 import nltk
+import numpy as np
+from nltk.corpus import stopwords
+from octis.evaluation_metrics.metrics import AbstractMetric
+from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+from sklearn.metrics.pairwise import cosine_similarity
+
+from ._helper_funcs import (Embed_corpus, Embed_stopwords, Embed_topic,
+                            Update_corpus_dic_list, cos_sim_pw)
+from .constants import NLTK_STOPWORD_LANGUAGE, SENTENCE_TRANSFORMER_MODEL
 
 nltk.download("stopwords")
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-import gensim
+
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
-nltk_stopwords = stopwords.words("english")
+nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
 stopwords = list(
     set(nltk_stopwords + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS))
 )
@@ -38,7 +36,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
         self,
         dataset,
         n_words=10,
-        embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path="Embeddings/",
         expansion_path="Embeddings/",
@@ -175,7 +173,8 @@ class Embedding_Topic_Diversity(AbstractMetric):
             half_topic_words = topics_tw[k][
                 : len(topics_tw[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(np.array(sim_mean)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(
+                np.array(sim_mean)[k], 5)
 
         return results
 
@@ -201,7 +200,7 @@ class Expressivity(AbstractMetric):
         dataset,
         stopword_list=stopwords,
         n_words=10,
-        embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path="Embeddings/",
         expansion_path="Embeddings/",
@@ -272,7 +271,8 @@ class Expressivity(AbstractMetric):
         if new_Embeddings:
             self.embeddings = None
         return float(
-            np.mean(list(self.score_per_topic(model_output, new_Embeddings).values()))
+            np.mean(list(self.score_per_topic(
+                model_output, new_Embeddings).values()))
         )
 
     def score_per_topic(self, model_output, new_Embeddings=True):
@@ -335,7 +335,8 @@ class Expressivity(AbstractMetric):
             if not np.isnan(
                 mean
             ).any():  # Check if there are no NaNs in the current mean
-                valid_topic_means.append(mean)  # Append non-NaN mean to the valid list
+                # Append non-NaN mean to the valid list
+                valid_topic_means.append(mean)
 
         # Compute cosine similarity for valid topic means only
         for mean in valid_topic_means:

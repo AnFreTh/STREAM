@@ -4,7 +4,7 @@ from loguru import logger
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 
-from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .base import BaseModel, TrainingStatus
 from .mixins import SentenceEncodingMixin
@@ -155,19 +155,16 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         """
 
         if dataset.has_embeddings(self.embedding_model_name):
-
             self.embeddings = dataset.get_embeddings(
                 self.embedding_model_name,
                 self.embeddings_path,
                 self.embeddings_file_path,
             )
             self.dataframe = dataset.dataframe
-
         else:
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
-
             if self.save_embeddings:
                 dataset.save_embeddings(
                     self.embeddings,

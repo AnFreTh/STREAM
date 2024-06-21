@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from ._helper_funcs import Embed_corpus, Embed_topic, Update_corpus_dic_list
 from .base import BaseMetric
+from .constants import SENTENCE_TRANSFORMER_MODEL
 
 
 class ISIM(BaseMetric):
@@ -26,7 +27,7 @@ class ISIM(BaseMetric):
         dataset,
         n_intruders=1,
         n_words=10,
-        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        metric_embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path="Embeddings/",
         expansion_path="Embeddings/",
@@ -251,7 +252,7 @@ class INT(AbstractMetric):
     def __init__(
         self,
         dataset,
-        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        metric_embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path="Embeddings/",
         expansion_path="Embeddings/",
@@ -464,7 +465,7 @@ class ISH(AbstractMetric):
         dataset,
         n_intruders=1,
         n_words=10,
-        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        metric_embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path="Embeddings/",
         expansion_path="Embeddings/",
