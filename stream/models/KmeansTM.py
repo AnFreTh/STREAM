@@ -186,10 +186,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(
-                self.embeddings)
+            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise RuntimeError(f"Error in dimensionality reduction: {e}")
+            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
 
     def _clustering(self):
         """
@@ -201,14 +200,12 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
             logger.info("--- Creating document cluster ---")
-            self.clustering_model = KMeans(
-                n_clusters=self.n_topics, **self.kmeans_args)
+            self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
 
@@ -221,7 +218,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 self.topic_centroids.append(mean_embedding)
 
         except Exception as e:
-            raise RuntimeError(f"Error in clustering: {e}")
+            raise RuntimeError(f"Error in clustering: {e}") from e
 
     def fit(self, dataset: TMDataset = None, n_topics: int = 20):
         """
@@ -259,14 +256,14 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             self._clustering()
 
             self.dataframe["predictions"] = self.labels
-            docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
-                {"text": " ".join}
-            )
+            docs_per_topic = self.dataframe.groupby(
+                ["predictions"], as_index=False
+            ).agg({"text": " ".join})
 
             tfidf, count = c_tf_idf(
-                docs_per_topic["text"].values, m=len(self.dataframe))
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
+                docs_per_topic["text"].values, m=len(self.dataframe)
+            )
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(

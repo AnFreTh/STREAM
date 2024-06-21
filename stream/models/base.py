@@ -140,8 +140,7 @@ class BaseModel(ABC):
         Parameters:
             ignore (list, optional): List of keys to ignore while saving hyperparameters. Defaults to [].
         """
-        self.hparams = {k: v for k, v in self.hparams.items()
-                        if k not in ignore}
+        self.hparams = {k: v for k, v in self.hparams.items() if k not in ignore}
         for key, value in self.hparams.items():
             setattr(self, key, value)
 
@@ -153,12 +152,11 @@ class BaseModel(ABC):
             path (str): Path to the JSON file containing hyperparameters.
         """
         if os.path.exists(path):
-            with open(path, "r") as file:
+            with open(path) as file:
                 self.hparams = json.load(file)
         else:
             logger.error(f"Hyperparameters file not found at: {path}")
-            raise FileNotFoundError(
-                f"Hyperparameters file not found at: {path}")
+            raise FileNotFoundError(f"Hyperparameters file not found at: {path}")
 
     def get_hyperparameters(self):
         """
@@ -221,9 +219,10 @@ class TrainingStatus(str, Enum):
         INTERRUPTED (str): The training process was interrupted.
         FAILED (str): The training process has failed.
     """
-    NOT_STARTED = 'empty'
-    INITIALIZED = 'initialized'
-    RUNNING = 'running'
-    SUCCEEDED = 'succeeded'
-    INTERRUPTED = 'interrupted'
-    FAILED = 'failed'
+
+    NOT_STARTED = "empty"
+    INITIALIZED = "initialized"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    INTERRUPTED = "interrupted"
+    FAILED = "failed"

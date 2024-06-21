@@ -3,9 +3,12 @@ from wordcloud import WordCloud
 
 from ..data_utils import TMDataset
 from ..models.base import BaseModel
-from ._interactive import (_visualize_topic_model_2d,
-                           _visualize_topic_model_3d, _visualize_topics_2d,
-                           _visualize_topics_3d)
+from ._interactive import (
+    _visualize_topic_model_2d,
+    _visualize_topic_model_3d,
+    _visualize_topics_2d,
+    _visualize_topics_3d,
+)
 from ._octis_visuals import OctisWrapperVisualModel
 
 
@@ -40,7 +43,7 @@ def visualize_topics_as_wordclouds(
         model.get_topic_dict(top_words=max_words)
 
     assert (
-        hasattr(model, "topic_dict") and model.trained == True
+        hasattr(model, "topic_dict") and model.trained
     ), "Model must have been trained with topics extracted."
 
     topics = model.get_topics()

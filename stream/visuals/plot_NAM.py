@@ -1,12 +1,7 @@
+import numpy as np
 import plotly.graph_objects as go
 import torch
-from dash import Dash, dcc, html, Input, Output
-import numpy as np
-
-
-import pandas as pd  # Make sure to import pandas
-
-import pandas as pd  # Ensure pandas is imported
+from dash import Dash, Input, Output, dcc, html
 
 
 def plot_with_plotly(feature_nn, feature_name, feature_values, y_min, y_max):

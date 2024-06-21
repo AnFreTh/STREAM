@@ -48,21 +48,21 @@ class TopicExtractor:
         """
 
         # define whether word is a noun
-        def is_noun(pos): return pos[:2] == "NN"
+        def is_noun(pos):
+            return pos[:2] == "NN"
 
-        DATADIR = "../datasets/preprocessed_datasets"
+        # not used for now
+        # DATADIR = "../datasets/preprocessed_datasets"
 
         # extend the corpus
         if corpus == "brown":
             word_list = nltk_words.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word)
-                         for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         elif corpus == "words":
             word_list = eng_dict.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word)
-                         for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         elif corpus == "octis":
             data = OCDataset()
             data.fetch_dataset("20NewsGroup")
@@ -79,16 +79,14 @@ class TopicExtractor:
             word_list += self.dataset.get_vocabulary()
 
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub("[^a-zA-Z0-9]+\s*", "", word)
-                         for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         else:
             raise ValueError(
                 "There are no words to be extracted for the Topics: Please specify a corpus"
             )
 
         if only_nouns:
-            word_list = [word for (word, pos) in pos_tag(
-                word_list) if is_noun(pos)]
+            word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
         else:
             word_list = [word for (word, pos) in pos_tag(word_list)]
 
@@ -102,7 +100,7 @@ class TopicExtractor:
             nouns = nouns[~pd.isnull(nouns)]
             try:
                 nouns.shape[1]
-            except:
+            except IndexError:
                 nouns = np.stack([noun for noun in nouns])
 
         mean_embeddings = []

@@ -1,6 +1,5 @@
 import hdbscan
 import numpy as np
-import pandas as pd
 import umap.umap_ as umap
 from octis.models.model import AbstractModel
 from sentence_transformers import SentenceTransformer
@@ -88,7 +87,7 @@ class BERTopicTM(AbstractModel):
             self.labels = clustering_model.labels_
 
         except Exception as e:
-            raise ValueError(f"Error in clustering: {e}")
+            raise ValueError(f"Error in clustering: {e}") from e
 
         labels = np.array(self.labels)
 
@@ -112,10 +111,9 @@ class BERTopicTM(AbstractModel):
         """
         try:
             self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(
-                self.embeddings)
+            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise ValueError(f"Error in dimensionality reduction: {e}")
+            raise ValueError(f"Error in dimensionality reduction: {e}") from e
 
     def _get_topic_document_matrix(self):
         assert (
@@ -164,8 +162,7 @@ class BERTopicTM(AbstractModel):
         )
 
         print("--- Extracting the Topics ---")
-        tfidf, count = c_tf_idf(
-            docs_per_topic["text"].values, m=len(self.dataframe))
+        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
         topics = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(

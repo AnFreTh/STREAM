@@ -7,8 +7,13 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
 
-from ._helper_funcs import (Embed_corpus, Embed_stopwords, Embed_topic,
-                            Update_corpus_dic_list, cos_sim_pw)
+from ._helper_funcs import (
+    cos_sim_pw,
+    embed_corpus,
+    embed_stopwords,
+    embed_topic,
+    update_corpus_dic_list,
+)
 from .constants import NLTK_STOPWORD_LANGUAGE, SENTENCE_TRANSFORMER_MODEL
 
 nltk.download("stopwords")
@@ -60,7 +65,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
             expansion_word_list (list, optional): List of words for expansion. Defaults to None.
         """
 
-        tw_emb = Embed_corpus(
+        tw_emb = embed_corpus(
             dataset,
             embedder,
             emb_filename=emb_filename,
@@ -68,7 +73,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
         )
 
         if expansion_word_list is not None:
-            tw_emb = Update_corpus_dic_list(
+            tw_emb = update_corpus_dic_list(
                 expansion_word_list,
                 tw_emb,
                 embedder,
@@ -102,7 +107,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
             -1, 1
         )  # normalize the weights such that they sum up to one
 
-        emb_tw = Embed_topic(
+        emb_tw = embed_topic(
             topics_tw, self.corpus_dict, self.n_words
         )  # embed the top words
         emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
@@ -139,14 +144,12 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True
-        ).reshape(
-            -1, 1
-        )  # normalize the weights such that they sum up to one
+        ).reshape(-1, 1)  # normalize the weights such that they sum up to one
 
         print(topic_weights)
         print(np.isnan(topic_weights).any())
 
-        emb_tw = Embed_topic(
+        emb_tw = embed_topic(
             topics_tw, self.corpus_dict, self.n_words
         )  # embed the top words
         emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
@@ -164,8 +167,8 @@ class Embedding_Topic_Diversity(AbstractMetric):
         sim = cosine_similarity(
             topic_means
         )  # calculate the pairwise cosine similarity of the topic means
-        sim_mean = (np.sum(sim, axis=1) - 1) / (
-            len(sim) - 1
+        sim_mean = (
+            (np.sum(sim, axis=1) - 1) / (len(sim) - 1)
         )  # average the similarity of each topic's mean to the mean of every other topic
 
         results = {}
@@ -173,8 +176,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
             half_topic_words = topics_tw[k][
                 : len(topics_tw[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(
-                np.array(sim_mean)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(np.array(sim_mean)[k], 5)
 
         return results
 
@@ -224,7 +226,7 @@ class Expressivity(AbstractMetric):
             expansion_word_list (list, optional): List of words for expansion. Defaults to None.
         """
 
-        tw_emb = Embed_corpus(
+        tw_emb = embed_corpus(
             dataset,
             embedder,
             emb_filename=emb_filename,
@@ -232,7 +234,7 @@ class Expressivity(AbstractMetric):
         )
 
         if expansion_word_list is not None:
-            tw_emb = Update_corpus_dic_list(
+            tw_emb = update_corpus_dic_list(
                 expansion_word_list,
                 tw_emb,
                 embedder,
@@ -245,7 +247,7 @@ class Expressivity(AbstractMetric):
         self.corpus_dict = tw_emb
         self.embeddings = None
 
-        self.stopword_emb = Embed_stopwords(
+        self.stopword_emb = embed_stopwords(
             stopword_list, embedder
         )  # embed all the stopwords size: (n_stopwords, emb_dim)
         self.stopword_mean = np.mean(
@@ -271,8 +273,7 @@ class Expressivity(AbstractMetric):
         if new_Embeddings:
             self.embeddings = None
         return float(
-            np.mean(list(self.score_per_topic(
-                model_output, new_Embeddings).values()))
+            np.mean(list(self.score_per_topic(model_output, new_Embeddings).values()))
         )
 
     def score_per_topic(self, model_output, new_Embeddings=True):
@@ -293,7 +294,8 @@ class Expressivity(AbstractMetric):
         if new_Embeddings:
             self.embeddings = None
 
-        ntopics = len(model_output["topics"])
+        # not used for now, but could be useful in the future
+        # ntopics = len(model_output["topics"])
 
         topics_tw = model_output["topics"]  # size: (n_topics, voc_size)
         topic_weights = model_output["topic-word-matrix"][
@@ -302,12 +304,10 @@ class Expressivity(AbstractMetric):
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True
-        ).reshape(
-            -1, 1
-        )  # normalize the weights such that they sum up to one
+        ).reshape(-1, 1)  # normalize the weights such that they sum up to one
 
         if self.embeddings is None:
-            emb_tw = Embed_topic(
+            emb_tw = embed_topic(
                 topics_tw, self.corpus_dict, self.n_words
             )  # embed the top words
             emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[

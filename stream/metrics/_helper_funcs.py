@@ -1,11 +1,12 @@
-from sentence_transformers import SentenceTransformer
-from tqdm import tqdm
 import pickle
+
 import numpy as np
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
 
 
-def Embed_corpus(
+def embed_corpus(
     dataset,
     embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
     emb_filename: str = None,
@@ -43,7 +44,7 @@ def Embed_corpus(
     return emb_dic
 
 
-def Update_corpus_dic_list(
+def update_corpus_dic_list(
     word_lis: list,
     emb_dic: dict,
     embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
@@ -57,8 +58,8 @@ def Update_corpus_dic_list(
 
     try:
         emb_dic = pickle.load(open(f"{emb_path}{emb_filename}.pickle", "rb"))
-    except:
-        FileNotFoundError
+    except FileNotFoundError as e:
+        print(e)
         print("No existing embedding found. Starting to embed corpus update dictionary")
 
         keys = set(emb_dic.keys())
@@ -73,7 +74,7 @@ def Update_corpus_dic_list(
     return emb_dic
 
 
-def Embed_topic(
+def embed_topic(
     topics_tw,
     corpus_dict: dict,
     n_words: int = 10,
@@ -85,7 +86,7 @@ def Embed_topic(
     """
     topic_embeddings = []
     for topic in tqdm(topics_tw):
-        if n_words != None:
+        if n_words is not None:
             topic = topic[:n_words]
 
         add_lis = []
@@ -101,7 +102,7 @@ def Embed_topic(
     return topic_embeddings
 
 
-def Embed_stopwords(
+def embed_stopwords(
     stopwords: list,
     embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
 ):

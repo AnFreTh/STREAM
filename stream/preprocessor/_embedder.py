@@ -61,10 +61,11 @@ class GensimBackend:
             that each have an embeddings size of `m`.
 
         """
-        vector_shape = self.embedding_model.get_vector(
-            list(self.embedding_model.index_to_key)[0]
-        ).shape[0]
-        empty_vector = np.zeros(vector_shape)
+        # unused variables
+        # vector_shape = self.embedding_model.get_vector(
+        #     list(self.embedding_model.index_to_key)[0]
+        # ).shape[0]
+        # empty_vector = np.zeros(vector_shape)
 
         embeddings = []
         for doc in tqdm(documents, disable=not verbose, position=0, leave=True):
@@ -134,8 +135,7 @@ class BaseEmbedder:
         """
         if isinstance(documents, Iterable) and not isinstance(documents, str):
             if not any([isinstance(doc, str) for doc in documents]):
-                raise TypeError(
-                    "Make sure that the iterable only contains strings.")
+                raise TypeError("Make sure that the iterable only contains strings.")
 
         else:
             raise TypeError(
@@ -162,12 +162,9 @@ class BaseEmbedder:
             documents["docs"].loc[i] = re.compile(r"[/(){}\[\]\|@,;]").sub(
                 "", documents["docs"][i]
             )
-            documents["docs"].loc[i] = re.compile(
-                r"\\").sub("", documents["docs"][i])
-            documents["docs"].loc[i] = re.compile(
-                "'").sub("", documents["docs"][i])
-            documents["docs"].loc[i] = re.compile(
-                "  ").sub(" ", documents["docs"][i])
+            documents["docs"].loc[i] = re.compile(r"\\").sub("", documents["docs"][i])
+            documents["docs"].loc[i] = re.compile("'").sub("", documents["docs"][i])
+            documents["docs"].loc[i] = re.compile("  ").sub(" ", documents["docs"][i])
         documents["docs"] = documents["docs"].str.lower()
 
         return documents

@@ -2,8 +2,9 @@ import os
 import pickle as pkl
 
 from octis.models.contextualized_topic_models.datasets import dataset
-from octis.models.contextualized_topic_models.utils.data_preparation import \
-    bert_embeddings_from_list
+from octis.models.contextualized_topic_models.utils.data_preparation import (
+    bert_embeddings_from_list,
+)
 from octis.models.model import AbstractModel
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -12,7 +13,6 @@ from .ctmneg_utils.ctmn import CTMNModel
 
 
 class CTMN(AbstractModel):
-
     def __init__(
         self,
         num_topics=10,
@@ -122,8 +122,7 @@ class CTMN(AbstractModel):
 
             bert_train_path = bert_test_path = bert_val_path = None
             if self.hyperparameters["bert_path"]:
-                bert_train_path = self.hyperparameters["bert_path"] + \
-                    "_train.pkl"
+                bert_train_path = self.hyperparameters["bert_path"] + "_train.pkl"
                 bert_test_path = self.hyperparameters["bert_path"] + "_test.pkl"
                 bert_val_path = self.hyperparameters["bert_path"] + "_val.pkl"
 
@@ -170,8 +169,7 @@ class CTMN(AbstractModel):
             x_train, input_size = self.preprocess(
                 self.vocab,
                 train=data_corpus,
-                bert_train_path=self.hyperparameters["bert_path"] +
-                "_trainAll.pkl",
+                bert_train_path=self.hyperparameters["bert_path"] + "_trainAll.pkl",
                 bert_model=self.hyperparameters["bert_model"],
             )
 
@@ -229,8 +227,7 @@ class CTMN(AbstractModel):
         bert_val_path=None,
     ):
         vocab2id = {w: i for i, w in enumerate(vocab)}
-        vec = CountVectorizer(vocabulary=vocab2id,
-                              token_pattern=r"(?u)\b[\w+|\-]+\b")
+        vec = CountVectorizer(vocabulary=vocab2id, token_pattern=r"(?u)\b[\w+|\-]+\b")
         entire_dataset = train.copy()
         if test is not None:
             entire_dataset.extend(test)
@@ -254,14 +251,12 @@ class CTMN(AbstractModel):
 
             x_valid = vec.transform(validation)
             b_val = CTMN.load_bert_data(bert_val_path, validation, bert_model)
-            valid_data = dataset.CTMDataset(
-                x_valid.toarray(), b_val, idx2token)
+            valid_data = dataset.CTMDataset(x_valid.toarray(), b_val, idx2token)
             return train_data, test_data, valid_data, input_size
         if test is None and validation is not None:
             x_valid = vec.transform(validation)
             b_val = CTMN.load_bert_data(bert_val_path, validation, bert_model)
-            valid_data = dataset.CTMDataset(
-                x_valid.toarray(), b_val, idx2token)
+            valid_data = dataset.CTMDataset(x_valid.toarray(), b_val, idx2token)
             return train_data, valid_data, input_size
         if test is not None and validation is None:
             x_test = vec.transform(test)
