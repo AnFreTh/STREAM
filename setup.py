@@ -9,14 +9,16 @@ def read_requirements():
 
 setup(
     name="stream",
-    version="0.1.0.9002",
-    packages=find_packages(
-        exclude=["examples", "examples.*", "tests", "tests.*"]),
+    version="0.1.0",
+    packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
     install_requires=read_requirements(),
     include_package_data=True,
     package_data={
         # Use '**' to include all files within subdirectories recursively
-        "stream": ["../datasets/preprocessed_datasets/**/*", "../datasets/pre_embedded_datasets/**/*"],
+        "stream": [
+            "../datasets/preprocessed_datasets/**/*",
+            "../datasets/pre_embedded_datasets/**/*",
+        ],
     },
     description="A package for expanded topic modeling and metrics",
     long_description=open("README.md").read(),

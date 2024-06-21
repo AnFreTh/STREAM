@@ -135,6 +135,7 @@ class DocumentCoherence:
                     ]
                     coherence_score = np.nanmean(selected_npmi_values)
                     coherence_scores.iat[i, j] = coherence_score
-                    coherence_scores.iat[j, i] = coherence_score  # Symmetric matrix
+                    # Symmetric matrix
+                    coherence_scores.iat[j, i] = coherence_score
 
         return coherence_scores

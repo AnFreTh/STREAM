@@ -6,3 +6,14 @@ from .DCTE import DCTE
 from .KmeansTM import KmeansTM
 from .som import SOMTM
 from .WordCluTM import WordCluTM
+
+__all__ = [
+    "BERTopicTM",
+    "CBC",
+    "CEDC",
+    "CTMN",
+    "DCTE",
+    "KmeansTM",
+    "SOMTM",
+    "WordCluTM",
+]
