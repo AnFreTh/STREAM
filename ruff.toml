@@ -12,6 +12,13 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
     "W191", # indentation contains tabs
+    "F401", # unused import
+    "B006", # mutable argument
+    "C401", # generator, set comprehensions
+    "C408", # dict call
+    "C416", # list comprehensions
+    "C419", # list comprehensions
+
 ]
 exclude = ["tests/*"]
 line-length = 88

@@ -29,11 +29,10 @@ class ContextualInferenceNetwork(nn.Module):
             activation : string, 'softplus' or 'relu', default 'softplus'
             dropout : float, default 0.2, default 0.2
         """
-        super(ContextualInferenceNetwork, self).__init__()
+        super().__init__()
         assert isinstance(input_size, int), "input_size must by type int."
         assert isinstance(output_size, int), "output_size must be type int."
-        assert isinstance(
-            hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",
@@ -78,7 +77,7 @@ class ContextualInferenceNetwork(nn.Module):
             OrderedDict(
                 [
                     (
-                        "l_{}".format(i),
+                        f"l_{i}",
                         nn.Sequential(nn.Linear(h_in, h_out), self.activation),
                     )
                     for i, (h_in, h_out) in enumerate(
@@ -131,13 +130,12 @@ class CombinedInferenceNetwork(nn.Module):
             activation : string, 'softplus' or 'relu', default 'softplus'
             dropout : float, default 0.2, default 0.2
         """
-        super(CombinedInferenceNetwork, self).__init__()
+        super().__init__()
         assert isinstance(input_size, int), "input_size must by type int."
         assert isinstance(output_size, int) or isinstance(
             output_size, np.int64
         ), "output_size must be type int."
-        assert isinstance(
-            hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",
@@ -184,7 +182,7 @@ class CombinedInferenceNetwork(nn.Module):
             OrderedDict(
                 [
                     (
-                        "l_{}".format(i),
+                        f"l_{i}",
                         nn.Sequential(nn.Linear(h_in, h_out), self.activation),
                     )
                     for i, (h_in, h_out) in enumerate(

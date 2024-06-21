@@ -1,13 +1,6 @@
 import numpy as np
 import pandas as pd
-import umap.umap_ as umap
-from octis.models.model import AbstractModel
 from sentence_transformers import SentenceTransformer
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import OneHotEncoder
-
-from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
-from ..utils.dataset import TMDataset
 
 
 class OctisWrapperVisualModel:
@@ -73,11 +66,9 @@ class OctisWrapperVisualModel:
             for idx, topic in enumerate(self.output["topic-word-matrix"]):
                 top_k = np.argsort(topic)[-top_words:]
                 vals = np.sort(topic)[-top_words:]
-                top_k_words = list(
-                    reversed([self._model.id2word[i] for i in top_k]))
+                top_k_words = list(reversed([self._model.id2word[i] for i in top_k]))
                 topics_output.append(top_k_words)
-                result[idx] = [(word, val)
-                               for word, val in zip(top_k_words, vals)]
+                result[idx] = [(word, val) for word, val in zip(top_k_words, vals)]
         self.topic_dict = result
         self.trained = True
 

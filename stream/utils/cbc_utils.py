@@ -1,8 +1,8 @@
-from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from scipy.sparse import csr_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer
+from tqdm import tqdm
 
 
 def get_top_tfidf_words_per_document(corpus, n=10):

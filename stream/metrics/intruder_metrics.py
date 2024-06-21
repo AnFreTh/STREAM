@@ -3,7 +3,7 @@ from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from ._helper_funcs import Embed_corpus, Embed_topic, Update_corpus_dic_list
+from ._helper_funcs import embed_corpus, embed_topic, update_corpus_dic_list
 from .base import BaseMetric
 from .constants import SENTENCE_TRANSFORMER_MODEL
 
@@ -51,14 +51,14 @@ class ISIM(BaseMetric):
             expansion_word_list (list, optional): List of words for expansion. Defaults to None.
         """
 
-        tw_emb = Embed_corpus(
+        tw_emb = embed_corpus(
             dataset,
             metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
         if expansion_word_list is not None:
-            tw_emb = Update_corpus_dic_list(
+            tw_emb = update_corpus_dic_list(
                 expansion_word_list,
                 tw_emb,
                 metric_embedder,
@@ -114,7 +114,7 @@ class ISIM(BaseMetric):
             self.embeddings = None
 
         if self.embeddings is None:
-            emb_tw = Embed_topic(
+            emb_tw = embed_topic(
                 topics, self.corpus_dict, self.n_words
             )  # embed the top words
             emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
@@ -124,9 +124,7 @@ class ISIM(BaseMetric):
         else:
             emb_tw = self.embeddings
 
-        avg_sim_topic_list = (
-            []
-        )  # iterate over each topic and append the average similarity to the intruder word
+        avg_sim_topic_list = []  # iterate over each topic and append the average similarity to the intruder word
         for idx, topic in enumerate(emb_tw):
             mask = np.full(emb_tw.shape[0], True)  # mask out the current topic
             mask[idx] = False
@@ -197,9 +195,9 @@ class ISIM(BaseMetric):
             )  # calculate the intruder score, but re-use embeddings
             score_lis.append(score_per_topic)  # and append to list
 
-        res = np.vstack(
-            score_lis
-        ).T  # stack all scores and transpose to get a (n_topics, n_intruder words) matrix
+        res = (
+            np.vstack(score_lis).T
+        )  # stack all scores and transpose to get a (n_topics, n_intruder words) matrix
 
         mean_scores = np.mean(res, axis=1)
         ntopics = len(topics)
@@ -209,8 +207,7 @@ class ISIM(BaseMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(
-                np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -278,14 +275,14 @@ class INT(AbstractMetric):
             n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
         """
 
-        tw_emb = Embed_corpus(
+        tw_emb = embed_corpus(
             dataset,
             metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
         if expansion_word_list is not None:
-            tw_emb = Update_corpus_dic_list(
+            tw_emb = update_corpus_dic_list(
                 expansion_word_list,
                 tw_emb,
                 metric_embedder,
@@ -318,7 +315,7 @@ class INT(AbstractMetric):
         topics_tw = model_output["topics"]
 
         if self.embeddings is None:
-            emb_tw = Embed_topic(
+            emb_tw = embed_topic(
                 topics_tw, self.corpus_dict, self.n_words
             )  # embed the top words
             emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
@@ -427,8 +424,7 @@ class INT(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(
-                np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -489,14 +485,14 @@ class ISH(AbstractMetric):
             expansion_word_list (list, optional): List of words for expansion. Defaults to None.
         """
 
-        tw_emb = Embed_corpus(
+        tw_emb = embed_corpus(
             dataset,
             metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
         if expansion_word_list is not None:
-            tw_emb = Update_corpus_dic_list(
+            tw_emb = update_corpus_dic_list(
                 expansion_word_list,
                 tw_emb,
                 metric_embedder,
@@ -531,7 +527,7 @@ class ISH(AbstractMetric):
         topics_tw = model_output["topics"]
 
         if self.embeddings is None:
-            emb_tw = Embed_topic(
+            emb_tw = embed_topic(
                 topics_tw, self.corpus_dict, self.n_words
             )  # embed the top words
             emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
@@ -554,8 +550,7 @@ class ISH(AbstractMetric):
             intruder_words_idx_word = np.random.choice(
                 np.arange(intruder_words.shape[1]), size=1
             )  # select one intruder word from each topic
-            intruder_words = intruder_words[:,
-                                            intruder_words_idx_word, :].squeeze()
+            intruder_words = intruder_words[:, intruder_words_idx_word, :].squeeze()
 
             topic_mean = np.mean(topic, axis=0)
 

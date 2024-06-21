@@ -9,8 +9,7 @@ from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
-from ._helper_funcs import (Embed_corpus, Embed_topic, Update_corpus_dic_list,
-                            cos_sim_pw)
+from ._helper_funcs import cos_sim_pw, embed_corpus, embed_topic, update_corpus_dic_list
 from .constants import NLTK_STOPWORD_LANGUAGE
 
 nltk.download("stopwords")
@@ -83,7 +82,7 @@ class NPMI(AbstractMetric):
         for file_num in range(0, len(data)):
             words = data[file_num].lower()
             words = words.strip()
-            words = re.sub("[^a-zA-Z0-9]+\s*", " ", words)
+            words = re.sub(r"[^a-zA-Z0-9]+\s*", " ", words)
             words = re.sub(" +", " ", words)
             # .translate(strip_punct).translate(strip_digit)
             words = words.split()
@@ -172,8 +171,7 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(
-                            w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -232,8 +230,7 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(
-                            w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -297,7 +294,7 @@ class Embedding_Coherence(AbstractMetric):
             expansion_word_list (list, optional): List of words for expansion. Defaults to None.
         """
 
-        tw_emb = Embed_corpus(
+        tw_emb = embed_corpus(
             dataset,
             metric_embedder,
             emb_filename=emb_filename,
@@ -305,7 +302,7 @@ class Embedding_Coherence(AbstractMetric):
         )
 
         if expansion_word_list is not None:
-            tw_emb = Update_corpus_dic_list(
+            tw_emb = update_corpus_dic_list(
                 expansion_word_list,
                 tw_emb,
                 metric_embedder,
@@ -334,7 +331,7 @@ class Embedding_Coherence(AbstractMetric):
         topic_words = model_output["topics"]
         ntopics = len(topic_words)
 
-        emb_tw = Embed_topic(
+        emb_tw = embed_topic(
             topics_tw, self.corpus_dict, self.n_words
         )  # embed the top words
         emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
@@ -343,11 +340,7 @@ class Embedding_Coherence(AbstractMetric):
         self.embeddings = emb_tw
 
         topic_sims = []
-        for (
-            topic_emb
-        ) in (
-            emb_tw
-        ):  # for each topic append the average pairwise cosine similarity within its words
+        for topic_emb in emb_tw:  # for each topic append the average pairwise cosine similarity within its words
             topic_sims.append(float(cos_sim_pw(topic_emb)))
 
         results = {}
@@ -355,8 +348,7 @@ class Embedding_Coherence(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(
-                np.array(topic_sims)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(np.array(topic_sims)[k], 5)
 
         return results
 

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from .decoding_network import DecoderNetwork
 
 
-class CTMNModel(object):
+class CTMNModel:
     """Class to train the contextualized topic model"""
 
     def __init__(
@@ -66,10 +66,8 @@ class CTMNModel(object):
         assert (
             isinstance(num_topics, int) or isinstance(num_topics, np.int64)
         ) and num_topics > 0, "num_topics must by type int > 0."
-        assert model_type in [
-            "LDA", "prodLDA"], "model must be 'LDA' or 'prodLDA'."
-        assert isinstance(
-            hidden_sizes, tuple), "hidden_sizes must be type tuple."
+        assert model_type in ["LDA", "prodLDA"], "model must be 'LDA' or 'prodLDA'."
+        assert isinstance(hidden_sizes, tuple), "hidden_sizes must be type tuple."
         assert activation in [
             "softplus",
             "relu",
@@ -145,8 +143,7 @@ class CTMNModel(object):
             self.topic_prior_variance,
             topic_perturb=self.topic_perturb,
         )
-        self.early_stopping = EarlyStopping(
-            patience=5, verbose=False, delta=-3)
+        self.early_stopping = EarlyStopping(patience=5, verbose=False, delta=-3)
         # init optimizer
         if self.solver == "adam":
             self.optimizer = optim.Adam(
@@ -210,15 +207,13 @@ class CTMNModel(object):
         var_division = torch.sum(posterior_variance / prior_variance, dim=1)
         # diff means term
         diff_means = prior_mean - posterior_mean
-        diff_term = torch.sum(
-            (diff_means * diff_means) / prior_variance, dim=1)
+        diff_term = torch.sum((diff_means * diff_means) / prior_variance, dim=1)
         # logvar det division term
         logvar_det_division = prior_variance.log().sum() - posterior_log_variance.sum(
             dim=1
         )
         # combine terms
-        KL = 0.5 * (var_division + diff_term -
-                    self.num_topics + logvar_det_division)
+        KL = 0.5 * (var_division + diff_term - self.num_topics + logvar_det_division)
         # Reconstruction term
         RL = -torch.sum(inputs * torch.log(word_dists + 1e-10), dim=1)
 
@@ -344,36 +339,21 @@ class CTMNModel(object):
         # Print settings to output file
         if verbose:
             print(
-                "Settings: \n\
-                   N Components: {}\n\
-                   Topic Prior Mean: {}\n\
-                   Topic Prior Variance: {}\n\
-                   Model Type: {}\n\
-                   Hidden Sizes: {}\n\
-                   Activation: {}\n\
-                   Dropout: {}\n\
-                   Learn Priors: {}\n\
-                   Learning Rate: {}\n\
-                   Momentum: {}\n\
-                   Reduce On Plateau: {}\n\
-                   Save Dir: {}\n\
-                   Topic Perturb: {}\n\
-                   TLoss Weight: {}\n".format(
-                    self.num_topics,
-                    self.topic_prior_mean,
-                    self.topic_prior_variance,
-                    self.model_type,
-                    self.hidden_sizes,
-                    self.activation,
-                    self.dropout,
-                    self.learn_priors,
-                    self.lr,
-                    self.momentum,
-                    self.reduce_on_plateau,
-                    save_dir,
-                    self.topic_perturb,
-                    self.triplet_loss_weight,
-                )
+                f"Settings: \n\
+                   N Components: {self.num_topics}\n\
+                   Topic Prior Mean: {self.topic_prior_mean}\n\
+                   Topic Prior Variance: {self.topic_prior_variance}\n\
+                   Model Type: {self.model_type}\n\
+                   Hidden Sizes: {self.hidden_sizes}\n\
+                   Activation: {self.activation}\n\
+                   Dropout: {self.dropout}\n\
+                   Learn Priors: {self.learn_priors}\n\
+                   Learning Rate: {self.lr}\n\
+                   Momentum: {self.momentum}\n\
+                   Reduce On Plateau: {self.reduce_on_plateau}\n\
+                   Save Dir: {save_dir}\n\
+                   Topic Perturb: {self.topic_perturb}\n\
+                   TLoss Weight: {self.triplet_loss_weight}\n"
             )
 
         self.model_dir = save_dir
@@ -396,21 +376,13 @@ class CTMNModel(object):
             self.nn_epoch = epoch
             # train epoch
             s = datetime.datetime.now()
-            sp, train_loss, topic_word, topic_document = self._train_epoch(
-                train_loader)
+            sp, train_loss, topic_word, topic_document = self._train_epoch(train_loader)
             samples_processed += sp
             e = datetime.datetime.now()
 
             if verbose:
                 print(
-                    "Epoch: [{}/{}]\tSamples: [{}/{}]\tTrain Loss: {}\tTime: {}".format(
-                        epoch + 1,
-                        self.num_epochs,
-                        samples_processed,
-                        len(self.train_data) * self.num_epochs,
-                        train_loss,
-                        e - s,
-                    )
+                    f"Epoch: [{epoch + 1}/{self.num_epochs}]\tSamples: [{samples_processed}/{len(self.train_data) * self.num_epochs}]\tTrain Loss: {train_loss}\tTime: {e - s}"
                 )
 
             self.best_components = self.model.beta
@@ -427,20 +399,12 @@ class CTMNModel(object):
                 )
                 # train epoch
                 s = datetime.datetime.now()
-                val_samples_processed, val_loss = self._validation(
-                    validation_loader)
+                val_samples_processed, val_loss = self._validation(validation_loader)
                 e = datetime.datetime.now()
 
                 if verbose:
                     print(
-                        "Epoch: [{}/{}]\tSamples: [{}/{}]\tValidation Loss: {}\tTime: {}".format(
-                            epoch + 1,
-                            self.num_epochs,
-                            val_samples_processed,
-                            len(self.validation_data) * self.num_epochs,
-                            val_loss,
-                            e - s,
-                        )
+                        f"Epoch: [{epoch + 1}/{self.num_epochs}]\tSamples: [{val_samples_processed}/{len(self.validation_data) * self.num_epochs}]\tValidation Loss: {val_loss}\tTime: {e - s}"
                     )
 
                 if np.isnan(val_loss) or np.isnan(train_loss):
@@ -484,8 +448,7 @@ class CTMNModel(object):
                 topic_document_mat.append(topic_document)
 
         results = self.get_info()
-        results["test-topic-document-matrix"] = np.asarray(
-            self.get_thetas(dataset)).T
+        results["test-topic-document-matrix"] = np.asarray(self.get_thetas(dataset)).T
 
         return results
 
@@ -524,30 +487,16 @@ class CTMNModel(object):
         info = {}
         topic_word = self.get_topics()
         topic_word_dist = self.get_topic_word_mat()
-        topic_document_dist = self.get_topic_document_mat()
+        # topic_document_dist = self.get_topic_document_mat()
         info["topics"] = topic_word
 
-        info["topic-document-matrix"] = np.asarray(
-            self.get_thetas(self.train_data)).T
+        info["topic-document-matrix"] = np.asarray(self.get_thetas(self.train_data)).T
 
         info["topic-word-matrix"] = topic_word_dist
         return info
 
     def _format_file(self):
-        model_dir = (
-            "AVITM_nc_{}_tpm_{}_tpv_{}_hs_{}_ac_{}_do_{}_lr_{}_mo_{}_rp_{}".format(
-                self.num_topics,
-                0.0,
-                1 - (1.0 / self.num_topics),
-                self.model_type,
-                self.hidden_sizes,
-                self.activation,
-                self.dropout,
-                self.lr,
-                self.momentum,
-                self.reduce_on_plateau,
-            )
-        )
+        model_dir = f"AVITM_nc_{self.num_topics}_tpm_{0.0}_tpv_{1 - (1.0 / self.num_topics)}_hs_{self.model_type}_ac_{self.hidden_sizes}_do_{self.activation}_lr_{self.dropout}_mo_{self.lr}_rp_{self.momentum}"
         return model_dir
 
     def save(self, models_dir=None):
@@ -557,12 +506,11 @@ class CTMNModel(object):
         :param models_dir: path to directory for saving NN models.
         """
         if (self.model is not None) and (models_dir is not None):
-
             model_dir = self._format_file()
             if not os.path.isdir(os.path.join(models_dir, model_dir)):
                 os.makedirs(os.path.join(models_dir, model_dir))
 
-            filename = "epoch_{}".format(self.nn_epoch) + ".pth"
+            filename = f"epoch_{self.nn_epoch}" + ".pth"
             fileloc = os.path.join(models_dir, model_dir, filename)
             with open(fileloc, "wb") as file:
                 torch.save(
@@ -602,7 +550,7 @@ class CTMNModel(object):
             num_workers=self.num_data_loader_workers,
         )
         final_thetas = []
-        for sample_index in range(self.num_samples):
+        for _ in range(self.num_samples):
             with torch.no_grad():
                 collect_theta = []
                 for batch_samples in loader:

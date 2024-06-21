@@ -71,8 +71,7 @@ class TMDataset(Dataset):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words)
-                                  for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -92,8 +91,7 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(
-            my_package_dir, "preprocessed_datasets", name)
+        dataset_path = os.path.join(my_package_dir, "preprocessed_datasets", name)
         return dataset_path
 
     def has_embeddings(self, embedding_model_name, path=None, file_name=None):
@@ -210,8 +208,7 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(
-            my_package_dir, "pre_embedded_datasets", name)
+        dataset_path = os.path.join(my_package_dir, "pre_embedded_datasets", name)
         return dataset_path
 
     def create_load_save_dataset(
@@ -248,21 +245,18 @@ class TMDataset(Dataset):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError(
-                    "doc_column must be specified for DataFrame input")
+                raise ValueError("doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [
-                    None] * len(documents)
+                data[label_column].tolist() if label_column else [None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError(
-                "data must be a pandas DataFrame or a list of documents")
+            raise TypeError("data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -396,8 +390,7 @@ class TMDataset(Dataset):
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
         if not os.path.exists(info_path):
-            raise FileNotFoundError(
-                f"Dataset info file {info_path} does not exist.")
+            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
 
         with open(info_path, "rb") as info_file:
             dataset_info = pickle.load(info_file)
@@ -502,10 +495,10 @@ class TMDataset(Dataset):
             documents_path = os.path.join(dataset_path, "corpus.txt")
             labels_path = os.path.join(dataset_path, "labels.txt")
 
-            with open(documents_path, "r", encoding="utf-8") as f:
+            with open(documents_path, encoding="utf-8") as f:
                 documents = f.readlines()
 
-            with open(labels_path, "r", encoding="utf-8") as f:
+            with open(labels_path, encoding="utf-8") as f:
                 labels = f.readlines()
 
             self.dataframe = pd.DataFrame(
@@ -515,8 +508,7 @@ class TMDataset(Dataset):
                 }
             )
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(
-                lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -578,6 +570,18 @@ class TMDataset(Dataset):
             Train, validation, and test datasets.
         """
         total_size = len(self)
+
+        if train_ratio < 0 or val_ratio < 0 or test_ratio < 0:
+            raise ValueError("Train, val and test ratios must be positive")
+
+        if train_ratio == 0 and val_ratio == 0 and test_ratio == 0:
+            raise ValueError("Train, val and test ratios cannot all be 0")
+
+        if train_ratio > 1 or val_ratio > 1 or test_ratio > 1:
+            raise ValueError(
+                "Train, val and test ratios must be less than or equal to 1"
+            )
+
         if train_ratio + val_ratio + test_ratio != 1.0:
             raise ValueError("Train, validation and test ratios must sum to 1")
 
@@ -683,7 +687,6 @@ class TMDataset(Dataset):
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(
-            lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
