@@ -9,7 +9,7 @@ Since most of STREAMs models are centered around Document embeddings, STREAM com
 Additionally, once a user fits a model that leverages document embeddings, the embeddings are saved and automatically loaded the next time the user wants to fit any model with the same set of embeddings.
 
 <div style="text-align: center;">
-    <img src="model_plot.png" alt="Figure Description" width="600"/>
+    <img src="assets/model_plot.png" alt="Figure Description" width="600"/>
 </div>
 
 Installation
@@ -124,7 +124,7 @@ To use these models, follow the steps below:
     ```
 
 <div style="text-align: center;">
-    <img src="topical_distances.png" alt="Figure Description" width="600"/>
+    <img src="assets/topical_distances.png" alt="Figure Description" width="600"/>
 </div>
 
 
@@ -132,7 +132,7 @@ To use these models, follow the steps below:
 
 
 <div style="text-align: center;">
-    <img src="stream_figure.png" alt="Figure Description" width="400"/>
+    <img src="assets/stream_figure.png" alt="Figure Description" width="400"/>
 </div>
 
 The general formulation of a Neural Additive Model (NAM) can be summarized by the equation:
