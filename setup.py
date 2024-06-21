@@ -16,7 +16,7 @@ setup(
     include_package_data=True,
     package_data={
         # Use '**' to include all files within subdirectories recursively
-        "stream": ["preprocessed_datasets/**/*", "pre_embedded_datasets/**/*"],
+        "stream": ["../datasets/preprocessed_datasets/**/*", "../datasets/pre_embedded_datasets/**/*"],
     },
     description="A package for expanded topic modeling and metrics",
     long_description=open("README.md").read(),
