@@ -124,7 +124,9 @@ class ISIM(BaseMetric):
         else:
             emb_tw = self.embeddings
 
-        avg_sim_topic_list = []  # iterate over each topic and append the average similarity to the intruder word
+        avg_sim_topic_list = (
+            []
+        )  # iterate over each topic and append the average similarity to the intruder word
         for idx, topic in enumerate(emb_tw):
             mask = np.full(emb_tw.shape[0], True)  # mask out the current topic
             mask[idx] = False
@@ -195,9 +197,9 @@ class ISIM(BaseMetric):
             )  # calculate the intruder score, but re-use embeddings
             score_lis.append(score_per_topic)  # and append to list
 
-        res = (
-            np.vstack(score_lis).T
-        )  # stack all scores and transpose to get a (n_topics, n_intruder words) matrix
+        res = np.vstack(
+            score_lis
+        ).T  # stack all scores and transpose to get a (n_topics, n_intruder words) matrix
 
         mean_scores = np.mean(res, axis=1)
         ntopics = len(topics)
