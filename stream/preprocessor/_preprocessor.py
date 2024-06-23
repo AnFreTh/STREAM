@@ -1,8 +1,8 @@
 import re
 import unicodedata
 from typing import List, Set
+from collections import Counter
 
-import nltk
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 from nltk.corpus import stopwords
@@ -11,14 +11,10 @@ from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
 
-nltk.download("punkt")
-nltk.download("stopwords")
-nltk.download("wordnet")
-
 
 class TextPreprocessor:
     def __init__(self, **kwargs):
-        self.language = kwargs.get("language", "english")
+        self.language = kwargs.get("language", "en")
         self.remove_stopwords = kwargs.get("remove_stopwords", False)
         self.lowercase = kwargs.get("lowercase", True)
         self.remove_punctuation = kwargs.get("remove_punctuation", True)
@@ -31,8 +27,17 @@ class TextPreprocessor:
         self.remove_accents = kwargs.get("remove_accents", True)
         self.custom_stopwords = set(kwargs.get("custom_stopwords", []))
         self.detokenize = kwargs.get("detokenize", True)
+        self.min_word_freq = kwargs.get("min_word_freq", 5)
+        self.max_word_freq = kwargs.get("max_word_freq", None)
+        self.min_word_length = kwargs.get("min_word_length", 3)
+        self.max_word_length = kwargs.get("max_word_length", None)
+        self.dictionary = set(kwargs.get("dictionary", []))
+        self.remove_words_with_numbers = kwargs.get("remove_words_with_numbers", False)
+        self.remove_words_with_special_chars = kwargs.get(
+            "remove_words_with_special_chars", False
+        )
 
-        if self.language != "english" and self.remove_stopwords:
+        if self.language != "en" and self.remove_stopwords:
             self.stop_words = set(stopwords.words(self.language))
         else:
             self.stop_words = set(stopwords.words("english"))
@@ -46,6 +51,7 @@ class TextPreprocessor:
             self.stemmer = PorterStemmer()
 
         self.contractions_dict = self._load_contractions()
+        self.word_freq = Counter()
 
     def _load_contractions(self):
         # Load a dictionary of contractions and their expansions
@@ -108,6 +114,9 @@ class TextPreprocessor:
 
         words = word_tokenize(text)
 
+        # Update word frequency counter
+        self.word_freq.update(words)
+
         if self.remove_stopwords:
             words = [word for word in words if word not in self.stop_words]
 
@@ -116,6 +125,31 @@ class TextPreprocessor:
 
         if self.stem:
             words = [self.stemmer.stem(word) for word in words]
+
+        if self.min_word_freq is not None:
+            words = [
+                word for word in words if self.word_freq[word] >= self.min_word_freq
+            ]
+
+        if self.max_word_freq is not None:
+            words = [
+                word for word in words if self.word_freq[word] <= self.max_word_freq
+            ]
+
+        if self.min_word_length is not None:
+            words = [word for word in words if len(word) >= self.min_word_length]
+
+        if self.max_word_length is not None:
+            words = [word for word in words if len(word) <= self.max_word_length]
+
+        if self.dictionary:
+            words = [word for word in words if word in self.dictionary]
+
+        if self.remove_words_with_numbers:
+            words = [word for word in words if not any(char.isdigit() for char in word)]
+
+        if self.remove_words_with_special_chars:
+            words = [word for word in words if not re.search(r"[^a-zA-Z0-9\s]", word)]
 
         if self.detokenize:
             text = TreebankWordDetokenizer().detokenize(words)
