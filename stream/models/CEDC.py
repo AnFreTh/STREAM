@@ -3,14 +3,20 @@ import pandas as pd
 import umap.umap_ as umap
 from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
+from loguru import logger
+from datetime import datetime
 
 from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
 from ..utils.dataset import TMDataset
-from .base import BaseModel
+from .base import BaseModel, TrainingStatus
 from .mixins import SentenceEncodingMixin
 
 DATADIR = "../datasets/preprocessed_datasets"
+MODEL_NAME = "CEDC"
+EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class CEDC(BaseModel, SentenceEncodingMixin):
@@ -56,7 +62,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
     def __init__(
         self,
-        embedding_model_name: str = "paraphrase-MiniLM-L3-v2",
+        embedding_model_name: str = EMBEDDING_MODEL_NAME,
         umap_args: dict = None,
         random_state: int = None,
         gmm_args: dict = None,
@@ -132,8 +138,9 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
-        self.trained = False
         self.save_embeddings = save_embeddings
+
+        self._status = TrainingStatus.NOT_STARTED
 
     def get_info(self):
         """
@@ -147,16 +154,16 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             K-Means arguments, and training status.
         """
         info = {
-            "model_name": "CEDC",
+            "model_name": MODEL_NAME,
             "num_topics": self.n_topics,
             "embedding_model": self.embedding_model_name,
             "umap_args": self.umap_args,
             "kmeans_args": self.gmm_args,
-            "trained": self.trained,
+            "trained": self._status.name,
         }
         return info
 
-    def _prepare_data(self, dataset):
+    def _prepare_embeddings(self, dataset):
         """
         Prepares the dataset for clustering.
 
@@ -167,6 +174,9 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         """
 
         if dataset.has_embeddings(self.embedding_model_name):
+            logger.info(
+                f"--- Loading pre-computed {EMBEDDING_MODEL_NAME} embeddings ---"
+            )
             self.embeddings = dataset.get_embeddings(
                 self.embedding_model_name,
                 self.embeddings_path,
@@ -175,6 +185,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             self.dataframe = dataset.dataframe
 
         else:
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -204,7 +215,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         self.gmm_args["n_components"] = self.n_topics
 
         try:
-            print("--- Creating document cluster ---")
+            logger.info("--- Creating document cluster ---")
             self.GMM = GaussianMixture(
                 **self.gmm_args,
             ).fit(self.reduced_embeddings)
@@ -214,7 +225,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             self.labels = self.GMM.predict(self.reduced_embeddings)
 
         except Exception as e:
-            raise ValueError(f"Error in clustering: {e}") from e
+            raise RuntimeError(f"Error in clustering: {e}") from e
 
     def _dim_reduction(self):
         """
@@ -226,7 +237,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during dimensionality reduction.
         """
         try:
-            print("--- Reducing dimensions ---")
+            logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
@@ -272,38 +283,56 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         ), "The dataset must be an instance of TMDataset."
 
         self.n_topics = n_topics
-        self._prepare_data(dataset)
-        self._dim_reduction()
-        self._clustering()
+        if self.n_topics <= 0:
+            raise ValueError("Number of topics must be greater than 0.")
 
-        assert (
-            hasattr(self, "soft_labels") and self.soft_labels is not None
-        ), "Clustering must generate labels."
+        self._status = TrainingStatus.INITIALIZED
 
-        TE = TopicExtractor(
-            dataset=dataset,
-            topic_assignments=self.soft_labels,
-            n_topics=self.n_topics,
-            embedding_model=SentenceTransformer(self.embedding_model_name),
-        )
+        try:
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
+            self._status = TrainingStatus.RUNNING
+            self._prepare_embeddings(dataset)
+            self._dim_reduction()
+            self._clustering()
 
-        print("--- Extract topics ---")
-        topics, self.topic_centroids = TE._noun_extractor_haystack(
-            self.embeddings,
-            n=n_words + 20,
-            corpus=expansion_corpus,
-            only_nouns=only_nouns,
-        )
+            assert (
+                hasattr(self, "soft_labels") and self.soft_labels is not None
+            ), "Clustering must generate labels."
 
-        self.trained = True
+            TE = TopicExtractor(
+                dataset=dataset,
+                topic_assignments=self.soft_labels,
+                n_topics=self.n_topics,
+                embedding_model=SentenceTransformer(self.embedding_model_name),
+            )
+
+            logger.info("--- Extract topics ---")
+            topics, self.topic_centroids = TE._noun_extractor_haystack(
+                self.embeddings,
+                n=n_words + 20,
+                corpus=expansion_corpus,
+                only_nouns=only_nouns,
+            )
+
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
 
         if clean:
-            print("--- Cleaning topics ---")
+            logger.info("--- Cleaning topics ---")
             cleaned_topics, cleaned_centroids = clean_topics(
                 topics, similarity=clean_threshold, embedding_model=self.embedding_model
             )
             topics = cleaned_topics
             self.topic_centroids = cleaned_centroids
+
+        logger.info("--- Training completed successfully. ---")
+        self._status = TrainingStatus.SUCCEEDED
 
         self.topic_word_distribution = self.get_topic_word_matrix(topics)
         self.topic_dict = topics
@@ -328,8 +357,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         words_list = []
         new_topics = {}
         for k in range(self.n_topics):
@@ -370,12 +399,11 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
 
-        assert (
-            self.trained
-        ), "Model must be trained before accessing the topic-document matrix."
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         # Safely get the topic-document matrix with a default value of None if not found
         return self.output.get("topic-document-matrix", None)
 
@@ -404,8 +432,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If the model has not been trained yet.
         """
 
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         # Extract all unique words and sort them
         all_words = set(word for topic in topic_dict.values() for word, _ in topic)
         sorted_words = sorted(all_words)
@@ -442,8 +470,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         embeddings = self.encode_documents(
             texts, encoder_model=self.embedding_model_name, use_average=True
         )

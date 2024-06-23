@@ -4,6 +4,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
+EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
+
 
 class SentenceEncodingMixin:
     """
@@ -13,7 +15,7 @@ class SentenceEncodingMixin:
     def encode_documents(
         self,
         documents: List[str],
-        encoder_model: str = "all-MiniLM-L6-v2",
+        encoder_model: str = EMBEDDING_MODEL_NAME,
         use_average: bool = True,
     ) -> np.ndarray:
         """
@@ -32,7 +34,6 @@ class SentenceEncodingMixin:
             encoder.max_seq_length
         )  # Extract maximum length from the encoder model
         embeddings = []
-        print("--- Encoding documents ---")
         for doc in tqdm(documents):
             if len(doc) > max_length and use_average:
                 # Split document into segments of max_length and encode each segment
@@ -60,6 +61,6 @@ class SentenceEncodingMixin:
         """
         segments = []
         for start in range(0, len(document), max_length):
-            segment = document[start: start + max_length]
+            segment = document[start : start + max_length]
             segments.append(segment)
         return segments
