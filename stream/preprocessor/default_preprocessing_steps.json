@@ -98,5 +98,25 @@
         "dictionary": [],
         "remove_words_with_numbers": true,
         "remove_words_with_special_chars": true
+    },
+    "BERTopicTM": {
+        "remove_stopwords": true,
+        "lowercase": true,
+        "remove_punctuation": true,
+        "remove_numbers": true,
+        "lemmatize": true,
+        "stem": false,
+        "expand_contractions": true,
+        "remove_html_tags": true,
+        "remove_special_chars": true,
+        "remove_accents": true,
+        "detokenize": true,
+        "min_word_freq": 1,
+        "max_word_freq": null,
+        "min_word_length": 3,
+        "max_word_length": 25,
+        "dictionary": [],
+        "remove_words_with_numbers": true,
+        "remove_words_with_special_chars": true
     }
 }

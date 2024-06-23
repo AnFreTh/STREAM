@@ -1,7 +1,6 @@
 from .bertopicTM import BERTopicTM
 from .cbc import CBC
 from .CEDC import CEDC
-from .ctmneg import CTMN
 from .DCTE import DCTE
 from .KmeansTM import KmeansTM
 from .som import SOMTM
@@ -11,7 +10,6 @@ __all__ = [
     "BERTopicTM",
     "CBC",
     "CEDC",
-    "CTMN",
     "DCTE",
     "KmeansTM",
     "SOMTM",
