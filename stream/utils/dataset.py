@@ -102,7 +102,7 @@ class TMDataset(Dataset):
             raise ValueError(f"Dataset path {dataset_path} does not exist.")
         self._load_data_to_dataframe()
 
-        self.info = self.get_info()
+        self.info = self.get_info(dataset_path)
 
     def _load_data_to_dataframe(self):
         """
