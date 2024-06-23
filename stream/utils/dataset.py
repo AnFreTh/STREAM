@@ -1,7 +1,7 @@
 import os
 import pickle
 import re
-
+import json
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -10,7 +10,7 @@ from ..preprocessor import TextPreprocessor
 
 
 class TMDataset(Dataset):
-    def __init__(self, name=None, language="english"):
+    def __init__(self, name=None, language="en"):
         """
         Initialize the TMDataset.
 
@@ -38,6 +38,49 @@ class TMDataset(Dataset):
         self.texts = None
         self.labels = None
         self.language = language
+        self.preprocessing_steps = self.default_preprocessing_steps()
+
+    def default_preprocessing_steps(self):
+        return {
+            "remove_stopwords": False,
+            "lowercase": True,
+            "remove_punctuation": True,
+            "remove_numbers": True,
+            "lemmatize": False,
+            "stem": False,
+            "expand_contractions": True,
+            "remove_html_tags": True,
+            "remove_special_chars": True,
+            "remove_accents": True,
+            "custom_stopwords": set(),
+            "detokenize": True,
+        }
+
+    def load_model_preprocessing_steps(self, model_type, filepath=None):
+        """
+        Load the default preprocessing steps from a JSON file.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the JSON file containing the default preprocessing steps.
+
+        Returns
+        -------
+        dict
+            The default preprocessing steps.
+        """
+        if filepath is None:
+            # Determine the absolute path based on the current file's location
+            current_dir = os.path.dirname(__file__)
+            filepath = os.path.join(
+                current_dir, "..", "preprocessor", "default_preprocessing_steps.json"
+            )
+            filepath = os.path.abspath(filepath)
+
+        with open(filepath, "r") as file:
+            all_steps = json.load(file)
+        return all_steps.get(model_type, {})
 
     def fetch_dataset(self, name, dataset_path=None):
         """
@@ -175,7 +218,7 @@ class TMDataset(Dataset):
                 "Embeddings are not available. Run the encoding process first or load embeddings."
             )
 
-        print("--- Loading pre-computed document embeddings ---")
+        # print("--- Loading pre-computed document embeddings ---")
 
         if self.embeddings is None:
             if path is None:
@@ -289,21 +332,7 @@ class TMDataset(Dataset):
 
         return preprocessor
 
-    def preprocess(
-        self,
-        remove_stopwords=False,
-        lowercase=True,
-        remove_punctuation=True,
-        remove_numbers=True,
-        lemmatize=False,
-        stem=False,
-        expand_contractions=False,
-        remove_html_tags=False,
-        remove_special_chars=False,
-        remove_accents=False,
-        custom_stopwords=[],
-        detokenize=True,
-    ):
+    def preprocess(self, model_type=None, custom_stopwords=None, **preprocessing_steps):
         """
         Preprocess the dataset.
 
@@ -347,23 +376,51 @@ class TMDataset(Dataset):
         the object's `texts` attribute. The preprocessed text is then stored back into the
         `texts` attribute and updated in the `dataframe["text"]` column.
         """
-        preprocessor = TextPreprocessor(
-            language=self.language,
-            remove_stopwords=remove_stopwords,
-            lowercase=lowercase,
-            remove_punctuation=remove_punctuation,
-            remove_numbers=remove_numbers,
-            lemmatize=lemmatize,
-            stem=stem,
-            expand_contractions=expand_contractions,
-            remove_html_tags=remove_html_tags,
-            remove_special_chars=remove_special_chars,
-            remove_accents=remove_accents,
-            custom_stopwords=custom_stopwords,
-            detokenize=detokenize,
-        )
-        self.texts = preprocessor.preprocess_documents(self.texts)
-        self.dataframe["text"] = self.texts
+        if model_type:
+            preprocessing_steps = self.load_model_preprocessing_steps(model_type)
+        previous_steps = self.info.get("preprocessing_steps", {})
+
+        # Filter out steps that have already been applied
+        filtered_steps = {
+            key: (
+                False
+                if key in previous_steps and previous_steps[key] == value
+                else value
+            )
+            for key, value in preprocessing_steps.items()
+        }
+
+        if custom_stopwords:
+            filtered_steps["remove_stopwords"] = True
+            filtered_steps["custom_stopwords"] = list(set(custom_stopwords))
+        else:
+            filtered_steps["custom_stopwords"] = []
+
+        # Only preprocess if there are steps that need to be applied
+
+        if filtered_steps:
+            try:
+                preprocessor = TextPreprocessor(
+                    language=self.language,
+                    **preprocessing_steps,
+                )
+                self.texts = preprocessor.preprocess_documents(self.texts)
+                self.dataframe["text"] = self.texts
+
+                self.info.update(
+                    {
+                        "preprocessing_steps": {
+                            k: v
+                            for k, v in preprocessor.__dict__.items()
+                            if k != "stopwords"
+                        }
+                    }
+                )
+            except Exception as e:
+                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+
+    def update_preprocessing_steps(self, **preprocessing_steps):
+        self.preprocessing_steps.update(preprocessing_steps)
 
     def get_info(self, dataset_path=None):
         """
