@@ -1,18 +1,26 @@
 import pandas as pd
 import pyarrow as pa
 from datasets import Dataset
-from octis.models.model import AbstractModel
+from .base import BaseModel, TrainingStatus
 from sentence_transformers.losses import CosineSimilarityLoss
 from setfit import SetFitModel, Trainer, TrainingArguments
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
+from loguru import logger
+from datetime import datetime
 
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 
 
-class DCTE(AbstractModel):
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+MODEL_NAME = "DCTE"
+EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
+logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+
+
+class DCTE(BaseModel):
     """
     A document classification and topic extraction class that utilizes the SetFitModel for
     document classification and TF-IDF for topic extraction.
@@ -30,35 +38,22 @@ class DCTE(AbstractModel):
 
     def __init__(
         self,
-        num_topics: int = 20,
-        model: str = "all-MiniLM-L6-v2",
-        batch_size: int = 8,
-        num_iterations: int = 20,
-        num_epochs: int = 10,
+        model: str = EMBEDDING_MODEL_NAME,
     ):
         """
         Initializes the DCTE model with specified number of topics, embedding model,
         SetFit model, batch size, number of iterations, and number of epochs.
 
         Parameters:
-            num_topics (int, optional): The number of topics to identify in the dataset.
-                Defaults to 20.
             model (str, optional): The identifier of the SetFit model to be used.
                 Defaults to "all-MiniLM-L6-v2".
-            batch_size (int, optional): The batch size to use during training. Defaults to 8.
-            num_iterations (int, optional): The number of iterations to run SetFit training.
-                Defaults to 20.
-            num_epochs (int, optional): The number of epochs to train SetFit model.
-                Defaults to 10.
+
         """
-        self.n_topics = num_topics
-        self.trained = False
-        self.model = SetFitModel.from_pretrained(
-            f"sentence-transformers/{model}")
-        self.trained = False
-        self.batch_size = batch_size
-        self.num_iterations = num_iterations
-        self.num_epochs = num_epochs
+        self.n_topics = None
+
+        self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
+
+        self._status = TrainingStatus.NOT_STARTED
 
     def _prepare_data(self, val_split: float):
         """
@@ -80,8 +75,7 @@ class DCTE(AbstractModel):
         print(
             "--- a train-validation split of 0.8 to 0.2 is performed --- \n---change 'val_split' if needed"
         )
-        train_df, val_df = train_test_split(
-            self.dataframe, test_size=val_split)
+        train_df, val_df = train_test_split(self.dataframe, test_size=val_split)
 
         # convert to Huggingface dataset
         self.train_ds = Dataset(pa.Table.from_pandas(train_df))
@@ -98,8 +92,7 @@ class DCTE(AbstractModel):
         docs_per_topic = predict_df.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
-        tfidf, count = c_tf_idf(
-            docs_per_topic["text"].values, m=len(predict_df))
+        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
         topics = extract_tfidf_topics(
             tfidf,
             count,
@@ -133,8 +126,7 @@ class DCTE(AbstractModel):
         one_hot_encoder = OneHotEncoder(
             sparse=False
         )  # Use sparse=False to get a dense array
-        predictions_one_hot = one_hot_encoder.fit_transform(
-            predict_df[["predictions"]])
+        predictions_one_hot = one_hot_encoder.fit_transform(predict_df[["predictions"]])
 
         # Transpose the one-hot encoded matrix to get shape (k, n)
         topic_document_matrix = predictions_one_hot.T
@@ -209,8 +201,7 @@ class DCTE(AbstractModel):
         print(metrics)
 
         predict_df = pd.DataFrame({"tokens": predict_dataset.get_corpus()})
-        predict_df["text"] = [" ".join(words)
-                              for words in predict_df["tokens"]]
+        predict_df["text"] = [" ".join(words) for words in predict_df["tokens"]]
 
         self.labels = self.model(predict_df["text"])
         predict_df["predictions"] = self.labels

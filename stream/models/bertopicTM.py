@@ -1,7 +1,10 @@
 import hdbscan
 import numpy as np
 import umap.umap_ as umap
-from octis.models.model import AbstractModel
+from loguru import logger
+from datetime import datetime
+from .base import BaseModel, TrainingStatus
+from .mixins import SentenceEncodingMixin
 from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import OneHotEncoder
 
@@ -9,7 +12,13 @@ from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 
 
-class BERTopicTM(AbstractModel):
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+MODEL_NAME = "BERTopicTM"
+EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
+logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+
+
+class BERTopicTM(BaseModel, SentenceEncodingMixin):
     """
     A topic modeling class that uses K-Means clustering on text data.
 
@@ -27,13 +36,15 @@ class BERTopicTM(AbstractModel):
 
     def __init__(
         self,
-        embedding_model_name: str = "all-MiniLM-L6-v2",
+        embedding_model_name: str = EMBEDDING_MODEL_NAME,
+        umap_args: dict = None,
         min_cluster_size: int = None,
-        umap_args: dict = {},
-        hdbscan_args: dict = {},
+        hdbscan_args: dict = None,
         random_state: int = None,
         embeddings_folder_path: str = None,
         embeddings_file_path: str = None,
+        save_embeddings: bool = False,
+        **kwargs,
     ):
         """
         Initializes the KmeansTM model with specified parameters.
@@ -46,48 +57,115 @@ class BERTopicTM(AbstractModel):
             kmeans_args (dict): KMeans arguments. Defaults to an empty dict.
             random_state (int): Random state for reproducibility. Defaults to None.
         """
-        super().__init__()
-        self.trained = False
-        self.embedding_model = SentenceTransformer(embedding_model_name)
-        self.embedding_model_name = embedding_model_name
-        self.umap_args = (
+        super().__init__(use_pretrained_embeddings=True, **kwargs)
+
+        self.save_hyperparameters(
+            ignore=[
+                "embeddings_file_path",
+                "embeddings_folder_path",
+                "random_state",
+                "save_embeddings",
+            ]
+        )
+
+        self.embedding_model_name = self.hparams.get(
+            "embedding_model_name", embedding_model_name
+        )
+        self.umap_args = self.hparams.get(
+            "umap_args",
             umap_args
-            if umap_args
-            else {
+            or {
                 "n_neighbors": 15,
                 "n_components": 15,
                 "metric": "cosine",
-            }
+            },
         )
         if random_state is not None:
             self.umap_args["random_state"] = random_state
         self.min_cluster_size = min_cluster_size
-        self.hdbscan_args = hdbscan_args
+        self.hdbscan_args = self.hparams.get("hdscan_args", hdbscan_args or {})
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
 
-    def _prepare_data(self):
+        self.save_embeddings = save_embeddings
+        self.n_topics = None
+
+        self._status = TrainingStatus.NOT_STARTED
+
+    def get_info(self):
+        """
+        Get information about the model.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including model name,
+            number of topics, embedding model name, UMAP arguments,
+            K-Means arguments, and training status.
+        """
+        info = {
+            "model_name": MODEL_NAME,
+            "num_topics": self.n_topics,
+            "embedding_model": self.embedding_model_name,
+            "umap_args": self.umap_args,
+            "hdbscan_args": self.hdbscan_args,
+            "trained": self._status.name,
+        }
+        return info
+
+    def _prepare_embeddings(self, dataset):
         """
         Prepares the dataset for clustering.
 
+        Parameters
+        ----------
+        dataset : Dataset
+            The dataset to be used for clustering.
         """
 
-        self.embeddings = self.dataset.get_embeddings(
-            self.embedding_model_name, self.embeddings_path, self.embeddings_file_path
-        )
-        self.dataframe = self.dataset.dataframe
+        if dataset.has_embeddings(self.embedding_model_name):
+            logger.info(
+                f"--- Loading precomputed {EMBEDDING_MODEL_NAME} embeddings ---"
+            )
+            self.embeddings = dataset.get_embeddings(
+                self.embedding_model_name,
+                self.embeddings_path,
+                self.embeddings_file_path,
+            )
+            self.dataframe = dataset.dataframe
+        else:
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
+            self.embeddings = self.encode_documents(
+                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
+            )
+            if self.save_embeddings:
+                dataset.save_embeddings(
+                    self.embeddings,
+                    self.embedding_model_name,
+                    self.embeddings_path,
+                    self.embeddings_file_path,
+                )
+        self.dataframe = dataset.dataframe
 
     def _clustering(self):
         """
         Applies K-Means clustering to the reduced embeddings.
         """
+
+        assert (
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+        ), "Reduced embeddings must be generated before clustering."
+
         try:
-            clustering_model = hdbscan.HDBSCAN(**self.hdbscan_args)
-            clustering_model.fit(self.reduced_embeddings)
-            self.labels = clustering_model.labels_
+            logger.info("--- Creating document cluster ---")
+            self.clustering_model = hdbscan.HDBSCAN(**self.hdbscan_args)
+            self.clustering_model.fit(self.reduced_embeddings)
+            self.labels = self.clustering_model.labels_
+            if self.labels.min() < 0:
+                self.labels += 1
 
         except Exception as e:
-            raise ValueError(f"Error in clustering: {e}") from e
+            raise RuntimeError(f"Error in clustering: {e}") from e
 
         labels = np.array(self.labels)
 
@@ -108,25 +186,24 @@ class BERTopicTM(AbstractModel):
     def _dim_reduction(self):
         """
         Reduces the dimensionality of embeddings using UMAP.
+
+        Raises
+        ------
+        ValueError
+            If an error occurs during dimensionality reduction.
         """
         try:
+            logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise ValueError(f"Error in dimensionality reduction: {e}") from e
+            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
 
-    def _get_topic_document_matrix(self):
-        assert (
-            self.trained
-        ), "Model must be trained before accessing the topic-document matrix."
-        # Safely get the topic-document matrix with a default value of None if not found
-        return self.output.get("topic-document-matrix", None)
-
-    def train_model(self, dataset):
+    def fit(self, dataset):
         """
-        Trains the K-Means topic model on the provided dataset.
+        Trains the BERTOPIC topic model on the provided dataset.
 
-        Applies sentence embedding, UMAP dimensionality reduction, and K-Means clustering
+        Applies sentence embedding, UMAP dimensionality reduction, and hdbscan clustering
         to the dataset to identify distinct topics within the text data.
 
         Parameters:
@@ -139,48 +216,132 @@ class BERTopicTM(AbstractModel):
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
-        self.dataset = dataset
-        print("--- preparing the dataset ---")
-        self._prepare_data()
-        print("--- Dimensionality Reduction ---")
-        self._dim_reduction()
-        if not self.min_cluster_size:
-            self.min_cluster_size = min(len(self.dataframe) // 100, 20)
-            self.min_samples = int(self.min_cluster_size / 2)
-            print(
-                "     --- Setting min_cluster_size to: ", self.min_cluster_size, " ---"
+        self._status = TrainingStatus.INITIALIZED
+        try:
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
+            self._status = TrainingStatus.RUNNING
+            self._prepare_embeddings(dataset)
+            self._dim_reduction()
+
+            self._clustering()
+
+            self.dataframe["predictions"] = self.labels
+            docs_per_topic = self.dataframe.groupby(
+                ["predictions"], as_index=False
+            ).agg({"text": " ".join})
+
+            tfidf, count = c_tf_idf(
+                docs_per_topic["text"].values, m=len(self.dataframe)
             )
-            print("     --- Setting min_samples to: ", self.min_samples, " ---")
-            self.hdbscan_args["min_cluster_size"] = self.min_cluster_size
-            self.hdbscan_args["min_samples"] = self.min_samples
-        print("--- Training the model ---")
-        self._clustering()
 
-        self.dataframe["predictions"] = self.labels
-        docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
-            {"text": " ".join}
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+
+            one_hot_encoder = OneHotEncoder(sparse=False)
+            predictions_one_hot = one_hot_encoder.fit_transform(
+                self.dataframe[["predictions"]]
+            )
+
+            self.topic_word_distribution = tfidf.T
+            self.document_topic_distribution = predictions_one_hot.T
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
+
+        logger.info("--- Training completed successfully. ---")
+        self._status = TrainingStatus.SUCCEEDED
+        self.n_topics = len(self.topic_dict)
+
+    def predict(self, texts):
+        """
+        Predict topics for new documents.
+
+        Parameters
+        ----------
+        texts : list of str
+            List of texts to predict topics for.
+
+        Returns
+        -------
+        list of int
+            List of predicted topic labels.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        embeddings = self.encode_documents(
+            texts, encoder_model=self.embedding_model_name, use_average=True
         )
+        reduced_embeddings = self.reducer.transform(embeddings)
+        labels = self.clustering_model.approximate_predict(reduced_embeddings)
+        return labels
 
-        print("--- Extracting the Topics ---")
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        topics = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
+    def get_topics(self, n_words=10):
+        """
+        Retrieve the top words for each topic.
 
-        one_hot_encoder = OneHotEncoder(
-            sparse=False
-        )  # Use sparse=False to get a dense array
-        predictions_one_hot = one_hot_encoder.fit_transform(
-            self.dataframe[["predictions"]]
-        )
+        Parameters
+        ----------
+        n_words : int
+            Number of top words to retrieve for each topic.
 
-        # Transpose the one-hot encoded matrix to get shape (k, n)
-        topic_document_matrix = predictions_one_hot.T
+        Returns
+        -------
+        list of list of str
+            List of topics with each topic represented as a list of top words.
 
-        self.output = {
-            "topics": [[word for word, _ in topics[key]] for key in topics],
-            "topic-word-matrix": tfidf.T,
-            "topic_dict": topics,
-            # Include the transposed one-hot encoded matrix
-            "topic-document-matrix": topic_document_matrix,
-        }
-        self.trained = True
-        return self.output
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        return [
+            [word for word, _ in self.topic_dict[key][:n_words]]
+            for key in self.topic_dict
+        ]
+
+    def get_topic_word_matrix(self):
+        """
+        Retrieve the topic-word distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-word distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        return self.topic_word_distribution
+
+    def get_topic_document_matrix(self):
+        """
+        Retrieve the topic-document distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-document distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        return self.topic_document_matrix

@@ -94,7 +94,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             Additional keyword arguments passed to super().__init__().
         """
 
-        super().__init__(**kwargs)
+        super().__init__(use_pretrained_embeddings=True, **kwargs)
         self.save_hyperparameters(
             ignore=[
                 "embeddings_file_path",
