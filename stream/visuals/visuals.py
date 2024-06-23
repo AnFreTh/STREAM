@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 
-from ..data_utils import TMDataset
-from ..models.base import BaseModel
+from ..utils import TMDataset
+from ..models.base import BaseModel, TrainingStatus
 from ._interactive import (
     _visualize_topic_model_2d,
     _visualize_topic_model_3d,
@@ -43,7 +43,7 @@ def visualize_topics_as_wordclouds(
         model.get_topic_dict(top_words=max_words)
 
     assert (
-        hasattr(model, "topic_dict") and model.trained
+        hasattr(model, "topic_dict") and model._status == TrainingStatus.SUCCEEDED
     ), "Model must have been trained with topics extracted."
 
     topics = model.get_topics()
@@ -118,7 +118,7 @@ def visualize_topic_model(
         model.get_embeddings(dataset)
 
     assert (
-        model.trained
+        model._status == TrainingStatus.SUCCEEDED
     ), "Be sure to only pass a trained model to the visualization function"
 
     if three_dim:
@@ -195,7 +195,7 @@ def visualize_topics(
         model.get_embeddings(dataset)
 
     assert (
-        model.trained
+        model._status == TrainingStatus.SUCCEEDED
     ), "Be sure to only pass a trained model to the visualization function"
 
     if three_dim:

@@ -94,6 +94,8 @@ def _visualize_topic_model_2d(
             embeddings = encoder.encode_documents(
                 dataset.texts, encoder_model=encoder_model, use_average=use_average
             )
+    else:
+        embeddings = model.embeddings
 
     num_docs_per_topic = pd.Series(model.labels).value_counts().sort_index()
 
