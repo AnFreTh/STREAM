@@ -3,11 +3,18 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
+from loguru import logger
+from datetime import datetime
 
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.cbc_utils import DocumentCoherence, get_top_tfidf_words_per_document
 from ..utils.dataset import TMDataset
-from .base import BaseModel
+from .base import BaseModel, TrainingStatus
+
+
+MODEL_NAME = "CBC"
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class CBC(BaseModel):
@@ -18,7 +25,8 @@ class CBC(BaseModel):
         Parameters:
             coherence_scores (DataFrame): DataFrame containing coherence scores between documents.
         """
-        self.trained = False
+        self._status = TrainingStatus.NOT_STARTED
+        self.n_topics = None
 
     def get_info(self):
         """
@@ -30,8 +38,9 @@ class CBC(BaseModel):
             Dictionary containing model information including model name
         """
         info = {
-            "model_name": "CBC",
-            "trained": self.trained,
+            "model_name": MODEL_NAME,
+            "num_topics": self.n_topics,
+            "trained": self._status.name,
         }
         return info
 
@@ -62,12 +71,17 @@ class CBC(BaseModel):
         dict
             A dictionary mapping cluster labels to lists of document indices.
         """
-        G = self._create_coherence_graph()
-        partition = community_louvain.best_partition(G, weight="weight")
+        try:
+            logger.info("--- Creating document cluster ---")
+            G = self._create_coherence_graph()
+            partition = community_louvain.best_partition(G, weight="weight")
 
-        clusters = {}
-        for node, cluster_id in partition.items():
-            clusters.setdefault(cluster_id, []).append(node)
+            clusters = {}
+            for node, cluster_id in partition.items():
+                clusters.setdefault(cluster_id, []).append(node)
+
+        except Exception as e:
+            raise RuntimeError(f"Error in clustering: {e}") from e
 
         return clusters
 
@@ -98,21 +112,9 @@ class CBC(BaseModel):
 
         return pd.DataFrame(combined_docs)
 
-    def _prepare_data(
+    def prepare_data(
         self,
         dataset,
-        remove_stopwords,
-        lowercase,
-        remove_punctuation,
-        remove_numbers,
-        lemmatize,
-        stem,
-        expand_contractions,
-        remove_html_tags,
-        remove_special_chars,
-        remove_accents,
-        custom_stopwords,
-        detokenize,
     ):
         """
         Prepares the dataset for clustering.
@@ -122,41 +124,6 @@ class CBC(BaseModel):
         dataset : TMDataset
             Dataset containing the documents.
         """
-
-        current_steps = {
-            "remove_stopwords": remove_stopwords,
-            "lowercase": lowercase,
-            "remove_punctuation": remove_punctuation,
-            "remove_numbers": remove_numbers,
-            "lemmatize": lemmatize,
-            "stem": stem,
-            "expand_contractions": expand_contractions,
-            "remove_html_tags": remove_html_tags,
-            "remove_special_chars": remove_special_chars,
-            "remove_accents": remove_accents,
-            "custom_stopwords": custom_stopwords,
-            "detokenize": detokenize,
-        }
-
-        # Check if the preprocessing steps are already applied
-        previous_steps = dataset.info.get("preprocessing_steps", {})
-
-        # Filter out steps that have already been applied
-        filtered_steps = {
-            key: (
-                False
-                if key in previous_steps and previous_steps[key] == value
-                else value
-            )
-            for key, value in current_steps.items()
-        }
-
-        if custom_stopwords:
-            filtered_steps["remove_stopwords"] = True
-
-        # Only preprocess if there are steps that need to be applied
-        if filtered_steps:
-            dataset.preprocess(**filtered_steps)
 
         self.dataframe = dataset.dataframe
         self.dataframe["tfidf_top_words"] = get_top_tfidf_words_per_document(
@@ -168,18 +135,6 @@ class CBC(BaseModel):
         dataset: TMDataset = None,
         max_topics: int = 20,
         max_iterations: int = 20,
-        remove_stopwords: bool = True,
-        lowercase: bool = False,
-        remove_punctuation: bool = True,
-        remove_numbers: bool = True,
-        lemmatize: bool = True,
-        stem: bool = False,
-        expand_contractions: bool = True,
-        remove_html_tags: bool = True,
-        remove_special_chars: bool = True,
-        remove_accents: bool = True,
-        custom_stopwords=[],
-        detokenize: bool = True,
     ):
         """
         Clusters documents based on coherence scores until the number of clusters is
@@ -204,69 +159,68 @@ class CBC(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        print("--- preparing the dataset ---")
-        self._prepare_data(
+        self.prepare_data(
             dataset,
-            remove_stopwords,
-            lowercase,
-            remove_punctuation,
-            remove_numbers,
-            lemmatize,
-            stem,
-            expand_contractions,
-            remove_html_tags,
-            remove_special_chars,
-            remove_accents,
-            custom_stopwords,
-            detokenize,
         )
 
         iteration = 0
         current_documents = self.dataframe.copy()
         document_indices = [[i] for i in range(len(current_documents))]
 
-        print("--- start training ---")
+        self._status = TrainingStatus.INITIALIZED
 
-        while True:
-            print(f"Iteration: {iteration}")
-            # Calculate coherence scores for the current set of documents
-            coherence_scores = DocumentCoherence(
-                current_documents, column="tfidf_top_words"
-            ).calculate_document_coherence()
+        try:
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
+            self._status = TrainingStatus.RUNNING
+            while True:
+                print(f"Iteration: {iteration}")
+                # Calculate coherence scores for the current set of documents
+                coherence_scores = DocumentCoherence(
+                    current_documents, column="tfidf_top_words"
+                ).calculate_document_coherence()
 
-            # Cluster the documents based on the current coherence scores
-            self.coherence_scores = coherence_scores
-            clusters = self.cluster_documents()
+                # Cluster the documents based on the current coherence scores
+                self.coherence_scores = coherence_scores
+                clusters = self.cluster_documents()
 
-            num_clusters = len(clusters)
-            print(f"Iteration {iteration}: {num_clusters} clusters formed.")
+                num_clusters = len(clusters)
+                print(f"Iteration {iteration}: {num_clusters} clusters formed.")
 
-            # Prepare for the next iteration
-            combined_documents = self.combine_documents(current_documents, clusters)
-            current_documents = combined_documents
-            iteration += 1
+                # Prepare for the next iteration
+                combined_documents = self.combine_documents(current_documents, clusters)
+                current_documents = combined_documents
+                iteration += 1
 
-            # Update document indices to reflect their new combined form
-            new_document_indices = []
-            for cluster_ids in clusters.values():
-                new_document_indices.append(
-                    [document_indices[idx] for idx in cluster_ids]
-                )
-            document_indices = new_document_indices
+                # Update document indices to reflect their new combined form
+                new_document_indices = []
+                for cluster_ids in clusters.values():
+                    new_document_indices.append(
+                        [document_indices[idx] for idx in cluster_ids]
+                    )
+                document_indices = new_document_indices
 
-            # Check if the number of clusters is within the threshold
-            if 2 <= num_clusters <= self.max_topics:
-                break
-            elif num_clusters < 2:
-                print(
-                    "Too few clusters formed. Consider changing parameters or input data."
-                )
-                break
+                # Check if the number of clusters is within the threshold
+                if 2 <= num_clusters <= self.max_topics:
+                    break
+                elif num_clusters < 2:
+                    print(
+                        "Too few clusters formed. Consider changing parameters or input data."
+                    )
+                    break
 
-            # Stop if too many iterations to prevent infinite loop
-            if iteration > max_iterations:  # You can adjust this limit
-                print("Maximum iterations reached. Stopping clustering process.")
-                break
+                # Stop if too many iterations to prevent infinite loop
+                if iteration > max_iterations:  # You can adjust this limit
+                    print("Maximum iterations reached. Stopping clustering process.")
+                    break
+
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
 
         labels = {}
         for cluster_label, doc_indices_group in enumerate(document_indices):
@@ -295,7 +249,7 @@ class CBC(BaseModel):
         docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
-        print("--- Extracting the Topics ---")
+        logger.info("--- Extract topics ---")
         tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
         self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
 
@@ -305,6 +259,9 @@ class CBC(BaseModel):
         predictions_one_hot = one_hot_encoder.fit_transform(
             self.dataframe[["predictions"]]
         )
+
+        logger.info("--- Training completed successfully. ---")
+        self._status = TrainingStatus.SUCCEEDED
 
         self.topic_word_distribution = tfidf.T
         self.document_topic_distribution = predictions_one_hot.T
@@ -329,8 +286,8 @@ class CBC(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         embeddings = self.encode_documents(
             texts, encoder_model=self.embedding_model_name, use_average=True
         )
@@ -357,8 +314,8 @@ class CBC(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return [
             [word for word, _ in self.topic_dict[key][:n_words]]
             for key in self.topic_dict
@@ -378,8 +335,8 @@ class CBC(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return self.topic_word_distribution
 
     def get_topic_document_matrix(self):
@@ -396,6 +353,6 @@ class CBC(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return self.topic_document_matrix

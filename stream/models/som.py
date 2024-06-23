@@ -5,11 +5,19 @@ import torch
 import umap.umap_ as umap
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm
+from loguru import logger
+from datetime import datetime
 
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
-from .base import BaseModel
+from .base import BaseModel, TrainingStatus
 from .mixins import SentenceEncodingMixin
+
+
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+MODEL_NAME = "SOMTM"
+EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
+logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class SOMTM(BaseModel, SentenceEncodingMixin):
@@ -18,7 +26,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         m: int,
         n: int,
         umap_args: dict = {},
-        embedding_model_name: str = "paraphrase-MiniLM-L3-v2",
+        embedding_model_name: str = EMBEDDING_MODEL_NAME,
         embeddings_folder_path: str = None,
         embeddings_file_path: str = None,
         save_embeddings: bool = False,
@@ -65,7 +73,6 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             ]
         )
 
-        self.trained = False
         self.m = self.hparams.get("m", m)
         self.n = self.hparams.get("n", n)
 
@@ -95,12 +102,13 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             umap_args
             or {
                 "n_neighbors": 15,
-                "n_components": 15,
+                "n_components": reduced_dimension,
                 "metric": "cosine",
             },
         )
 
         self.save_embeddings = save_embeddings
+        self._status = TrainingStatus.NOT_STARTED
 
     def get_info(self):
         """
@@ -114,16 +122,16 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             K-Means arguments, and training status.
         """
         info = {
-            "model_name": "SOMTM",
+            "model_name": MODEL_NAME,
             "num_topics": np.round(self.m * self.n),
             "embedding_model": self.embedding_model_name,
             "umap_args": self.umap_args,
-            "trained": self.trained,
+            "trained": self._status.name,
             "hyperparameters": self.hparams,
         }
         return info
 
-    def _prepare_data(self, dataset):
+    def _prepare_embeddings(self, dataset):
         """
         Prepares the dataset for clustering.
 
@@ -134,6 +142,9 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         """
 
         if dataset.has_embeddings(self.embedding_model_name):
+            logger.info(
+                f"--- Loading pre-computed {EMBEDDING_MODEL_NAME} embeddings ---"
+            )
             self.embeddings = dataset.get_embeddings(
                 self.embedding_model_name,
                 self.embeddings_path,
@@ -142,6 +153,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             self.dataframe = dataset.dataframe
 
         else:
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -231,7 +243,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
 
             if self.use_softmax:
                 influence = torch.nn.functional.softmax(
-                    -distance_squares / (2 * rad_squared)
+                    -distance_squares / (2 * rad_squared), dim=0
                 )
             else:
                 influence = torch.exp(-distance_squares / (2 * rad_squared))
@@ -250,7 +262,6 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         batch_size : int
             Size of each mini-batch.
         """
-        print("--- start training ---")
         n_samples = len(data)
         for iteration in tqdm(range(self.n_iterations)):
             # Shuffle data at each epoch
@@ -275,11 +286,11 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during dimensionality reduction.
         """
         try:
-            print("--- Reducing dimensions ---")
+            logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise ValueError(f"Error in dimensionality reduction: {e}") from e
+            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
 
     def _get_weights(self):
         """
@@ -361,29 +372,43 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        self._prepare_data(dataset)
-        if self.reduce_dim:
-            self._dim_reduction()
-            self._train_batch(self.reduced_embeddings, self.batch_size)
-        else:
-            self._train_batch(self.embeddings, self.batch_size)
+        self._status = TrainingStatus.INITIALIZED
+        try:
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
+            self._status = TrainingStatus.RUNNING
+            self._prepare_embeddings(dataset)
+            if self.reduce_dim:
+                self._dim_reduction()
+                self._train_batch(self.reduced_embeddings, self.batch_size)
+            else:
+                self._train_batch(self.embeddings, self.batch_size)
+            self.dataframe["predictions"] = self.labels
+            docs_per_topic = self.dataframe.groupby(
+                ["predictions"], as_index=False
+            ).agg({"text": " ".join})
 
-        self.dataframe["predictions"] = self.labels
-        docs_per_topic = self.dataframe.groupby(["predictions"], as_index=False).agg(
-            {"text": " ".join}
-        )
+            tfidf, count = c_tf_idf(
+                docs_per_topic["text"].values, m=len(self.dataframe)
+            )
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+            one_hot_encoder = OneHotEncoder(sparse=False)
+            predictions_one_hot = one_hot_encoder.fit_transform(
+                self.dataframe[["predictions"]]
+            )
+            self.topic_word_distribution = tfidf.T
+            self.document_topic_distribution = predictions_one_hot.T
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
 
-        one_hot_encoder = OneHotEncoder(sparse=False)
-        predictions_one_hot = one_hot_encoder.fit_transform(
-            self.dataframe[["predictions"]]
-        )
-
-        self.topic_word_distribution = tfidf.T
-        self.document_topic_distribution = predictions_one_hot.T
-        self.trained = True
+        logger.info("--- Training completed successfully. ---")
+        self._status = TrainingStatus.SUCCEEDED
 
     def get_topics(self, n_words=10):
         """
@@ -404,8 +429,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return [
             [word for word, _ in self.topic_dict[key][:n_words]]
             for key in self.topic_dict
@@ -425,8 +450,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return self.topic_word_distribution
 
     def get_topic_document_matrix(self):
@@ -443,6 +468,9 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         ValueError
             If the model has not been trained yet.
         """
-        if not self.trained:
-            raise ValueError("Model has not been trained yet.")
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
         return self.topic_document_matrix
+
+    def predict(self, documents):
+        pass

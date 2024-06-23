@@ -54,7 +54,7 @@ class BaseModel(ABC):
             Load the model state and parameters from a file.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, use_pretrained_embeddings=True, **kwargs):
         """
         Initialize BaseModel with hyperparameters.
 
@@ -67,6 +67,7 @@ class BaseModel(ABC):
         self.document_topic_distribution = None
         self.topic_word_distribution = None
         self.training_data = None
+        self.use_pretrained_embeddings = use_pretrained_embeddings
 
     @abstractmethod
     def get_info(self):

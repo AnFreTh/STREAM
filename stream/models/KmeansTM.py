@@ -1,6 +1,7 @@
 import numpy as np
 import umap.umap_ as umap
 from loguru import logger
+from datetime import datetime
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 
@@ -9,9 +10,11 @@ from ..utils.dataset import TMDataset
 from .base import BaseModel, TrainingStatus
 from .mixins import SentenceEncodingMixin
 
+
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "KmeansTM"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
-logger.add("{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class KmeansTM(BaseModel, SentenceEncodingMixin):
@@ -59,8 +62,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
     def __init__(
         self,
         embedding_model_name: str = EMBEDDING_MODEL_NAME,
-        umap_args: dict = {},
-        kmeans_args: dict = {},
+        umap_args: dict = None,
+        kmeans_args: dict = None,
         random_state: int = None,
         embeddings_folder_path: str = None,
         embeddings_file_path: str = None,
@@ -89,7 +92,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         **kwargs
             Additional keyword arguments passed to the superclass.
         """
-        super().__init__(**kwargs)
+        super().__init__(use_pretrained_embeddings=True, **kwargs)
         self.save_hyperparameters(
             ignore=[
                 "embeddings_file_path",
@@ -144,7 +147,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         }
         return info
 
-    def _prepare_data(self, dataset):
+    def _prepare_embeddings(self, dataset):
         """
         Prepares the dataset for clustering.
 
@@ -155,6 +158,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         """
 
         if dataset.has_embeddings(self.embedding_model_name):
+            logger.info(
+                f"--- Loading precomputed {EMBEDDING_MODEL_NAME} embeddings ---"
+            )
             self.embeddings = dataset.get_embeddings(
                 self.embedding_model_name,
                 self.embeddings_path,
@@ -162,6 +168,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             )
             self.dataframe = dataset.dataframe
         else:
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -220,7 +227,11 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         except Exception as e:
             raise RuntimeError(f"Error in clustering: {e}") from e
 
-    def fit(self, dataset: TMDataset = None, n_topics: int = 20):
+    def fit(
+        self,
+        dataset: TMDataset = None,
+        n_topics: int = 20,
+    ):
         """
         Trains the K-Means topic model on the provided dataset.
 
@@ -247,11 +258,10 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             raise ValueError("Number of topics must be greater than 0.")
 
         self._status = TrainingStatus.INITIALIZED
-
         try:
-            logger.info("Training K-Means topic model.")
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self._prepare_data(dataset)
+            self._prepare_embeddings(dataset)
             self._dim_reduction()
             self._clustering()
 
@@ -282,7 +292,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             self._status = TrainingStatus.INTERRUPTED
             raise
 
-        logger.info("Training completed successfully.")
+        logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
     def predict(self, texts):
