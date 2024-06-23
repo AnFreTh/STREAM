@@ -406,6 +406,9 @@ class TMDataset(Dataset):
                 )
                 self.texts = preprocessor.preprocess_documents(self.texts)
                 self.dataframe["text"] = self.texts
+                self.dataframe["tokens"] = self.dataframe["text"].apply(
+                    lambda x: x.split()
+                )
 
                 self.info.update(
                     {
