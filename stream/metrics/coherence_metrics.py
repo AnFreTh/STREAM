@@ -12,8 +12,6 @@ from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from ._helper_funcs import cos_sim_pw, embed_corpus, embed_topic, update_corpus_dic_list
 from .constants import NLTK_STOPWORD_LANGUAGE
 
-nltk.download("stopwords")
-
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 
@@ -136,7 +134,7 @@ class NPMI(AbstractMetric):
         """
         return self._create_vocab_preprocess(self.files, preprocess)
 
-    def score(self, model_output):
+    def score(self, topic_words):
         """
         Calculates the average NPMI score for the given model output.
 
@@ -149,7 +147,6 @@ class NPMI(AbstractMetric):
         Returns:
             float: The average NPMI score for the topics.
         """
-        topic_words = model_output["topics"]
         self.ntopics = len(topic_words)
         (
             word_doc_counts,
@@ -190,7 +187,7 @@ class NPMI(AbstractMetric):
 
         return avg_score
 
-    def score_per_topic(self, model_output, preprocess=5):
+    def score_per_topic(self, topic_words, preprocess=5):
         """
         Calculates NPMI scores per topic for the given set of topics.
 
@@ -206,7 +203,7 @@ class NPMI(AbstractMetric):
         Returns:
             dict: A dictionary with topics as keys and their corresponding NPMI scores as values.
         """
-        topic_words = model_output["topics"]
+
         ntopics = len(topic_words)
 
         (
@@ -340,7 +337,11 @@ class Embedding_Coherence(AbstractMetric):
         self.embeddings = emb_tw
 
         topic_sims = []
-        for topic_emb in emb_tw:  # for each topic append the average pairwise cosine similarity within its words
+        for (
+            topic_emb
+        ) in (
+            emb_tw
+        ):  # for each topic append the average pairwise cosine similarity within its words
             topic_sims.append(float(cos_sim_pw(topic_emb)))
 
         results = {}

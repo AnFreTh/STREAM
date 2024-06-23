@@ -16,8 +16,6 @@ from ._helper_funcs import (
 )
 from .constants import NLTK_STOPWORD_LANGUAGE, SENTENCE_TRANSFORMER_MODEL
 
-nltk.download("stopwords")
-
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
@@ -144,7 +142,9 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True
-        ).reshape(-1, 1)  # normalize the weights such that they sum up to one
+        ).reshape(
+            -1, 1
+        )  # normalize the weights such that they sum up to one
 
         print(topic_weights)
         print(np.isnan(topic_weights).any())
@@ -167,8 +167,8 @@ class Embedding_Topic_Diversity(AbstractMetric):
         sim = cosine_similarity(
             topic_means
         )  # calculate the pairwise cosine similarity of the topic means
-        sim_mean = (
-            (np.sum(sim, axis=1) - 1) / (len(sim) - 1)
+        sim_mean = (np.sum(sim, axis=1) - 1) / (
+            len(sim) - 1
         )  # average the similarity of each topic's mean to the mean of every other topic
 
         results = {}
@@ -304,7 +304,9 @@ class Expressivity(AbstractMetric):
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True
-        ).reshape(-1, 1)  # normalize the weights such that they sum up to one
+        ).reshape(
+            -1, 1
+        )  # normalize the weights such that they sum up to one
 
         if self.embeddings is None:
             emb_tw = embed_topic(
