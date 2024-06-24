@@ -44,16 +44,16 @@ class TMDataset(Dataset):
         return {
             "remove_stopwords": False,
             "lowercase": True,
-            "remove_punctuation": True,
-            "remove_numbers": True,
+            "remove_punctuation": False,
+            "remove_numbers": False,
             "lemmatize": False,
             "stem": False,
             "expand_contractions": True,
             "remove_html_tags": True,
             "remove_special_chars": True,
-            "remove_accents": True,
+            "remove_accents": False,
             "custom_stopwords": set(),
-            "detokenize": False,
+            "detokenize": True,
         }
 
     def load_model_preprocessing_steps(self, model_type, filepath=None):
