@@ -27,7 +27,7 @@ class TextPreprocessor:
         self.remove_accents = kwargs.get("remove_accents", True)
         self.custom_stopwords = set(kwargs.get("custom_stopwords", []))
         self.detokenize = kwargs.get("detokenize", False)
-        self.min_word_freq = kwargs.get("min_word_freq", 5)
+        self.min_word_freq = kwargs.get("min_word_freq", 2)
         self.max_word_freq = kwargs.get("max_word_freq", None)
         self.min_word_length = kwargs.get("min_word_length", 3)
         self.max_word_length = kwargs.get("max_word_length", None)
@@ -85,10 +85,10 @@ class TextPreprocessor:
 
     def _remove_html_tags(self, text):
         clean = re.compile("<.*?>")
-        return re.sub(clean, "", text)
+        return re.sub(clean, " ", text)
 
     def _remove_special_characters(self, text):
-        return re.sub(r"[^a-zA-Z0-9\s]", "", text)
+        return re.sub(r"[^a-zA-Z0-9\s]", " ", text)
 
     def _remove_accents(self, text):
         text = unicodedata.normalize("NFD", text)
@@ -108,9 +108,9 @@ class TextPreprocessor:
         if self.remove_accents:
             text = self._remove_accents(text)
         if self.remove_numbers:
-            text = re.sub(r"\d+", "", text)
+            text = re.sub(r"\d+", " ", text)
         if self.remove_punctuation:
-            text = re.sub(r"[^\w\s]", "", text)
+            text = re.sub(r"[^\w\s]", " ", text)
 
         words = word_tokenize(text)
 
@@ -142,7 +142,7 @@ class TextPreprocessor:
         if self.max_word_length is not None:
             words = [word for word in words if len(word) <= self.max_word_length]
 
-        if self.dictionary:
+        if self.dictionary != set():
             words = [word for word in words if word in self.dictionary]
 
         if self.remove_words_with_numbers:
@@ -155,6 +155,9 @@ class TextPreprocessor:
             text = TreebankWordDetokenizer().detokenize(words)
         else:
             text = " ".join(words)
+
+        # Remove double spaces
+        text = re.sub(r"\s+", " ", text)
 
         return text
 
