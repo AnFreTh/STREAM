@@ -7,7 +7,7 @@ from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm
 from loguru import logger
 from datetime import datetime
-
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .base import BaseModel, TrainingStatus
@@ -131,42 +131,6 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         }
         return info
 
-    def _prepare_embeddings(self, dataset):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.embedding_model_name):
-            logger.info(
-                f"--- Loading pre-computed {EMBEDDING_MODEL_NAME} embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.embedding_model_name,
-                self.embeddings_path,
-                self.embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-
-        else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
-            )
-
-            if self.save_embeddings:
-                dataset.save_embeddings(
-                    self.embeddings,
-                    self.embedding_model_name,
-                    self.embeddings_path,
-                    self.embeddings_file_path,
-                )
-        self.dataframe = dataset.dataframe
-
     def _find_bmu(self, x):
         """
         Find the Best Matching Unit (BMU) for a given vector.
@@ -276,22 +240,6 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
 
         self.labels = self._get_cluster_labels(data)
 
-    def _dim_reduction(self):
-        """
-        Reduces the dimensionality of embeddings using UMAP.
-
-        Raises
-        ------
-        ValueError
-            If an error occurs during dimensionality reduction.
-        """
-        try:
-            logger.info("--- Reducing dimensions ---")
-            self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
-        except Exception as e:
-            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
-
     def _get_weights(self):
         """
         Get the trained weights of the SOM.
@@ -372,13 +320,16 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+
         self._status = TrainingStatus.INITIALIZED
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self._prepare_embeddings(dataset)
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+
             if self.reduce_dim:
-                self._dim_reduction()
+                self.reduced_embeddings = self.dim_reduction(logger)
                 self._train_batch(self.reduced_embeddings, self.batch_size)
             else:
                 self._train_batch(self.embeddings, self.batch_size)
@@ -396,8 +347,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             predictions_one_hot = one_hot_encoder.fit_transform(
                 self.dataframe[["predictions"]]
             )
-            self.topic_word_distribution = tfidf.T
-            self.document_topic_distribution = predictions_one_hot.T
+            self.beta = tfidf.T
+            self.theta = predictions_one_hot.T
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED

@@ -3,7 +3,9 @@ from datetime import datetime
 import gensim.corpora as corpora
 from nltk.tokenize import word_tokenize
 import numpy as np
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
+from ..utils.check_dataset_steps import check_dataset_steps
 from .base import BaseModel, TrainingStatus
 from gensim.models import ldamodel
 import pandas as pd
@@ -129,6 +131,8 @@ class LDA(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+
         self.n_topics = n_topics
 
         try:
@@ -150,45 +154,15 @@ class LDA(BaseModel):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
-        self.soft_labels = self.get_topic_document_matrix()
-        self.labels = np.array(np.argmax(self.soft_labels, axis=1))
+        self.theta = self.get_theta()
+        self.labels = np.array(np.argmax(self.theta, axis=1))
 
         self.topic_dict = self._get_topic_word_dict()
 
     def predict(self, dataset):
         pass
 
-    def get_topics(self, n_words: int = 10):
-        """
-        Get the top words for each topic.
-
-        Parameters
-        ----------
-        n_words : int, optional
-            The number of top words to retrieve for each topic (default is 10).
-
-        Returns
-        -------
-        topics : list of list of str
-            List of topics, where each topic is a list of top words.
-
-        Raises
-        ------
-        RuntimeError
-            If the model has not been trained yet or failed.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-
-        topics = []
-        for i in range(self.n_topics):
-            topic_words_list = []
-            for word_tuple in self.model.get_topic_terms(i, n_words):
-                topic_words_list.append(self.id2word[word_tuple[0]])
-            topics.append(topic_words_list)
-        return topics
-
-    def get_topic_document_matrix(self):
+    def get_theta(self):
         """
         Get the topic distribution for each document.
 
@@ -249,7 +223,7 @@ class LDA(BaseModel):
 
         return df
 
-    def get_topic_word_matrix(self):
+    def get_beta(self):
         """
         Get the word distribution for each topic.
 
