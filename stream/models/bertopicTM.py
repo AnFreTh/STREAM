@@ -7,7 +7,7 @@ from .base import BaseModel, TrainingStatus
 from .mixins import SentenceEncodingMixin
 from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import OneHotEncoder
-
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 
@@ -113,40 +113,6 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         }
         return info
 
-    def _prepare_embeddings(self, dataset):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.embedding_model_name):
-            logger.info(
-                f"--- Loading precomputed {EMBEDDING_MODEL_NAME} embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.embedding_model_name,
-                self.embeddings_path,
-                self.embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-        else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
-            )
-            if self.save_embeddings:
-                dataset.save_embeddings(
-                    self.embeddings,
-                    self.embedding_model_name,
-                    self.embeddings_path,
-                    self.embeddings_file_path,
-                )
-        self.dataframe = dataset.dataframe
-
     def _clustering(self):
         """
         Applies K-Means clustering to the reduced embeddings.
@@ -183,22 +149,6 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             # Store the mean embedding in the dictionary
             self.topic_centroids.append(mean_embedding)
 
-    def _dim_reduction(self):
-        """
-        Reduces the dimensionality of embeddings using UMAP.
-
-        Raises
-        ------
-        ValueError
-            If an error occurs during dimensionality reduction.
-        """
-        try:
-            logger.info("--- Reducing dimensions ---")
-            self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
-        except Exception as e:
-            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
-
     def fit(self, dataset):
         """
         Trains the BERTOPIC topic model on the provided dataset.
@@ -216,12 +166,14 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
+        check_dataset_steps(dataset, logger, MODEL_NAME)
         self._status = TrainingStatus.INITIALIZED
+
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self._prepare_embeddings(dataset)
-            self._dim_reduction()
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.reduced_embeddings = self.dim_reduction(logger)
 
             self._clustering()
 
@@ -241,8 +193,8 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
                 self.dataframe[["predictions"]]
             )
 
-            self.topic_word_distribution = tfidf.T
-            self.document_topic_distribution = predictions_one_hot.T
+            self.beta = tfidf.T
+            self.theta = predictions_one_hot.T
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED
@@ -283,65 +235,3 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         reduced_embeddings = self.reducer.transform(embeddings)
         labels = self.clustering_model.approximate_predict(reduced_embeddings)
         return labels
-
-    def get_topics(self, n_words=10):
-        """
-        Retrieve the top words for each topic.
-
-        Parameters
-        ----------
-        n_words : int
-            Number of top words to retrieve for each topic.
-
-        Returns
-        -------
-        list of list of str
-            List of topics with each topic represented as a list of top words.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        return [
-            [word for word, _ in self.topic_dict[key][:n_words]]
-            for key in self.topic_dict
-        ]
-
-    def get_topic_word_matrix(self):
-        """
-        Retrieve the topic-word distribution matrix.
-
-        Returns
-        -------
-        numpy.ndarray
-            Topic-word distribution matrix.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        return self.topic_word_distribution
-
-    def get_topic_document_matrix(self):
-        """
-        Retrieve the topic-document distribution matrix.
-
-        Returns
-        -------
-        numpy.ndarray
-            Topic-document distribution matrix.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        return self.topic_document_matrix
