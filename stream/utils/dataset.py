@@ -53,7 +53,7 @@ class TMDataset(Dataset):
             "remove_special_chars": True,
             "remove_accents": True,
             "custom_stopwords": set(),
-            "detokenize": True,
+            "detokenize": False,
         }
 
     def load_model_preprocessing_steps(self, model_type, filepath=None):
@@ -323,7 +323,9 @@ class TMDataset(Dataset):
             "name": dataset_name,
             "language": self.language,
             "preprocessing_steps": {
-                k: v for k, v in preprocessor.__dict__.items() if k != "stopwords"
+                k: v
+                for k, v in preprocessor.__dict__.items()
+                if k not in ["stop_words", "language", "contractions_dict"]
             },
         }
         info_path = os.path.join(save_dir, f"{dataset_name}_info.pkl")
@@ -378,7 +380,7 @@ class TMDataset(Dataset):
         """
         if model_type:
             preprocessing_steps = self.load_model_preprocessing_steps(model_type)
-        previous_steps = self.info.get("preprocessing_steps", {})
+        previous_steps = self.preprocessing_steps
 
         # Filter out steps that have already been applied
         filtered_steps = {
@@ -406,6 +408,9 @@ class TMDataset(Dataset):
                 )
                 self.texts = preprocessor.preprocess_documents(self.texts)
                 self.dataframe["text"] = self.texts
+                self.dataframe["tokens"] = self.dataframe["text"].apply(
+                    lambda x: x.split()
+                )
 
                 self.info.update(
                     {
@@ -418,9 +423,26 @@ class TMDataset(Dataset):
                 )
             except Exception as e:
                 raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+        self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
-        self.preprocessing_steps.update(preprocessing_steps)
+        """
+        Update preprocessing steps to True if they were previously False.
+
+        Parameters
+        ----------
+        preprocessing_steps : dict
+            Key-value pairs of preprocessing steps to update.
+        """
+        for step, value in preprocessing_steps.items():
+            if (
+                value is True
+                and step in self.preprocessing_steps
+                and not self.preprocessing_steps[step]
+            ):
+                self.preprocessing_steps[step] = True
+            elif value is True and step not in self.preprocessing_steps:
+                self.preprocessing_steps[step] = True
 
     def get_info(self, dataset_path=None):
         """

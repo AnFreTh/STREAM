@@ -181,22 +181,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 )
         self.dataframe = dataset.dataframe
 
-    def _dim_reduction(self):
-        """
-        Reduces the dimensionality of embeddings using UMAP.
-
-        Raises
-        ------
-        ValueError
-            If an error occurs during dimensionality reduction.
-        """
-        try:
-            logger.info("--- Reducing dimensions ---")
-            self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
-        except Exception as e:
-            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
-
     def _clustering(self):
         """
         Applies K-Means clustering to the reduced embeddings.
@@ -261,8 +245,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self._prepare_embeddings(dataset)
-            self._dim_reduction()
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
             self.dataframe["predictions"] = self.labels
@@ -280,8 +264,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 self.dataframe[["predictions"]]
             )
 
-            self.topic_word_distribution = tfidf.T
-            self.document_topic_distribution = predictions_one_hot.T
+            self.beta = tfidf.T
+            self.theta = predictions_one_hot.T
 
         except Exception as e:
             logger.error(f"Error in training: {e}")
@@ -322,65 +306,3 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         reduced_embeddings = self.reducer.transform(embeddings)
         labels = self.clustering_model.predict(reduced_embeddings)
         return labels
-
-    def get_topics(self, n_words=10):
-        """
-        Retrieve the top words for each topic.
-
-        Parameters
-        ----------
-        n_words : int
-            Number of top words to retrieve for each topic.
-
-        Returns
-        -------
-        list of list of str
-            List of topics with each topic represented as a list of top words.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        return [
-            [word for word, _ in self.topic_dict[key][:n_words]]
-            for key in self.topic_dict
-        ]
-
-    def get_topic_word_matrix(self):
-        """
-        Retrieve the topic-word distribution matrix.
-
-        Returns
-        -------
-        numpy.ndarray
-            Topic-word distribution matrix.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        return self.topic_word_distribution
-
-    def get_topic_document_matrix(self):
-        """
-        Retrieve the topic-document distribution matrix.
-
-        Returns
-        -------
-        numpy.ndarray
-            Topic-document distribution matrix.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        return self.topic_document_matrix
