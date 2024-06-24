@@ -26,7 +26,7 @@ class TextPreprocessor:
         self.remove_special_chars = kwargs.get("remove_special_chars", True)
         self.remove_accents = kwargs.get("remove_accents", True)
         self.custom_stopwords = set(kwargs.get("custom_stopwords", []))
-        self.detokenize = kwargs.get("detokenize", True)
+        self.detokenize = kwargs.get("detokenize", False)
         self.min_word_freq = kwargs.get("min_word_freq", 5)
         self.max_word_freq = kwargs.get("max_word_freq", None)
         self.min_word_length = kwargs.get("min_word_length", 3)
