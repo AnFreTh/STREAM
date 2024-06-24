@@ -3,7 +3,7 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from enum import Enum
-
+import umap.umap_ as umap
 from loguru import logger
 
 
@@ -32,10 +32,10 @@ class BaseModel(ABC):
         get_topics(n_words=10):
             Retrieve the top words for each topic.
 
-        get_topic_word_matrix():
+        get_beta():
             Retrieve the topic-word distribution matrix.
 
-        get_topic_document_matrix():
+        get_theta():
             Retrieve the topic-document distribution matrix.
 
         save_hyperparameters(ignore=[]):
@@ -98,39 +98,6 @@ class BaseModel(ABC):
 
         Returns:
             Predicted topics for input documents.
-        """
-        pass
-
-    @abstractmethod
-    def get_topics(self, n_words=10):
-        """
-        Retrieve the top words for each topic.
-
-        Parameters:
-            n_words (int): Number of top words to retrieve for each topic.
-
-        Returns:
-            dict: A dictionary where keys are topic ids and values are lists of top words.
-        """
-        pass
-
-    @abstractmethod
-    def get_topic_word_matrix(self):
-        """
-        Retrieve the topic-word distribution matrix.
-
-        Returns:
-            np.array: A matrix of size (n_topics, n_words) representing the word distribution for each topic.
-        """
-        pass
-
-    @abstractmethod
-    def get_topic_document_matrix(self):
-        """
-        Retrieve the topic-document distribution matrix.
-
-        Returns:
-            np.array: A matrix of size (n_topics, n_documents) representing the topic distribution for each document.
         """
         pass
 
@@ -207,6 +174,129 @@ class BaseModel(ABC):
         else:
             logger.error(f"Model file not found at: {path}")
             raise FileNotFoundError(f"Model file not found at: {path}")
+
+    def dim_reduction(self, logger):
+        """
+        Reduces the dimensionality of embeddings using UMAP.
+
+        Raises
+        ------
+        ValueError
+            If an error occurs during dimensionality reduction.
+        """
+        assert hasattr(
+            self, "embeddings"
+        ), "Model has no embeddings to reduce dimensions."
+        assert hasattr(self, "umap_args"), "Model has no UMAP arguments specified."
+        try:
+            logger.info("--- Reducing dimensions ---")
+            self.reducer = umap.UMAP(**self.umap_args)
+            reduced_embeddings = self.reducer.fit_transform(self.embeddings)
+        except Exception as e:
+            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
+
+        return reduced_embeddings
+
+    def prepare_embeddings(self, dataset, logger):
+        """
+        Prepares the dataset for clustering.
+
+        Parameters
+        ----------
+        dataset : Dataset
+            The dataset to be used for clustering.
+        """
+
+        if dataset.has_embeddings(self.embedding_model_name):
+            logger.info(
+                f"--- Loading precomputed {self.embedding_model_name} embeddings ---"
+            )
+            embeddings = dataset.get_embeddings(
+                self.embedding_model_name,
+                self.embeddings_path,
+                self.embeddings_file_path,
+            )
+
+        else:
+            logger.info(
+                f"--- Creating {self.embedding_model_name} document embeddings ---"
+            )
+            embeddings = self.encode_documents(
+                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
+            )
+            if self.save_embeddings:
+                dataset.save_embeddings(
+                    embeddings,
+                    self.embedding_model_name,
+                    self.embeddings_path,
+                    self.embeddings_file_path,
+                )
+        return dataset.dataframe, embeddings
+
+    def get_topics(self, n_words=10):
+        """
+        Retrieve the top words for each topic.
+
+        Parameters
+        ----------
+        n_words : int
+            Number of top words to retrieve for each topic.
+
+        Returns
+        -------
+        list of list of str
+            List of topics with each topic represented as a list of top words.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        assert hasattr(self, "topic_dict"), "Model has no topic dictionary."
+        return [
+            [word for word, _ in self.topic_dict[key][:n_words]]
+            for key in self.topic_dict
+        ]
+
+    def get_beta(self):
+        """
+        Retrieve the topic-word distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-word distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        assert hasattr(self, "beta"), "Model has no topic-word distribution."
+        return self.beta
+
+    def get_theta(self):
+        """
+        Retrieve the topic-document distribution matrix.
+
+        Returns
+        -------
+        numpy.ndarray
+            Topic-document distribution matrix.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        assert hasattr(self, "theta"), "Model has no topic-document distribution."
+        return self.theta
 
 
 class TrainingStatus(str, Enum):
