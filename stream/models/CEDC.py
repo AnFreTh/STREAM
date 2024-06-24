@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
 from loguru import logger
 from datetime import datetime
-
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
 from ..utils.dataset import TMDataset
@@ -163,42 +163,6 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         }
         return info
 
-    def _prepare_embeddings(self, dataset):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.embedding_model_name):
-            logger.info(
-                f"--- Loading pre-computed {EMBEDDING_MODEL_NAME} embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.embedding_model_name,
-                self.embeddings_path,
-                self.embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-
-        else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
-            )
-
-            if self.save_embeddings:
-                dataset.save_embeddings(
-                    self.embeddings,
-                    self.embedding_model_name,
-                    self.embeddings_path,
-                    self.embeddings_file_path,
-                )
-        self.dataframe = dataset.dataframe
-
     def _clustering(self):
         """
         Applies GMM clustering to the reduced embeddings.
@@ -226,22 +190,6 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
         except Exception as e:
             raise RuntimeError(f"Error in clustering: {e}") from e
-
-    def _dim_reduction(self):
-        """
-        Reduces the dimensionality of embeddings using UMAP.
-
-        Raises
-        ------
-        ValueError
-            If an error occurs during dimensionality reduction.
-        """
-        try:
-            logger.info("--- Reducing dimensions ---")
-            self.reducer = umap.UMAP(**self.umap_args)
-            self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
-        except Exception as e:
-            raise ValueError(f"Error in dimensionality reduction: {e}") from e
 
     def fit(
         self,
@@ -282,6 +230,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+
         self.n_topics = n_topics
         if self.n_topics <= 0:
             raise ValueError("Number of topics must be greater than 0.")
@@ -291,8 +241,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self._prepare_embeddings(dataset)
-            self._dim_reduction()
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
             assert (
@@ -334,122 +284,9 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
-        self.topic_word_distribution = self.get_topic_word_matrix(topics)
         self.topic_dict = topics
-        self.document_topic_distribution = np.array(self.soft_labels.T)
-
-    def get_topics(self, n_words=10):
-        """
-        Retrieve the top words for each topic.
-
-        Parameters
-        ----------
-        n_words : int
-            Number of top words to retrieve for each topic.
-
-        Returns
-        -------
-        list of list of str
-            List of topics with each topic represented as a list of top words.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        words_list = []
-        new_topics = {}
-        for k in range(self.n_topics):
-            words = [
-                word
-                for t in self.topic_dict[k][0:n_words]
-                for word in t
-                if isinstance(word, str)
-            ]
-            weights = [
-                weight
-                for t in self.topic_dict[k][0:n_words]
-                for weight in t
-                if isinstance(weight, float)
-            ]
-            weights = [weight / sum(weights) for weight in weights]
-            new_topics[k] = list(zip(words, weights))
-            words_list.append(words)
-
-        return words_list
-
-    def get_topic_document_matrix(self):
-        """
-        Retrieves the topic-document matrix if the model is trained.
-
-        Returns
-        -------
-        ndarray or None
-            Topic-document matrix if the model is trained, otherwise None.
-
-        Raises
-        ------
-        RuntimeError
-            If the model is not trained before accessing the topic-document matrix.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        # Safely get the topic-document matrix with a default value of None if not found
-        return self.output.get("topic-document-matrix", None)
-
-    def get_topic_word_matrix(self, topic_dict):
-        """
-        Constructs a topic-word matrix from the given topic dictionary.
-
-        Parameters
-        ----------
-        topic_dict : dict
-            Dictionary where keys are topic indices and values are lists of (word, prevalence) tuples.
-
-        Returns
-        -------
-        ndarray
-            Topic-word matrix where rows represent topics and columns represent words.
-
-        Notes
-        -----
-        The topic-word matrix is constructed by assigning prevalences of words in topics.
-        Words are sorted alphabetically across all topics.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        # Extract all unique words and sort them
-        all_words = set(word for topic in topic_dict.values() for word, _ in topic)
-        sorted_words = sorted(all_words)
-
-        # Create an empty DataFrame with sorted words as rows and topics as columns
-        topic_word_matrix = pd.DataFrame(
-            index=sorted_words, columns=sorted(topic_dict.keys()), data=0.0
-        )
-
-        # Populate the DataFrame with prevalences
-        for topic, words in topic_dict.items():
-            for word, prevalence in words:
-                if word in topic_word_matrix.index:
-                    topic_word_matrix.at[word, topic] = prevalence
-
-        return np.array(topic_word_matrix).T
+        self.theta = np.array(self.soft_labels.T)
+        self.beta = self.get_beta()
 
     def predict(self, texts, proba=True):
         """
@@ -481,3 +318,51 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         else:
             labels = self.GMM.predict(reduced_embeddings)
         return labels
+
+    def get_beta(self):
+        """
+        Constructs a topic-word matrix from the given topic dictionary.
+
+        Parameters
+        ----------
+        topic_dict : dict
+            Dictionary where keys are topic indices and values are lists of (word, prevalence) tuples.
+
+        Returns
+        -------
+        ndarray
+            Topic-word matrix where rows represent topics and columns represent words.
+
+        Notes
+        -----
+        The topic-word matrix is constructed by assigning prevalences of words in topics.
+        Words are sorted alphabetically across all topics.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        assert hasattr(self, "topic_dict"), "Model has no topic_dict."
+
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        # Extract all unique words and sort them
+        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
+        sorted_words = sorted(all_words)
+
+        # Create an empty DataFrame with sorted words as rows and topics as columns
+        topic_word_matrix = pd.DataFrame(
+            index=sorted_words, columns=sorted(self.topic_dict.keys()), data=0.0
+        )
+
+        # Populate the DataFrame with prevalences
+        for topic, words in self.topic_dict.items():
+            for word, prevalence in words:
+                if word in topic_word_matrix.index:
+                    topic_word_matrix.at[word, topic] = prevalence
+
+        return np.array(topic_word_matrix).T
