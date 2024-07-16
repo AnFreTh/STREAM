@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 
 from ..utils import TMDataset
-from ..models.base import BaseModel, TrainingStatus
+from ..models.abstract_helper_models.base import BaseModel, TrainingStatus
 from ._interactive import (
     _visualize_topic_model_2d,
     _visualize_topic_model_3d,
