@@ -6,7 +6,7 @@ import numpy as np
 from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from ..utils.check_dataset_steps import check_dataset_steps
-from .base import BaseModel, TrainingStatus
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 from gensim.models import ldamodel
 import pandas as pd
 
@@ -136,6 +136,7 @@ class LDA(BaseModel):
         self.n_topics = n_topics
 
         try:
+            self._status = TrainingStatus.INITIALIZED
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
             self._prepare_documents(dataset)
