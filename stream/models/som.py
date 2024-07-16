@@ -10,8 +10,8 @@ from datetime import datetime
 from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
-from .base import BaseModel, TrainingStatus
-from .mixins import SentenceEncodingMixin
+from .abstract_helper_models.base import BaseModel, TrainingStatus
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

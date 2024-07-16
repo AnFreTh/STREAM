@@ -297,6 +297,17 @@ class BaseModel(ABC):
             raise RuntimeError("Model has not been trained yet or failed.")
         assert hasattr(self, "theta"), "Model has no topic-document distribution."
         return self.theta
+    
+    @abstractmethod
+    def fit(self, dataset):
+        pass
+
+    
+
+
+
+
+
 
 
 class TrainingStatus(str, Enum):

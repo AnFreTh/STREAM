@@ -6,6 +6,7 @@ from .KmeansTM import KmeansTM
 from .som import SOMTM
 from .WordCluTM import WordCluTM
 from .lda import LDA
+from .WordCluTM import WordCluTM
 
 __all__ = [
     "BERTopicTM",
@@ -16,4 +17,5 @@ __all__ = [
     "SOMTM",
     "WordCluTM",
     "LDA",
+    "WordCluTM",
 ]

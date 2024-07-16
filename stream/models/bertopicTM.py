@@ -3,9 +3,8 @@ import numpy as np
 import umap.umap_ as umap
 from loguru import logger
 from datetime import datetime
-from .base import BaseModel, TrainingStatus
-from .mixins import SentenceEncodingMixin
-from sentence_transformers import SentenceTransformer
+from .abstract_helper_models.base import BaseModel, TrainingStatus
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 from sklearn.preprocessing import OneHotEncoder
 from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
@@ -193,8 +192,8 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
                 self.dataframe[["predictions"]]
             )
 
-            self.beta = tfidf.T
-            self.theta = predictions_one_hot.T
+            self.beta = tfidf
+            self.theta = predictions_one_hot
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED
