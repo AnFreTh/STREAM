@@ -254,6 +254,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 ["predictions"], as_index=False
             ).agg({"text": " ".join})
 
+            print('########')
+            print(docs_per_topic)
+
             tfidf, count = c_tf_idf(
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )

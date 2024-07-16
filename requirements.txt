@@ -3,7 +3,7 @@ datasets
 gensim
 matplotlib
 nltk
-numpy
+numpy<2.0.0
 octis==1.13.1
 pandas
 plotly
