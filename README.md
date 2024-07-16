@@ -197,8 +197,9 @@ We welcome contributions to enhance the functionality of our topic modeling pack
    ```
 
 2. **Create a New Branch**:
-   - Create a new branch for your model development.
+   - Ensure you are on the develop branch and create a new branch for your model development.
    ```bash
+   git checkout develop
    git checkout -b new-model-branch
    ```
 
