@@ -1,7 +1,7 @@
 import pandas as pd
 import pyarrow as pa
 from datasets import Dataset
-from .base import BaseModel, TrainingStatus
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 from sentence_transformers.losses import CosineSimilarityLoss
 from setfit import SetFitModel, Trainer, TrainingArguments
 from sklearn import preprocessing
