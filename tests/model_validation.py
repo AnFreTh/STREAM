@@ -130,6 +130,18 @@ def validate_model(ModelClass):
     ), "The sum of 'theta' values along axis 1 must be all ones."
     print("Check for sum of theta values: passed")
 
+    # Validate the shape of beta
+    if hasattr(model, "beta"):
+        beta = model.beta
+    else:
+        beta = model.get_beta()
+
+    expected_shape = model.n_topics  # Number of topics used in fit method
+    assert (
+        beta.shape[1] == expected_shape
+    ), f"The second dim (column dimensino) of 'beta' must be {expected_shape}, but got {beta.shape[1]}."
+    print("Check for beta shape: passed")
+
     # Check method signatures (optional)
     sig = inspect.signature(ModelClass.fit)
     assert "dataset" in sig.parameters, "'fit' method must have a 'dataset' parameter."
