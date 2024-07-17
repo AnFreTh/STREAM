@@ -362,5 +362,5 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             for word, prevalence in words:
                 if word in topic_word_matrix.index:
                     topic_word_matrix.at[word, topic] = prevalence
-
-        return np.array(topic_word_matrix)
+        self.beta = np.array(topic_word_matrix)
+        return self.beta
