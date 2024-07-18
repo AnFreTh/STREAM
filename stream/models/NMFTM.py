@@ -7,7 +7,7 @@ import pandas as pd
 
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
-from .base import BaseModel, TrainingStatus
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 
 MODEL_NAME = "NMFTM"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -93,8 +93,13 @@ class NMFTM(BaseModel):
         self._status = TrainingStatus.RUNNING
         try:
             tfidf_matrix = self.tfidf_vectorizer.fit_transform(dataset.texts)
-            W = self.nmf_model.fit_transform(tfidf_matrix)
+            W = self.nmf_model.fit_transform(tfidf_matrix) # Document-topic matrix (Theta)
+            H = self.nmf_model.components_  # Topic-term matrix (Beta)
+
+            # Assigning attributes 
             self.labels = np.argmax(W, axis=1)
+            self.theta = W  
+            self.beta = H
             
             # Prepare data for visualization
             topic_data = pd.DataFrame(columns=['predictions', 'text'])
