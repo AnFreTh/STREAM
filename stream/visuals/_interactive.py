@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.manifold import TSNE
 
-from ..models.mixins import SentenceEncodingMixin
+from ..models.abstract_helper_models.mixins import SentenceEncodingMixin
 
 
 def calculate_distances_to_other_topics(selected_topic_index, plot_df, model):

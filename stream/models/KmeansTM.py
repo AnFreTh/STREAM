@@ -1,5 +1,4 @@
 import numpy as np
-import umap.umap_ as umap
 from loguru import logger
 from datetime import datetime
 from sklearn.cluster import KMeans
@@ -7,8 +6,8 @@ from sklearn.preprocessing import OneHotEncoder
 
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
-from .base import BaseModel, TrainingStatus
-from .mixins import SentenceEncodingMixin
+from .abstract_helper_models.base import BaseModel, TrainingStatus
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -267,8 +266,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 self.dataframe[["predictions"]]
             )
 
-            self.beta = tfidf.T
-            self.theta = predictions_one_hot.T
+            self.beta = tfidf
+            self.theta = predictions_one_hot
 
         except Exception as e:
             logger.error(f"Error in training: {e}")

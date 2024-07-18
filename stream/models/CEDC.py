@@ -9,8 +9,8 @@ from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
 from ..utils.dataset import TMDataset
-from .base import BaseModel, TrainingStatus
-from .mixins import SentenceEncodingMixin
+from .abstract_helper_models.base import BaseModel, TrainingStatus
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 
 DATADIR = "../datasets/preprocessed_datasets"
 MODEL_NAME = "CEDC"
@@ -285,7 +285,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         self._status = TrainingStatus.SUCCEEDED
 
         self.topic_dict = topics
-        self.theta = np.array(self.soft_labels.T)
+        self.theta = np.array(self.soft_labels)
         self.beta = self.get_beta()
 
     def predict(self, texts, proba=True):
@@ -348,8 +348,6 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             raise RuntimeError("Model has not been trained yet or failed.")
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
         # Extract all unique words and sort them
         all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
         sorted_words = sorted(all_words)
@@ -364,5 +362,5 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             for word, prevalence in words:
                 if word in topic_word_matrix.index:
                     topic_word_matrix.at[word, topic] = prevalence
-
-        return np.array(topic_word_matrix).T
+        self.beta = np.array(topic_word_matrix)
+        return self.beta

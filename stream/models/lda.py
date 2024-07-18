@@ -6,7 +6,7 @@ import numpy as np
 from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from ..utils.check_dataset_steps import check_dataset_steps
-from .base import BaseModel, TrainingStatus
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 from gensim.models import ldamodel
 import pandas as pd
 
@@ -136,6 +136,7 @@ class LDA(BaseModel):
         self.n_topics = n_topics
 
         try:
+            self._status = TrainingStatus.INITIALIZED
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
             self._prepare_documents(dataset)
@@ -246,7 +247,21 @@ class LDA(BaseModel):
                 topic_id, topn=len(self.id2word)
             )
             topic_word_matrix.append(word_distribution)
-        return topic_word_matrix
+
+        n = max(max(t[0] for t in topic) for topic in topic_word_matrix) + 1
+        num_topics = len(topic_word_matrix)
+        num_words_per_topic = len(topic_word_matrix[0])
+
+        # Initialize the matrix with zeros
+        beta_matrix = np.zeros((n, num_topics))
+
+        # Fill the matrix with values from the beta list
+        for topic_idx, topic in enumerate(topic_word_matrix):
+            for word_index, probability in topic:
+                beta_matrix[word_index, topic_idx] = probability
+
+        self.beta = beta_matrix
+        return self.beta
 
     def _get_topic_word_dict(self, num_words=100):
         """

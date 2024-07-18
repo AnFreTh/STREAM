@@ -9,7 +9,7 @@ from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.cbc_utils import DocumentCoherence, get_top_tfidf_words_per_document
 from ..utils.dataset import TMDataset
-from .base import BaseModel, TrainingStatus
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 
 
 MODEL_NAME = "CBC"
@@ -232,6 +232,7 @@ class CBC(BaseModel):
 
         self.dataframe["predictions"] = self.dataframe.index.map(labels)
         self.labels = np.array(self.dataframe["predictions"])
+        self.n_topics = len(np.unique(self.labels))
         if np.isnan(self.labels).sum() > 0:
             # Store the indices of NaN values
             self.dropped_indices = np.where(np.isnan(self.labels))[0]
@@ -265,8 +266,8 @@ class CBC(BaseModel):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
-        self.beta = tfidf.T
-        self.theta = predictions_one_hot.T
+        self.beta = tfidf
+        self.theta = predictions_one_hot
 
     def predict(self, texts):
         """

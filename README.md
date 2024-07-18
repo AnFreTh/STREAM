@@ -179,3 +179,120 @@ trainer.fit(downstream_model)
 from stream.visuals import plot_downstream_model
 plot_downstream_model(downstream_model)
 ```
+
+
+
+## Contributing and Testing New Models
+
+We welcome contributions to enhance the functionality of our topic modeling package. To ensure your new models integrate seamlessly, please follow the guidelines and testing instructions provided below.
+
+#### Steps for Contributing
+
+1. **Fork the Repository**:
+   - Fork the repository to your GitHub account.
+   - Clone the forked repository to your local machine.
+   ```bash
+   git clone https://github.com/your-username/your-repository.git
+   cd your-repository
+   ```
+
+2. **Create a New Branch**:
+   - Ensure you are on the develop branch and create a new branch for your model development.
+   ```bash
+   git checkout develop
+   git checkout -b new-model-branch
+   ```
+
+3. **Develop Your Model**:
+   - Navigate to the `mypackage/models/` directory.
+   - Create your model class file, ensuring it follows the expected structure and naming conventions.
+   - Implement the required methods (`get_info`, `fit`, `predict`) and attributes (`topic_dict`). Optionally, implement `beta`, `theta`, or corresponding methods (`get_beta`, `get_theta`).
+
+#### Example Model Structure
+
+Here is an example of how your model class should be structured:
+
+```python
+import numpy as np
+from mypackage.models.abstract_helper_models.base import BaseModel, TrainingStatus
+
+class ExampleModel(BaseModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._status = TrainingStatus.NOT_STARTED
+
+    def get_info(self):
+        return {"model_name": "ExampleModel", "trained": False}
+
+    def any_other_processing_functions(self):
+        pass
+
+    def fit(self, dataset, n_topics=3):
+        # do what you do during fitting the models
+        self._status = TrainingStatus.INITIALIZED
+        self._status = TrainingStatus.RUNNING
+        self._status = TrainingStatus.SUCCEEDED
+
+    def predict(self, texts):
+        return [0] * len(texts)
+
+    # If self.beta or self.theta are not assigned during fitting, plese include these two methods
+    def get_beta(self):
+        return self.beta
+
+    def get_theta(self):
+        return self.theta
+```
+
+#### Testing Your Model
+
+1. **Install Dependencies**:
+   - Ensure all dependencies are installed.
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Validate Your Model**:
+   - To validate your model, use `tests/validate_new_model.py` to include your new model class.
+   ```python
+   from tests.model_validation import validate_model
+
+   validate_model(NewModel)
+   ```
+If this validation fails, it will tell you 
+
+#### Validation Criteria
+
+The following checks are performed during validation:
+- Presence of required methods (`get_info`, `fit`, `predict`).
+- Presence of required attributes (`topic_dict`).
+- Either presence of optional attributes (`beta`, `theta`) or corresponding methods (`get_beta`, `get_theta`).
+- Correct shape and sum of `theta`.
+- Proper status transitions during model fitting.
+- `get_info` method returns a dictionary with `model_name` and `trained` keys.
+
+Refer to the `tests/model_validation.py` script for detailed validation logic.
+
+#### Submitting Your Contribution
+
+1. **Commit Your Changes**:
+   - Commit your changes to your branch.
+   ```bash
+   git add .
+   git commit -m "Add new model: YourModelName"
+   ```
+
+2. **Push to GitHub**:
+   - Push your branch to your GitHub repository.
+   ```bash
+   git push origin new-model-branch
+   ```
+
+3. **Create a Pull Request**:
+   - Go to the original repository on GitHub.
+   - Create a pull request from your forked repository and branch.
+   - Provide a clear description of your changes and request a review.
+
+We appreciate your contributions and strive to make the integration process as smooth as possible. If you encounter any issues or have questions, feel free to open an issue on GitHub. Happy coding!
+
+If you want to include a new model where these guidelines are not approriate please mark this in your review request.
