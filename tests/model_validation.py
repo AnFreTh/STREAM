@@ -24,7 +24,7 @@ class ModelLoggerValidator:
         )
 
 
-def validate_model(ModelClass):
+def validate_model(ModelClass, **model_args):
     """
     Validates if the provided model class adheres to the required guidelines.
 
@@ -64,7 +64,7 @@ def validate_model(ModelClass):
     print("Check for dataset creation: passed")
 
     # Instantiate the model and validator
-    model = ModelClass()
+    model = ModelClass(**model_args)
     validator = ModelLoggerValidator(model)
 
     # Validate the get_info method
@@ -88,7 +88,7 @@ def validate_model(ModelClass):
             validator.log_status_change(value)
             self.__dict__["_actual_status"] = value
 
-    model = ModelWithLogging()
+    model = ModelWithLogging(**model_args)
 
     # Fit the model with dummy data
     model.fit(dataset)
