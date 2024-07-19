@@ -6,6 +6,7 @@ from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
+from .TopwordEmbeddings import TopwordEmbeddings
 
 from ._helper_funcs import (
     cos_sim_pw,
@@ -32,55 +33,33 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
     Attributes:
         n_words (int): The number of top words to consider for each topic.
-        corpus_dict (dict): A dictionary mapping each word in the corpus to its embedding.
+        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
     """
 
     def __init__(
         self,
-        dataset,
         n_words=10,
-        embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
+        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
         emb_filename=None,
         emb_path="Embeddings/",
-        expansion_path="Embeddings/",
-        expansion_filename=None,
-        expansion_word_list=None,
     ):
         """
-        Initializes the Embedding_Topic_Diversity object with a dataset, number of words,
-        embedding model, and paths for storing embeddings.
+        Initializes the Embedding_Coherence object with the number of top words to consider
+        and the embedding model to use.
 
         Parameters:
-            dataset: The dataset to be used for embedding topic diversity calculation.
-            n_words (int, optional): The number of top words to consider for each topic.
-                Defaults to 10.
-            embedder (SentenceTransformer, optional): The embedding model to use.
-                Defaults to SentenceTransformer("paraphrase-MiniLM-L6-v2").
-            emb_filename (str, optional): Filename to store embeddings. Defaults to None.
-            emb_path (str, optional): Path to store embeddings. Defaults to "Embeddings/".
-            expansion_path (str, optional): Path for expansion embeddings. Defaults to "Embeddings/".
-            expansion_filename (str, optional): Filename for expansion embeddings. Defaults to None.
-            expansion_word_list (list, optional): List of words for expansion. Defaults to None.
+        ----------
+        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
         """
 
-        tw_emb = embed_corpus(
-            dataset,
-            embedder,
+        self.topword_embeddings = TopwordEmbeddings(
+            word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
 
-        if expansion_word_list is not None:
-            tw_emb = update_corpus_dic_list(
-                expansion_word_list,
-                tw_emb,
-                embedder,
-                emb_filename=expansion_filename,
-                emb_path=expansion_path,
-            )
-
         self.n_words = n_words
-        self.corpus_dict = tw_emb
 
     def score(self, model_output):
         """
@@ -105,15 +84,13 @@ class Embedding_Topic_Diversity(AbstractMetric):
             -1, 1
         )  # normalize the weights such that they sum up to one
 
-        emb_tw = embed_topic(
-            topics_tw, self.corpus_dict, self.n_words
-        )  # embed the top words
-        emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-            :, : self.n_words, :
-        ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
+        topwords_embedded = self.topword_embeddings.embed_topwords(
+            topics_tw,
+            n_topwords_to_use=self.n_words
+        )
 
         weighted_vecs = (
-            topic_weights[:, :, None] * emb_tw
+            topic_weights[:, :, None] * topwords_embedded
         )  # multiply each embedding vector with its corresponding weight
         topic_means = np.sum(
             weighted_vecs, axis=1
@@ -146,19 +123,13 @@ class Embedding_Topic_Diversity(AbstractMetric):
             -1, 1
         )  # normalize the weights such that they sum up to one
 
-        print(topic_weights)
-        print(np.isnan(topic_weights).any())
-
-        emb_tw = embed_topic(
-            topics_tw, self.corpus_dict, self.n_words
-        )  # embed the top words
-        emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-            :, : self.n_words, :
-        ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-        self.embeddings = emb_tw
+        topwords_embedded = self.topword_embeddings.embed_topwords(
+            topics_tw,
+            n_topwords_to_use=self.n_words
+        )
 
         weighted_vecs = (
-            topic_weights[:, :, None] * emb_tw
+            topic_weights[:, :, None] * topwords_embedded
         )  # multiply each embedding vector with its corresponding weight
         topic_means = np.sum(
             weighted_vecs, axis=1
@@ -189,66 +160,41 @@ class Expressivity(AbstractMetric):
     top words are distinct from common stopwords.
 
     Attributes:
-        stopword_list (list): A list of stopwords to use for comparison.
         n_words (int): The number of top words to consider for each topic.
-        corpus_dict (dict): A dictionary mapping each word in the corpus to its embedding.
-        embeddings (numpy.ndarray): The embeddings for the top words of the topics.
-        stopword_emb (numpy.ndarray): The embeddings for the stopwords.
-        stopword_mean (numpy.ndarray): The mean vector of the embeddings of the stopwords.
+        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
     """
 
     def __init__(
         self,
-        dataset,
-        stopword_list=stopwords,
         n_words=10,
-        embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
+        stopword_list=stopwords,
+        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
         emb_filename=None,
         emb_path="Embeddings/",
-        expansion_path="Embeddings/",
-        expansion_filename=None,
-        expansion_word_list=None,
     ):
         """
-        Initializes the Expressivity object with a dataset, a list of stopwords, number of
-        words, embedding model, and paths for storing embeddings.
+        Initializes the Embedding_Coherence object with the number of top words to consider
+        and the embedding model to use.
 
         Parameters:
-            dataset: The dataset to be used for expressivity calculation.
-            stopword_list (list, optional): A list of stopwords for comparison. Defaults to a standard list.
-            n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-            embedder (SentenceTransformer, optional): The embedding model to use.
-                Defaults to SentenceTransformer("paraphrase-MiniLM-L6-v2").
-            emb_filename (str, optional): Filename to store embeddings. Defaults to None.
-            emb_path (str, optional): Path to store embeddings. Defaults to "Embeddings/".
-            expansion_path (str, optional): Path for expansion embeddings. Defaults to "Embeddings/".
-            expansion_filename (str, optional): Filename for expansion embeddings. Defaults to None.
-            expansion_word_list (list, optional): List of words for expansion. Defaults to None.
+        ----------
+        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        stopword_list (list, optional): A list of stopwords to use for the expressivity calculation. Defaults to the combined list of NLTK, Gensim, and Scikit-learn stopwords.
+        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
+        emb_filename (str, optional): The filename of the embeddings to load. Defaults to None.
+        emb_path (str, optional): The path to the embeddings file. Defaults to "Embeddings/".
         """
 
-        tw_emb = embed_corpus(
-            dataset,
-            embedder,
+        self.topword_embeddings = TopwordEmbeddings(
+            word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
 
-        if expansion_word_list is not None:
-            tw_emb = update_corpus_dic_list(
-                expansion_word_list,
-                tw_emb,
-                embedder,
-                emb_filename=expansion_filename,
-                emb_path=expansion_path,
-            )
-        self.stopword_list = stopword_list
-
         self.n_words = n_words
-        self.corpus_dict = tw_emb
-        self.embeddings = None
 
         self.stopword_emb = embed_stopwords(
-            stopword_list, embedder
+            stopword_list, metric_embedder
         )  # embed all the stopwords size: (n_stopwords, emb_dim)
         self.stopword_mean = np.mean(
             np.array(self.stopword_emb), axis=0
@@ -308,16 +254,11 @@ class Expressivity(AbstractMetric):
             -1, 1
         )  # normalize the weights such that they sum up to one
 
-        if self.embeddings is None:
-            emb_tw = embed_topic(
-                topics_tw, self.corpus_dict, self.n_words
-            )  # embed the top words
-            emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-                :, : self.n_words, :
-            ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-            self.embeddings = emb_tw
-        else:
-            emb_tw = self.embeddings
+        emb_tw = self.topword_embeddings.embed_topwords(
+            topics_tw,
+            n_topwords_to_use=self.n_words
+        )
+
 
         weighted_vecs = (
             topic_weights[:, :, None] * emb_tw
