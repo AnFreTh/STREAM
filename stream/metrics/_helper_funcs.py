@@ -112,7 +112,7 @@ def embed_stopwords(
 
     sw_dic = {}  # first create dictionary with embedding of every unique word
     stopwords_set = set(stopwords)
-    for word in tqdm(stopwords_set):
+    for word in stopwords_set:
         sw_dic[word] = embedder.encode(word)
 
     sw_list = []
