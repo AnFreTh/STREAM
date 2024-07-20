@@ -1,7 +1,7 @@
 import re
 import unicodedata
-from typing import List, Set
 from collections import Counter
+from typing import List, Set
 
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
@@ -32,7 +32,8 @@ class TextPreprocessor:
         self.min_word_length = kwargs.get("min_word_length", 3)
         self.max_word_length = kwargs.get("max_word_length", None)
         self.dictionary = set(kwargs.get("dictionary", []))
-        self.remove_words_with_numbers = kwargs.get("remove_words_with_numbers", False)
+        self.remove_words_with_numbers = kwargs.get(
+            "remove_words_with_numbers", False)
         self.remove_words_with_special_chars = kwargs.get(
             "remove_words_with_special_chars", False
         )
@@ -137,19 +138,23 @@ class TextPreprocessor:
             ]
 
         if self.min_word_length is not None:
-            words = [word for word in words if len(word) >= self.min_word_length]
+            words = [word for word in words if len(
+                word) >= self.min_word_length]
 
         if self.max_word_length is not None:
-            words = [word for word in words if len(word) <= self.max_word_length]
+            words = [word for word in words if len(
+                word) <= self.max_word_length]
 
         if self.dictionary != set():
             words = [word for word in words if word in self.dictionary]
 
         if self.remove_words_with_numbers:
-            words = [word for word in words if not any(char.isdigit() for char in word)]
+            words = [word for word in words if not any(
+                char.isdigit() for char in word)]
 
         if self.remove_words_with_special_chars:
-            words = [word for word in words if not re.search(r"[^a-zA-Z0-9\s]", word)]
+            words = [word for word in words if not re.search(
+                r"[^a-zA-Z0-9\s]", word)]
 
         if self.detokenize:
             text = TreebankWordDetokenizer().detokenize(words)

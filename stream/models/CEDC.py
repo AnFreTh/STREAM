@@ -1,13 +1,15 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import umap.umap_ as umap
+from loguru import logger
 from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
-from loguru import logger
-from datetime import datetime
-from ..utils.check_dataset_steps import check_dataset_steps
+
 from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
@@ -173,7 +175,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -241,7 +244,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(
+                dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -349,7 +353,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
         # Extract all unique words and sort them
-        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
+        all_words = set(word for topic in self.topic_dict.values()
+                        for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns
