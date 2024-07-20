@@ -531,7 +531,8 @@ def _visualize_topics_2d(
     else:
         embeddings = model.embeddings
     labels = model.labels
-    top_words_per_document = get_top_tfidf_words_per_document(model.dataframe["text"])
+    top_words_per_document = get_top_tfidf_words_per_document(
+        model.dataframe["text"])
 
     # Reduce embeddings to 2D for visualization
     if reducer == "umap":
@@ -583,7 +584,8 @@ def _visualize_topics_2d(
     # Callback for updating scatter plot
     @app.callback(
         Output("scatter-plot", "figure"),
-        [Input("num-top-words-slider", "value"), Input("topic-dropdown", "value")],
+        [Input("num-top-words-slider", "value"),
+         Input("topic-dropdown", "value")],
     )
     def update_plot(num_top_words, selected_topic):
         if selected_topic == "All":
@@ -600,7 +602,8 @@ def _visualize_topics_2d(
 
         plot_df["top_words"] = [
             "<br>".join(
-                [f"{word} ({score:.2f})" for word, score in words[:num_top_words]]
+                [f"{word} ({score:.2f})" for word,
+                 score in words[:num_top_words]]
             )
             for words in filtered_top_words
         ]
@@ -673,7 +676,8 @@ def _visualize_topics_3d(
     else:
         embeddings = model.embeddings
     labels = model.labels
-    top_words_per_document = get_top_tfidf_words_per_document(model.dataframe["text"])
+    top_words_per_document = get_top_tfidf_words_per_document(
+        model.dataframe["text"])
 
     # Reduce embeddings to 3D for visualization
     if reducer == "umap":
@@ -725,7 +729,8 @@ def _visualize_topics_3d(
     # Callback for updating scatter plot
     @app.callback(
         Output("scatter-plot", "figure"),
-        [Input("num-top-words-slider", "value"), Input("topic-dropdown", "value")],
+        [Input("num-top-words-slider", "value"),
+         Input("topic-dropdown", "value")],
     )
     def update_plot(num_top_words, selected_topic):
         if selected_topic == "All":
@@ -742,7 +747,8 @@ def _visualize_topics_3d(
 
         plot_df["top_words"] = [
             "<br>".join(
-                [f"{word} ({score:.2f})" for word, score in words[:num_top_words]]
+                [f"{word} ({score:.2f})" for word,
+                 score in words[:num_top_words]]
             )
             for words in filtered_top_words
         ]

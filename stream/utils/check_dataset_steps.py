@@ -1,7 +1,7 @@
+import json
 import os
 import pickle
 import re
-import json
 
 
 def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None):

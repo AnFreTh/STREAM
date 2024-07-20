@@ -7,15 +7,9 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
 
-from ._helper_funcs import (
-    cos_sim_pw,
-    embed_corpus,
-    embed_stopwords,
-    embed_topic,
-    update_corpus_dic_list,
-)
+from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_stopwords,
+                            embed_topic, update_corpus_dic_list)
 from .constants import NLTK_STOPWORD_LANGUAGE, SENTENCE_TRANSFORMER_MODEL
-
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
@@ -176,7 +170,8 @@ class Embedding_Topic_Diversity(AbstractMetric):
             half_topic_words = topics_tw[k][
                 : len(topics_tw[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(np.array(sim_mean)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(
+                np.array(sim_mean)[k], 5)
 
         return results
 
@@ -273,7 +268,8 @@ class Expressivity(AbstractMetric):
         if new_Embeddings:
             self.embeddings = None
         return float(
-            np.mean(list(self.score_per_topic(model_output, new_Embeddings).values()))
+            np.mean(list(self.score_per_topic(
+                model_output, new_Embeddings).values()))
         )
 
     def score_per_topic(self, model_output, new_Embeddings=True):

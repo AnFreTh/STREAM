@@ -1,18 +1,18 @@
+from datetime import datetime
 from itertools import product
 
 import numpy as np
 import torch
 import umap.umap_ as umap
+from loguru import logger
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm
-from loguru import logger
-from datetime import datetime
-from ..utils.check_dataset_steps import check_dataset_steps
+
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
-
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "SOMTM"
@@ -94,7 +94,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             else dim
         )
         self.weights = torch.randn(self.m * self.n, self.dim)
-        self.locations = torch.tensor(list(product(range(self.m), range(self.n))))
+        self.locations = torch.tensor(
+            list(product(range(self.m), range(self.n))))
         self.train_history = []
 
         self.umap_args = self.hparams.get(
@@ -232,11 +233,12 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             np.random.shuffle(data)
 
             for i in range(0, n_samples, batch_size):
-                batch = data[i : i + batch_size]
+                batch = data[i: i + batch_size]
                 batch_tensor = torch.tensor(batch)
                 bmu_indices = [self._find_bmu(x) for x in batch_tensor]
 
-                self._update_weights_batch(batch_tensor, bmu_indices, iteration)
+                self._update_weights_batch(
+                    batch_tensor, bmu_indices, iteration)
 
         self.labels = self._get_cluster_labels(data)
 
@@ -326,7 +328,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(
+                dataset, logger)
 
             if self.reduce_dim:
                 self.reduced_embeddings = self.dim_reduction(logger)
@@ -341,7 +344,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             tfidf, count = c_tf_idf(
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
-            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(
+                tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(

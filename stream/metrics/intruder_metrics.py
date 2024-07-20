@@ -209,7 +209,8 @@ class ISIM(BaseMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(
+                np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -426,7 +427,8 @@ class INT(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(
+                np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -552,7 +554,8 @@ class ISH(AbstractMetric):
             intruder_words_idx_word = np.random.choice(
                 np.arange(intruder_words.shape[1]), size=1
             )  # select one intruder word from each topic
-            intruder_words = intruder_words[:, intruder_words_idx_word, :].squeeze()
+            intruder_words = intruder_words[:,
+                                            intruder_words_idx_word, :].squeeze()
 
             topic_mean = np.mean(topic, axis=0)
 

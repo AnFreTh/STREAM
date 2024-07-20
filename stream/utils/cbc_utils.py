@@ -90,13 +90,15 @@ class DocumentCoherence:
 
     def _calculate_npmi(self, co_occurrences, n_documents):
         eps = 1e-12
-        word_prob = np.array(self.doc_word_matrix.sum(axis=0) / n_documents).flatten()
+        word_prob = np.array(self.doc_word_matrix.sum(
+            axis=0) / n_documents).flatten()
 
         # Convert sparse matrix to dense for the operation
         joint_prob = co_occurrences.toarray() / n_documents
 
         # Calculate PMI
-        pmi = np.log((joint_prob + eps) / (np.outer(word_prob, word_prob) + eps))
+        pmi = np.log((joint_prob + eps) /
+                     (np.outer(word_prob, word_prob) + eps))
 
         # Calculate NPMI
         npmi = pmi / -np.log(joint_prob + eps)

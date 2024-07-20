@@ -9,9 +9,9 @@ from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
-from ._helper_funcs import cos_sim_pw, embed_corpus, embed_topic, update_corpus_dic_list
+from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_topic,
+                            update_corpus_dic_list)
 from .constants import NLTK_STOPWORD_LANGUAGE
-
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 
@@ -168,7 +168,8 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(
+                            w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -227,7 +228,8 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(
+                            w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -349,7 +351,8 @@ class Embedding_Coherence(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(np.array(topic_sims)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(
+                np.array(topic_sims)[k], 5)
 
         return results
 

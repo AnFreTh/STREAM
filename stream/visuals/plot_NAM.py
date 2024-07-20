@@ -11,7 +11,8 @@ def plot_with_plotly(feature_nn, feature_name, feature_values, y_min, y_max):
         if len(unique_values) > 10:  # Arbitrary threshold, adjust based on your data
             # Treat as continuous
             # Generate simulated 'x' values within the range of observed values for smoother plotting
-            x_simulated = np.linspace(feature_values.min(), feature_values.max(), 250)
+            x_simulated = np.linspace(
+                feature_values.min(), feature_values.max(), 250)
         else:
             # Treat as categorical/binary, use unique values directly
             x_simulated = unique_values
@@ -68,7 +69,8 @@ def plot_downstream_model(downstream_model):
             html.H1("Feature-specific Neural Network Functions"),
             dcc.Dropdown(
                 id="feature-dropdown",
-                options=[{"label": name, "value": name} for name in feature_names],
+                options=[{"label": name, "value": name}
+                         for name in feature_names],
                 value=feature_names[0],  # Default value
             ),
             dcc.Graph(id="feature-graph"),
