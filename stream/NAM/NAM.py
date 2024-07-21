@@ -303,20 +303,6 @@ class DownstreamModel(pl.LightningModule):
         combined_data (pd.DataFrame): Combined DataFrame containing structured data and topic probabilities.
         model (NeuralAdditiveModel): Neural Additive Model for downstream modeling.
 
-    Methods:
-        prepare_combined_data(): Prepare combined DataFrame containing structured data and topic probabilities.
-        preprocess_structured_data(data): Preprocess structured data.
-        define_nam_model(hidden_units, feature_dropout, hidden_dropout, activation, out_activation): Define the Neural Additive Model architecture.
-        forward(x): Forward pass of the model.
-        training_step(batch, batch_idx): Training step for LightningModule.
-        validation_step(batch, batch_idx): Validation step for LightningModule.
-        test_step(batch, batch_idx): Test step for LightningModule.
-        configure_optimizers(): Configure optimizer for training.
-        setup(stage): Setup datasets for training and validation.
-        train_dataloader(): DataLoader for training dataset.
-        val_dataloader(): DataLoader for validation dataset.
-        get_feature_names(): Get names of input features.
-        plot_feature_nns(): Plot the learned functions for each feature-specific neural network.
     """
 
     def __init__(
