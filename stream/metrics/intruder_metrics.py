@@ -508,19 +508,19 @@ class ISH(AbstractMetric):
         self.corpus_dict = tw_emb
         self.n_words = n_words
         self.embeddings = None
-        """
-        corpus_dict: dict that maps each word in the corpus to its embedding
-        n_words: number of top words to consider
-        """
+        # """
+        # corpus_dict: dict that maps each word in the corpus to its embedding
+        # n_words: number of top words to consider
+        # """
 
         self.n_intruders = n_intruders
 
     def score(self, model_output, new_Embeddings=True):
-        if new_Embeddings:
-            self.embeddings = None
         """
         Calculate the score for all topics combined
         """
+        if new_Embeddings:
+            self.embeddings = None
 
         return float(np.mean(list(self.score_per_topic(model_output).values())))
 
