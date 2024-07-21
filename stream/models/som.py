@@ -3,7 +3,6 @@ from itertools import product
 
 import numpy as np
 import torch
-import umap.umap_ as umap
 from loguru import logger
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm
