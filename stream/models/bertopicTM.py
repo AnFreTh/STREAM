@@ -2,7 +2,6 @@ from datetime import datetime
 
 import hdbscan
 import numpy as np
-import umap.umap_ as umap
 from loguru import logger
 from sklearn.preprocessing import OneHotEncoder
 

@@ -2,7 +2,6 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import umap.umap_ as umap
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
