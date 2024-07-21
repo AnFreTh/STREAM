@@ -1,9 +1,9 @@
 from typing import List
 
+import lightning as pl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -30,10 +30,6 @@ class FeatureNN(nn.Module):
     Attributes:
         model (nn.Sequential): Sequential neural network model.
 
-    Methods:
-        forward(x): Forward pass of the neural network.
-        plot(feature_name, ax=None): Plot the model's predictions for a specific feature.
-        plot_data(x, y, feature_name, ax=None): Plot the model's predictions and actual data points for a specific feature.
     """
 
     def __init__(
@@ -154,11 +150,6 @@ class NeuralAdditiveModel(nn.Module):
         out_activation (nn.Module): Activation function for the output layer.
         feature_nns (nn.ModuleList): List of feature-specific neural networks.
 
-    Methods:
-        forward(x): Forward pass of the neural network.
-        plot(): Plot the learned functions for each feature-specific neural network.
-        plot_data(x, y): Plot the learned functions and actual data points for each feature-specific neural network.
-        _get_activation_fn(activation): Get the activation function based on the provided string.
     """
 
     def __init__(
