@@ -73,6 +73,7 @@ autodoc_mock_imports = [
     "datasets",
     "setfit",
     "umap_learn",
+    "dash"
     ""
 
 ]
