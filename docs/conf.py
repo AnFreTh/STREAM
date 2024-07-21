@@ -67,7 +67,8 @@ autodoc_mock_imports = [
     "octis",
     "loguru",
     "scipy",
-    "community"
+    "community",
+    "networkx"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
