@@ -14,3 +14,8 @@ readthedocs-sphinx-ext==2.2.5
 lxml-html-clean==0.1.1
 pydata-sphinx-theme==0.15.2
 sphinx-design
+ipykernel
+jupytext
+
+# notebooks
+einops
