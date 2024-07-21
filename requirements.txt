@@ -26,4 +26,3 @@ langdetect
 hdbscan
 loguru
 pre-commit
-requests==2.27.1
