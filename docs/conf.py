@@ -68,7 +68,8 @@ autodoc_mock_imports = [
     "loguru",
     "scipy",
     "community",
-    "networkx"
+    "networkx",
+    "pyarrow"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
