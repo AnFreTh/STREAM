@@ -13,10 +13,10 @@ from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_topic,
                             update_corpus_dic_list)
 from .constants import NLTK_STOPWORD_LANGUAGE
 
-GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
-NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-STOPWORDS = list(
-    set(NLTK_STOPWORDS + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS)))
+gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
+nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
+stopwords = list(
+    set(nltk_stopwords + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS)))
 
 
 class NPMI(AbstractMetric):
@@ -37,7 +37,7 @@ class NPMI(AbstractMetric):
     def __init__(
         self,
         dataset,
-        stopwords: list,
+        stopwords=stopwords,
     ):
         """
         Initializes the NPMI object with a dataset, stopwords, and a specified number of topics.
@@ -48,9 +48,6 @@ class NPMI(AbstractMetric):
             n_topics (int, optional): The number of topics to evaluate. Defaults to 20.
         """
         self.stopwords = stopwords
-        if self.stopwords is None:
-            self.stopwords = STOPWORDS
-
         self.dataset = dataset
 
         files = self.dataset.get_corpus()
