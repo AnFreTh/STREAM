@@ -58,7 +58,9 @@ autodoc_mock_imports = [
     "pandas",
     "sklearn",
     "properscoring",
-    "tqdm"
+    "tqdm",
+    "transformers",
+    "sentence_transformers",
 ]
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
