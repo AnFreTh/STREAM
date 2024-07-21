@@ -64,7 +64,8 @@ autodoc_mock_imports = [
     "gensim",
     "nltk",
     "langdetect",
-    "octis"
+    "octis",
+    "loguru"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
