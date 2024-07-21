@@ -58,8 +58,11 @@ autodoc_mock_imports = [
     "sentence_transformers",
     "umap",
     "hdbscan",
-
+    "wordcloud",
+    "plotly",
+    "matplotlib",
 ]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
