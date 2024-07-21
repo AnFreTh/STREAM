@@ -14,8 +14,7 @@ from .constants import NLTK_STOPWORD_LANGUAGE, SENTENCE_TRANSFORMER_MODEL
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
 stopwords = list(
-    set(nltk_stopwords + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS))
-)
+    set(list(nltk_stopwords) + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS)))
 
 
 class Embedding_Topic_Diversity(AbstractMetric):
