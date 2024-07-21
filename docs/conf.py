@@ -69,7 +69,8 @@ autodoc_mock_imports = [
     "scipy",
     "community",
     "networkx",
-    "pyarrow"
+    "pyarrow",
+    "datasets"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
