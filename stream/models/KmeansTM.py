@@ -23,7 +23,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
     This class inherits from the BaseModel class and utilizes sentence embeddings,
     UMAP for dimensionality reduction, and K-Means for clustering text data into topics.
 
-    Attributes
+    Parameters
     ----------
     embedding_model_name : str
         Name of the sentence embedding model to use.
@@ -42,20 +42,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
     n_topics : int or None
         Number of topics to extract.
 
-    Methods
-    -------
-    get_info()
-        Returns a dictionary containing information about the model.
-    fit(dataset, n_topics=20)
-        Trains the model on the provided dataset and extracts topics.
-    predict(texts)
-        Predicts topics for new documents.
-    get_topics(n_words=10)
-        Retrieves the top words for each topic.
-    get_topic_word_matrix()
-        Retrieves the topic-word distribution matrix.
-    get_topic_document_matrix()
-        Retrieves the topic-document distribution matrix.
     """
 
     def __init__(
