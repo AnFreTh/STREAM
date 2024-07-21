@@ -13,7 +13,7 @@ from .abstract_helper_models.base import BaseModel, TrainingStatus
 
 MODEL_NAME = "LDA"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class LDA(BaseModel):
