@@ -61,6 +61,7 @@ autodoc_mock_imports = [
     "wordcloud",
     "plotly",
     "matplotlib",
+    "gensim"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
