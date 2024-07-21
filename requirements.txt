@@ -20,9 +20,10 @@ wordcloud
 community
 networkx
 python_louvain
-pytorch_lightning
+lightning
 torch
 langdetect
 hdbscan
 loguru
 pre-commit
+requests==2.27.1
