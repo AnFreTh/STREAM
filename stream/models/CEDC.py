@@ -23,10 +23,10 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 class CEDC(BaseModel, SentenceEncodingMixin):
     """
     Class for Clustering-based Embedding-driven Document Clustering (CEDC).
-
     Inherits from BaseModel and SentenceEncodingMixin.
 
-    Attributes:
+
+    Parameters
     ----------
     n_topics : int or None
         Number of topics to extract.
@@ -45,20 +45,6 @@ class CEDC(BaseModel, SentenceEncodingMixin):
     save_embeddings : bool
         Whether to save generated embeddings.
 
-    Methods
-    -------
-    get_info()
-        Returns a dictionary containing information about the model.
-    fit(dataset, n_topics=20)
-        Trains the model on the provided dataset and extracts topics.
-    predict(texts)
-        Predicts topics for new documents.
-    get_topics(n_words=10)
-        Retrieves the top words for each topic.
-    get_topic_word_matrix()
-        Retrieves the topic-word distribution matrix.
-    get_topic_document_matrix()
-        Retrieves the topic-document distribution matrix.
     """
 
     def __init__(
@@ -74,6 +60,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
     ):
         """
         Initializes the CEDC model.
+
 
         Parameters
         ----------
@@ -147,6 +134,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         """
         Get information about the model.
 
+
         Returns
         -------
         dict
@@ -167,6 +155,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
     def _clustering(self):
         """
         Applies GMM clustering to the reduced embeddings.
+
 
         Raises
         ------
@@ -222,6 +211,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             Corpus for expanding topics (default is 'octis').
         n_words : int, optional
             Number of top words to include in each topic (default is 20).
+
 
         Returns
         -------
@@ -295,15 +285,18 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         """
         Predict topics for new documents.
 
+
         Parameters
         ----------
         texts : list of str
             List of texts to predict topics for.
 
+
         Returns
         -------
         list of int
             List of predicted topic labels.
+
 
         Raises
         ------
@@ -336,10 +329,12 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         ndarray
             Topic-word matrix where rows represent topics and columns represent words.
 
+
         Notes
         -----
         The topic-word matrix is constructed by assigning prevalences of words in topics.
         Words are sorted alphabetically across all topics.
+
 
         Raises
         ------
