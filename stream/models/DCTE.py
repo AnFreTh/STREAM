@@ -17,7 +17,7 @@ from .abstract_helper_models.base import BaseModel, TrainingStatus
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "DCTE"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class DCTE(BaseModel):

@@ -18,7 +18,7 @@ DATADIR = "../datasets/preprocessed_datasets"
 MODEL_NAME = "CEDC"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class CEDC(BaseModel, SentenceEncodingMixin):
