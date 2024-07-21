@@ -7,14 +7,30 @@ Welcome to STREAM's documentation!
 ==================================
 
 .. toctree::
+   :name: Getting Started
+   :caption: Getting Started
    :maxdepth: 2
-   :caption: Contents:
+   :hidden:
+
+   installation
+   
+
+.. toctree::
+   :name: API Reference
+   :caption: API Reference
+   :maxdepth: 2
+   :hidden:
+   
+   api/stream.models/index
+   api/stream.NAM/index
+   api/stream.metrics/index
+   api/stream.preprocessor/index
+   api/stream.visuals/index
+   api/stream.utils/index
 
 
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. toctree::
+   :name: Developer Guide
+   :caption: Developer Guide
+   :maxdepth: 1
+   :hidden:
