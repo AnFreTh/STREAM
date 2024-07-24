@@ -1,20 +1,22 @@
+from datetime import datetime
+
 import community as community_louvain
 import networkx as nx
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
 from loguru import logger
-from datetime import datetime
-from ..utils.check_dataset_steps import check_dataset_steps
+from sklearn.preprocessing import OneHotEncoder
+
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
-from ..utils.cbc_utils import DocumentCoherence, get_top_tfidf_words_per_document
+from ..utils.cbc_utils import (DocumentCoherence,
+                               get_top_tfidf_words_per_document)
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 
-
 MODEL_NAME = "CBC"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class CBC(BaseModel):
@@ -186,10 +188,12 @@ class CBC(BaseModel):
                 clusters = self.cluster_documents()
 
                 num_clusters = len(clusters)
-                print(f"Iteration {iteration}: {num_clusters} clusters formed.")
+                print(
+                    f"Iteration {iteration}: {num_clusters} clusters formed.")
 
                 # Prepare for the next iteration
-                combined_documents = self.combine_documents(current_documents, clusters)
+                combined_documents = self.combine_documents(
+                    current_documents, clusters)
                 current_documents = combined_documents
                 iteration += 1
 
@@ -242,7 +246,8 @@ class CBC(BaseModel):
             self.labels += 1
 
             # Update the 'predictions' column in the dataframe with -1 where NaN was present
-            self.dataframe["predictions"] = self.dataframe["predictions"].fillna(-1)
+            self.dataframe["predictions"] = self.dataframe["predictions"].fillna(
+                -1)
             self.dataframe["predictions"] += 1
             print("--- replaced NaN values with 0 in topics ---")
             print(
@@ -253,8 +258,10 @@ class CBC(BaseModel):
             {"text": " ".join}
         )
         logger.info("--- Extract topics ---")
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(self.dataframe))
-        self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=10)
+        tfidf, count = c_tf_idf(
+            docs_per_topic["text"].values, m=len(self.dataframe))
+        self.topic_dict = extract_tfidf_topics(
+            tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(
             sparse=False

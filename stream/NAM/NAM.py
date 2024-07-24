@@ -1,9 +1,9 @@
 from typing import List
 
+import lightning as pl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -30,10 +30,6 @@ class FeatureNN(nn.Module):
     Attributes:
         model (nn.Sequential): Sequential neural network model.
 
-    Methods:
-        forward(x): Forward pass of the neural network.
-        plot(feature_name, ax=None): Plot the model's predictions for a specific feature.
-        plot_data(x, y, feature_name, ax=None): Plot the model's predictions and actual data points for a specific feature.
     """
 
     def __init__(
@@ -154,11 +150,6 @@ class NeuralAdditiveModel(nn.Module):
         out_activation (nn.Module): Activation function for the output layer.
         feature_nns (nn.ModuleList): List of feature-specific neural networks.
 
-    Methods:
-        forward(x): Forward pass of the neural network.
-        plot(): Plot the learned functions for each feature-specific neural network.
-        plot_data(x, y): Plot the learned functions and actual data points for each feature-specific neural network.
-        _get_activation_fn(activation): Get the activation function based on the provided string.
     """
 
     def __init__(
@@ -227,8 +218,10 @@ class NeuralAdditiveModel(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        feature_outputs = [nn(x[:, i : i + 1]) for i, nn in enumerate(self.feature_nns)]
-        output = torch.cat(feature_outputs, dim=1).sum(dim=1, keepdim=True) + self.bias
+        feature_outputs = [nn(x[:, i: i + 1])
+                           for i, nn in enumerate(self.feature_nns)]
+        output = torch.cat(feature_outputs, dim=1).sum(
+            dim=1, keepdim=True) + self.bias
         return self.out_activation(output)
 
     def plot(self):
@@ -241,7 +234,8 @@ class NeuralAdditiveModel(nn.Module):
         self.eval()
         with torch.no_grad():
             if len(self.feature_nns) > 1:
-                fig, axes = plt.subplots(len(self.feature_nns), 1, figsize=(10, 7))
+                fig, axes = plt.subplots(
+                    len(self.feature_nns), 1, figsize=(10, 7))
                 for i, ax in enumerate(axes.flat):
                     component = self.feature_nns[i]
                     component.plot(ax)
@@ -262,7 +256,8 @@ class NeuralAdditiveModel(nn.Module):
         self.eval()
         with torch.no_grad():
             if len(self.feature_nns) > 1:
-                fig, axes = plt.subplots(len(self.feature_nns), 1, figsize=(10, 7))
+                fig, axes = plt.subplots(
+                    len(self.feature_nns), 1, figsize=(10, 7))
                 for i, ax in enumerate(axes.flat):
                     component = self.feature_nns[i]
                     component.plot_data(ax, x[i], y)
@@ -299,20 +294,6 @@ class DownstreamModel(pl.LightningModule):
         combined_data (pd.DataFrame): Combined DataFrame containing structured data and topic probabilities.
         model (NeuralAdditiveModel): Neural Additive Model for downstream modeling.
 
-    Methods:
-        prepare_combined_data(): Prepare combined DataFrame containing structured data and topic probabilities.
-        preprocess_structured_data(data): Preprocess structured data.
-        define_nam_model(hidden_units, feature_dropout, hidden_dropout, activation, out_activation): Define the Neural Additive Model architecture.
-        forward(x): Forward pass of the model.
-        training_step(batch, batch_idx): Training step for LightningModule.
-        validation_step(batch, batch_idx): Validation step for LightningModule.
-        test_step(batch, batch_idx): Test step for LightningModule.
-        configure_optimizers(): Configure optimizer for training.
-        setup(stage): Setup datasets for training and validation.
-        train_dataloader(): DataLoader for training dataset.
-        val_dataloader(): DataLoader for validation dataset.
-        get_feature_names(): Get names of input features.
-        plot_feature_nns(): Plot the learned functions for each feature-specific neural network.
     """
 
     def __init__(
@@ -342,7 +323,8 @@ class DownstreamModel(pl.LightningModule):
                 self.trained_topic_model.dataset.get_structured_data()
             )
         else:
-            self.structured_data = dataset.get_structured_data(data=structured_data)
+            self.structured_data = dataset.get_structured_data(
+                data=structured_data)
         self.target_column = target_column
 
         # Combine topic probabilities with structured data
@@ -362,7 +344,8 @@ class DownstreamModel(pl.LightningModule):
             self.metric = torchmetrics.MeanSquaredError()
         elif task == "classification":
             # Determine the number of unique target values
-            num_classes = len(np.unique(self.combined_data[self.target_column]))
+            num_classes = len(
+                np.unique(self.combined_data[self.target_column]))
             if num_classes == 2:
                 # Binary classification
                 self.metric = BinaryAccuracy()
@@ -395,7 +378,8 @@ class DownstreamModel(pl.LightningModule):
 
         # Convert the matrix to a DataFrame and transpose it to shape (n, k)
         topic_probabilities = pd.DataFrame(topic_document_matrix).transpose()
-        new_column_names = [f"Topic_{i}" for i in range(topic_probabilities.shape[1])]
+        new_column_names = [f"Topic_{i}" for i in range(
+            topic_probabilities.shape[1])]
         topic_probabilities.columns = new_column_names
 
         preprocessed_structured_data = preprocessed_structured_data.reset_index(
@@ -438,7 +422,8 @@ class DownstreamModel(pl.LightningModule):
         categorical_cols = features.select_dtypes(
             include=["object", "category"]
         ).columns
-        numerical_cols = features.select_dtypes(include=["int64", "float64"]).columns
+        numerical_cols = features.select_dtypes(
+            include=["int64", "float64"]).columns
 
         transformers = []
 
@@ -458,7 +443,8 @@ class DownstreamModel(pl.LightningModule):
                     ("onehot", OneHotEncoder(handle_unknown="ignore")),
                 ]
             )
-            transformers.append(("cat", categorical_transformer, categorical_cols))
+            transformers.append(
+                ("cat", categorical_transformer, categorical_cols))
 
         preprocessor = ColumnTransformer(transformers=transformers)
 
@@ -661,7 +647,8 @@ class DownstreamModel(pl.LightningModule):
         # Train-validation split
         train_size = int(0.8 * len(dataset))
         val_size = len(dataset) - train_size
-        train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+        train_dataset, val_dataset = random_split(
+            dataset, [train_size, val_size])
 
         # Assign to use in dataloaders
         self.train_dataset = train_dataset
@@ -702,7 +689,8 @@ class DownstreamModel(pl.LightningModule):
         feature_names = self.get_feature_names()  # Retrieve feature names
         num_features = len(self.model.feature_nns)
 
-        fig, axs = plt.subplots(num_features, 1, figsize=(10, num_features * 2))
+        fig, axs = plt.subplots(
+            num_features, 1, figsize=(10, num_features * 2))
 
         for i, feature_nn in enumerate(self.model.feature_nns):
             ax = axs[i] if num_features > 1 else axs

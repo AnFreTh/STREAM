@@ -3,6 +3,7 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from enum import Enum
+
 import umap.umap_ as umap
 from loguru import logger
 
@@ -108,7 +109,8 @@ class BaseModel(ABC):
         Parameters:
             ignore (list, optional): List of keys to ignore while saving hyperparameters. Defaults to [].
         """
-        self.hparams = {k: v for k, v in self.hparams.items() if k not in ignore}
+        self.hparams = {k: v for k, v in self.hparams.items()
+                        if k not in ignore}
         for key, value in self.hparams.items():
             setattr(self, key, value)
 
@@ -124,7 +126,8 @@ class BaseModel(ABC):
                 self.hparams = json.load(file)
         else:
             logger.error(f"Hyperparameters file not found at: {path}")
-            raise FileNotFoundError(f"Hyperparameters file not found at: {path}")
+            raise FileNotFoundError(
+                f"Hyperparameters file not found at: {path}")
 
     def get_hyperparameters(self):
         """
@@ -187,13 +190,15 @@ class BaseModel(ABC):
         assert hasattr(
             self, "embeddings"
         ), "Model has no embeddings to reduce dimensions."
-        assert hasattr(self, "umap_args"), "Model has no UMAP arguments specified."
+        assert hasattr(
+            self, "umap_args"), "Model has no UMAP arguments specified."
         try:
             logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
+            raise RuntimeError(
+                f"Error in dimensionality reduction: {e}") from e
 
         return reduced_embeddings
 
@@ -295,19 +300,13 @@ class BaseModel(ABC):
         """
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
-        assert hasattr(self, "theta"), "Model has no topic-document distribution."
+        assert hasattr(
+            self, "theta"), "Model has no topic-document distribution."
         return self.theta
-    
+
     @abstractmethod
     def fit(self, dataset):
         pass
-
-    
-
-
-
-
-
 
 
 class TrainingStatus(str, Enum):

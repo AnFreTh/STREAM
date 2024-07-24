@@ -1,23 +1,23 @@
+from datetime import datetime
+
 import pandas as pd
 import pyarrow as pa
 from datasets import Dataset
-from .abstract_helper_models.base import BaseModel, TrainingStatus
+from loguru import logger
 from sentence_transformers.losses import CosineSimilarityLoss
 from setfit import SetFitModel, Trainer, TrainingArguments
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
-from loguru import logger
-from datetime import datetime
 
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
-
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "DCTE"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class DCTE(BaseModel):
@@ -51,7 +51,8 @@ class DCTE(BaseModel):
         """
         self.n_topics = None
 
-        self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
+        self.model = SetFitModel.from_pretrained(
+            f"sentence-transformers/{model}")
 
         self._status = TrainingStatus.NOT_STARTED
 
@@ -75,7 +76,8 @@ class DCTE(BaseModel):
         print(
             "--- a train-validation split of 0.8 to 0.2 is performed --- \n---change 'val_split' if needed"
         )
-        train_df, val_df = train_test_split(self.dataframe, test_size=val_split)
+        train_df, val_df = train_test_split(
+            self.dataframe, test_size=val_split)
 
         # convert to Huggingface dataset
         self.train_ds = Dataset(pa.Table.from_pandas(train_df))
@@ -92,7 +94,8 @@ class DCTE(BaseModel):
         docs_per_topic = predict_df.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
+        tfidf, count = c_tf_idf(
+            docs_per_topic["text"].values, m=len(predict_df))
         topics = extract_tfidf_topics(
             tfidf,
             count,
@@ -126,7 +129,8 @@ class DCTE(BaseModel):
         one_hot_encoder = OneHotEncoder(
             sparse=False
         )  # Use sparse=False to get a dense array
-        predictions_one_hot = one_hot_encoder.fit_transform(predict_df[["predictions"]])
+        predictions_one_hot = one_hot_encoder.fit_transform(
+            predict_df[["predictions"]])
 
         # Transpose the one-hot encoded matrix to get shape (k, n)
         topic_document_matrix = predictions_one_hot.T
@@ -201,7 +205,8 @@ class DCTE(BaseModel):
         print(metrics)
 
         predict_df = pd.DataFrame({"tokens": predict_dataset.get_corpus()})
-        predict_df["text"] = [" ".join(words) for words in predict_df["tokens"]]
+        predict_df["text"] = [" ".join(words)
+                              for words in predict_df["tokens"]]
 
         self.labels = self.model(predict_df["text"])
         predict_df["predictions"] = self.labels

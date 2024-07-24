@@ -9,19 +9,15 @@ from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
-from ._helper_funcs import cos_sim_pw, embed_corpus, embed_topic, update_corpus_dic_list
+from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_topic,
+                            update_corpus_dic_list)
 from .constants import NLTK_STOPWORD_LANGUAGE
 from .TopwordEmbeddings import TopwordEmbeddings
 
-
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
-
-
 nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-
 stopwords = list(
-    set(nltk_stopwords + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS))
-)
+    set(list(nltk_stopwords) + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS)))
 
 
 class NPMI(AbstractMetric):
@@ -169,7 +165,8 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(
+                            w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -228,7 +225,8 @@ class NPMI(AbstractMetric):
                     w2 = topic_words[k][j]
 
                     w1w2_dc = len(
-                        word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set())
+                        word_doc_counts.get(
+                            w1, set()) & word_doc_counts.get(w2, set())
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
@@ -321,7 +319,8 @@ class Embedding_Coherence(AbstractMetric):
             half_topic_words = topics[k][
                 : len(topics[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(np.array(topic_sims)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(
+                np.array(topic_sims)[k], 5)
 
         return results
 

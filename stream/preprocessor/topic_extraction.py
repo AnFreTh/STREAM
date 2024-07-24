@@ -58,11 +58,13 @@ class TopicExtractor:
         if corpus == "brown":
             word_list = nltk_words.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word)
+                         for word in word_list]
         elif corpus == "words":
             word_list = eng_dict.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word)
+                         for word in word_list]
         elif corpus == "octis":
             data = OCDataset()
             data.fetch_dataset("20NewsGroup")
@@ -79,14 +81,16 @@ class TopicExtractor:
             word_list += self.dataset.get_vocabulary()
 
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word)
+                         for word in word_list]
         else:
             raise ValueError(
                 "There are no words to be extracted for the Topics: Please specify a corpus"
             )
 
         if only_nouns:
-            word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
+            word_list = [word for (word, pos) in pos_tag(
+                word_list) if is_noun(pos)]
         else:
             word_list = [word for (word, pos) in pos_tag(word_list)]
 

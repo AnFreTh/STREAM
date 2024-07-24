@@ -1,7 +1,8 @@
+import json
 import os
 import pickle
 import re
-import json
+
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -114,7 +115,8 @@ class TMDataset(Dataset):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words)
+                                  for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -134,7 +136,8 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(my_package_dir, "preprocessed_datasets", name)
+        dataset_path = os.path.join(
+            my_package_dir, "preprocessed_datasets", name)
         return dataset_path
 
     def has_embeddings(self, embedding_model_name, path=None, file_name=None):
@@ -251,7 +254,8 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(my_package_dir, "pre_embedded_datasets", name)
+        dataset_path = os.path.join(
+            my_package_dir, "pre_embedded_datasets", name)
         return dataset_path
 
     def create_load_save_dataset(
@@ -288,18 +292,21 @@ class TMDataset(Dataset):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError("doc_column must be specified for DataFrame input")
+                raise ValueError(
+                    "doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [None] * len(documents)
+                data[label_column].tolist() if label_column else [
+                    None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError("data must be a pandas DataFrame or a list of documents")
+            raise TypeError(
+                "data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -379,7 +386,8 @@ class TMDataset(Dataset):
         `texts` attribute and updated in the `dataframe["text"]` column.
         """
         if model_type:
-            preprocessing_steps = self.load_model_preprocessing_steps(model_type)
+            preprocessing_steps = self.load_model_preprocessing_steps(
+                model_type)
         previous_steps = self.preprocessing_steps
 
         # Filter out steps that have already been applied
@@ -422,7 +430,8 @@ class TMDataset(Dataset):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(
+                    f"Error in dataset preprocessing: {e}") from e
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
@@ -469,7 +478,8 @@ class TMDataset(Dataset):
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
         if not os.path.exists(info_path):
-            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
+            raise FileNotFoundError(
+                f"Dataset info file {info_path} does not exist.")
 
         with open(info_path, "rb") as info_file:
             dataset_info = pickle.load(info_file)
@@ -587,7 +597,8 @@ class TMDataset(Dataset):
                 }
             )
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(
+                lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -766,6 +777,7 @@ class TMDataset(Dataset):
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(
+            lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()

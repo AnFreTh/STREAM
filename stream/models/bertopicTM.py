@@ -1,20 +1,20 @@
+from datetime import datetime
+
 import hdbscan
 import numpy as np
-import umap.umap_ as umap
 from loguru import logger
-from datetime import datetime
+from sklearn.preprocessing import OneHotEncoder
+
+from ..preprocessor import c_tf_idf, extract_tfidf_topics
+from ..utils.check_dataset_steps import check_dataset_steps
+from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
-from sklearn.preprocessing import OneHotEncoder
-from ..utils.check_dataset_steps import check_dataset_steps
-from ..preprocessor import c_tf_idf, extract_tfidf_topics
-from ..utils.dataset import TMDataset
-
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "BERTopicTM"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class BERTopicTM(BaseModel, SentenceEncodingMixin):
@@ -118,7 +118,8 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         """
 
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
@@ -171,7 +172,8 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(
+                dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
 
             self._clustering()
@@ -185,7 +187,8 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
 
-            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(
+                tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(

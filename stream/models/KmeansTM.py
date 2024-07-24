@@ -1,6 +1,7 @@
+from datetime import datetime
+
 import numpy as np
 from loguru import logger
-from datetime import datetime
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 
@@ -9,11 +10,10 @@ from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
 
-
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "KmeansTM"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class KmeansTM(BaseModel, SentenceEncodingMixin):
@@ -23,7 +23,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
     This class inherits from the BaseModel class and utilizes sentence embeddings,
     UMAP for dimensionality reduction, and K-Means for clustering text data into topics.
 
-    Attributes
+    Parameters
     ----------
     embedding_model_name : str
         Name of the sentence embedding model to use.
@@ -42,20 +42,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
     n_topics : int or None
         Number of topics to extract.
 
-    Methods
-    -------
-    get_info()
-        Returns a dictionary containing information about the model.
-    fit(dataset, n_topics=20)
-        Trains the model on the provided dataset and extracts topics.
-    predict(texts)
-        Predicts topics for new documents.
-    get_topics(n_words=10)
-        Retrieves the top words for each topic.
-    get_topic_word_matrix()
-        Retrieves the topic-word distribution matrix.
-    get_topic_document_matrix()
-        Retrieves the topic-document distribution matrix.
     """
 
     def __init__(
@@ -167,7 +153,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             )
             self.dataframe = dataset.dataframe
         else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
+            logger.info(
+                f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -190,12 +177,14 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
             logger.info("--- Creating document cluster ---")
-            self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
+            self.clustering_model = KMeans(
+                n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
 
@@ -244,7 +233,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(
+                dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -256,7 +246,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             tfidf, count = c_tf_idf(
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
-            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(
+                tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
