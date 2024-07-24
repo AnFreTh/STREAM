@@ -9,7 +9,6 @@ from .constants import SENTENCE_TRANSFORMER_MODEL
 from .TopwordEmbeddings import TopwordEmbeddings
 
 
-
 class ISIM(BaseMetric):
     """
     A metric class to calculate the Intruder Similarity Metric (ISIM) for topics. This metric evaluates
@@ -89,9 +88,8 @@ class ISIM(BaseMetric):
             numpy.ndarray: An array of ISIM scores for each topic with one intruder word.
         """
         emb_tw = self.topword_embeddings.embed_topwords(
-                topics,
-                n_topwords_to_use=self.n_words
-            )  # embed the top words
+            topics, n_topwords_to_use=self.n_words
+        )  # embed the top words
         avg_sim_topic_list = (
             []
         )  # iterate over each topic and append the average similarity to the intruder word
@@ -177,8 +175,7 @@ class ISIM(BaseMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(
-                np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -199,7 +196,7 @@ class ISIM(BaseMetric):
         """
         if new_Embeddings:
             self.embeddings = None
-        
+
         topics = topics["topics"]
 
         return float(np.mean(list(self.score_per_topic(topics).values())))
@@ -265,9 +262,8 @@ class INT(AbstractMetric):
         topics_tw = model_output["topics"]
 
         emb_tw = self.topword_embeddings.embed_topwords(
-                topics_tw,
-                n_topwords_to_use=self.n_words
-            )  # embed the top words
+            topics_tw, n_topwords_to_use=self.n_words
+        )  # embed the top words
         avg_sim_topic_list = []
         for idx, topic in enumerate(emb_tw):
             mask = np.full(emb_tw.shape[0], True)  # mask out the current topic
@@ -365,8 +361,7 @@ class INT(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(
-                np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -425,15 +420,10 @@ class ISH(AbstractMetric):
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
-S
+
         self.n_words = n_words
 
         self.embeddings = None
-        # """
-        # corpus_dict: dict that maps each word in the corpus to its embedding
-        # n_words: number of top words to consider
-        # """
-
         self.n_intruders = n_intruders
 
     def score(self, model_output, new_Embeddings=True):
@@ -452,9 +442,8 @@ S
         topics_tw = model_output["topics"]
 
         emb_tw = self.topword_embeddings.embed_topwords(
-                topics_tw,
-                n_topwords_to_use=self.n_words
-            )
+            topics_tw, n_topwords_to_use=self.n_words
+        )
 
         score_topic_list = []
         for idx, topic in enumerate(emb_tw):
@@ -469,8 +458,7 @@ S
             intruder_words_idx_word = np.random.choice(
                 np.arange(intruder_words.shape[1]), size=1
             )  # select one intruder word from each topic
-            intruder_words = intruder_words[:,
-                                            intruder_words_idx_word, :].squeeze()
+            intruder_words = intruder_words[:, intruder_words_idx_word, :].squeeze()
 
             topic_mean = np.mean(topic, axis=0)
 
