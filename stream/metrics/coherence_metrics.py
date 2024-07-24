@@ -12,6 +12,7 @@ from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_topic,
                             update_corpus_dic_list)
 from .constants import NLTK_STOPWORD_LANGUAGE
+from .TopwordEmbeddings import TopwordEmbeddings
 
 gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
 nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
@@ -257,57 +258,33 @@ class Embedding_Coherence(AbstractMetric):
 
     Attributes:
         n_words (int): The number of top words to consider for each topic.
-        corpus_dict (dict): A dictionary mapping each word in the corpus to its embedding.
-        embeddings (numpy.ndarray): The embeddings for the top words of the topics.
+        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
     """
 
     def __init__(
         self,
-        dataset,
         n_words=10,
         metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
         emb_filename=None,
         emb_path="Embeddings/",
-        expansion_path="Embeddings/",
-        expansion_filename=None,
-        expansion_word_list=None,
     ):
         """
-        Initializes the Embedding_Coherence object with a dataset, number of words,
-        embedding model, and paths for storing embeddings.
+        Initializes the Embedding_Coherence object with the number of top words to consider
+        and the embedding model to use.
 
         Parameters:
-            dataset: The dataset to be used for embedding coherence calculation.
-            n_words (int, optional): The number of top words to consider for each topic.
-                Defaults to 10.
-            metric_embedder (SentenceTransformer, optional): The embedding model to use.
-                Defaults to SentenceTransformer("paraphrase-MiniLM-L6-v2").
-            emb_filename (str, optional): Filename to store embeddings. Defaults to None.
-            emb_path (str, optional): Path to store embeddings. Defaults to "Embeddings/".
-            expansion_path (str, optional): Path for expansion embeddings. Defaults to "Embeddings/".
-            expansion_filename (str, optional): Filename for expansion embeddings. Defaults to None.
-            expansion_word_list (list, optional): List of words for expansion. Defaults to None.
+        ----------
+        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
         """
 
-        tw_emb = embed_corpus(
-            dataset,
-            metric_embedder,
+        self.topword_embeddings = TopwordEmbeddings(
+            word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
 
-        if expansion_word_list is not None:
-            tw_emb = update_corpus_dic_list(
-                expansion_word_list,
-                tw_emb,
-                metric_embedder,
-                emb_filename=expansion_filename,
-                emb_path=expansion_path,
-            )
-
         self.n_words = n_words
-        self.corpus_dict = tw_emb
-        self.embeddings = None
 
     def score_per_topic(self, model_output):
         """
@@ -322,30 +299,25 @@ class Embedding_Coherence(AbstractMetric):
         Returns:
             numpy.ndarray: An array of coherence scores for each topic.
         """
-        topics_tw = model_output["topics"]
-        topic_words = model_output["topics"]
-        ntopics = len(topic_words)
-
-        emb_tw = embed_topic(
-            topics_tw, self.corpus_dict, self.n_words
-        )  # embed the top words
-        emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-            :, : self.n_words, :
-        ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-        self.embeddings = emb_tw
+        topics= model_output["topics"]
+        n_topics = len(topics)
+        topwords_embedded = self.topword_embeddings.embed_topwords(
+            topics,
+            n_topwords_to_use=self.n_words
+        )
 
         topic_sims = []
         for (
             topic_emb
         ) in (
-            emb_tw
+            topwords_embedded
         ):  # for each topic append the average pairwise cosine similarity within its words
             topic_sims.append(float(cos_sim_pw(topic_emb)))
 
         results = {}
-        for k in range(ntopics):
-            half_topic_words = topic_words[k][
-                : len(topic_words[k]) // 2
+        for k in range(n_topics):
+            half_topic_words = topics[k][
+                : len(topics[k]) // 2
             ]  # Take only the first half of the words
             results[", ".join(half_topic_words)] = np.around(
                 np.array(topic_sims)[k], 5)

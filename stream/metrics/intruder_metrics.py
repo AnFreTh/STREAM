@@ -6,6 +6,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from ._helper_funcs import embed_corpus, embed_topic, update_corpus_dic_list
 from .base import BaseMetric
 from .constants import SENTENCE_TRANSFORMER_MODEL
+from .TopwordEmbeddings import TopwordEmbeddings
+
 
 
 class ISIM(BaseMetric):
@@ -16,61 +18,37 @@ class ISIM(BaseMetric):
     distinctiveness.
 
     Attributes:
-        n_intruders (int): The number of intruder words to draw for each topic.
         n_words (int): The number of top words to consider for each topic.
-        corpus_dict (dict): A dictionary mapping each word in the corpus to its embedding.
-        embeddings (numpy.ndarray): The embeddings for the top words of the topics.
+        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
+        n_intruders (int): The number of intruder words to draw for each topic.
     """
 
     def __init__(
         self,
-        dataset,
-        n_intruders=1,
         n_words=10,
-        metric_embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
+        n_intruders=1,
+        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
         emb_filename=None,
         emb_path="Embeddings/",
-        expansion_path="Embeddings/",
-        expansion_filename=None,
-        expansion_word_list=None,
     ):
         """
-        Initializes the ISIM object with a dataset, number of intruders, number of words,
-        embedding model, and paths for storing embeddings.
+        Initializes the Embedding_Coherence object with the number of top words to consider
+        and the embedding model to use.
 
         Parameters:
-            dataset: The dataset to be used for ISIM calculation.
-            n_intruders (int, optional): The number of intruder words to draw for each topic. Defaults to 1.
-            n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-            metric_embedder (SentenceTransformer, optional): The embedding model to use.
-                Defaults to SentenceTransformer("paraphrase-MiniLM-L6-v2").
-            emb_filename (str, optional): Filename to store embeddings. Defaults to None.
-            emb_path (str, optional): Path to store embeddings. Defaults to "Embeddings/".
-            expansion_path (str, optional): Path for expansion embeddings. Defaults to "Embeddings/".
-            expansion_filename (str, optional): Filename for expansion embeddings. Defaults to None.
-            expansion_word_list (list, optional): List of words for expansion. Defaults to None.
+        ----------
+        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
         """
 
-        tw_emb = embed_corpus(
-            dataset,
-            metric_embedder,
+        self.topword_embeddings = TopwordEmbeddings(
+            word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
-        if expansion_word_list is not None:
-            tw_emb = update_corpus_dic_list(
-                expansion_word_list,
-                tw_emb,
-                metric_embedder,
-                emb_filename=expansion_filename,
-                emb_path=expansion_path,
-            )
 
-        self.n_intruders = n_intruders
-        self.corpus_dict = tw_emb
         self.n_words = n_words
-        self.embeddings = None
-        self.metric_embedder = metric_embedder
+        self.n_intruders = n_intruders
 
     def get_info(self):
         """
@@ -110,20 +88,10 @@ class ISIM(BaseMetric):
         Returns:
             numpy.ndarray: An array of ISIM scores for each topic with one intruder word.
         """
-        if new_Embeddings:  # for this function, reuse embeddings per default
-            self.embeddings = None
-
-        if self.embeddings is None:
-            emb_tw = embed_topic(
-                topics, self.corpus_dict, self.n_words
+        emb_tw = self.topword_embeddings.embed_topwords(
+                topics,
+                n_topwords_to_use=self.n_words
             )  # embed the top words
-            emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-                :, : self.n_words, :
-            ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-            self.embeddings = emb_tw
-        else:
-            emb_tw = self.embeddings
-
         avg_sim_topic_list = (
             []
         )  # iterate over each topic and append the average similarity to the intruder word
@@ -231,6 +199,8 @@ class ISIM(BaseMetric):
         """
         if new_Embeddings:
             self.embeddings = None
+        
+        topics = topics["topics"]
 
         return float(np.mean(list(self.score_per_topic(topics).values())))
 
@@ -243,60 +213,37 @@ class INT(AbstractMetric):
     intruder words. Higher scores suggest better topic distinctiveness.
 
     Attributes:
-        n_intruders (int): The number of intruder words to draw for each topic.
         n_words (int): The number of top words to consider for each topic.
-        corpus_dict (dict): A dictionary mapping each word in the corpus to its embedding.
-        embeddings (numpy.ndarray): The embeddings for the top words of the topics.
+        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
+        n_intruders (int): The number of intruder words to draw for each topic.
     """
 
     def __init__(
         self,
-        dataset,
-        metric_embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
+        n_words=10,
+        n_intruders=1,
+        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
         emb_filename=None,
         emb_path="Embeddings/",
-        expansion_path="Embeddings/",
-        expansion_filename=None,
-        expansion_word_list=None,
-        n_intruders=1,
-        n_words=10,
     ):
         """
-        Initializes the INT object with a dataset, number of intruders, number of words,
-        embedding model, and paths for storing embeddings.
+        Initializes the Embedding_Coherence object with the number of top words to consider
+        and the embedding model to use.
 
         Parameters:
-            dataset: The dataset to be used for INT calculation.
-            metric_embedder (SentenceTransformer, optional): The embedding model to use.
-                Defaults to SentenceTransformer("paraphrase-MiniLM-L6-v2").
-            emb_filename (str, optional): Filename to store embeddings. Defaults to None.
-            emb_path (str, optional): Path to store embeddings. Defaults to "Embeddings/".
-            expansion_path (str, optional): Path for expansion embeddings. Defaults to "Embeddings/".
-            expansion_filename (str, optional): Filename for expansion embeddings. Defaults to None.
-            expansion_word_list (list, optional): List of words for expansion. Defaults to None.
-            n_intruders (int, optional): The number of intruder words to draw for each topic. Defaults to 1.
-            n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        ----------
+        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
         """
 
-        tw_emb = embed_corpus(
-            dataset,
-            metric_embedder,
+        self.topword_embeddings = TopwordEmbeddings(
+            word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
-        if expansion_word_list is not None:
-            tw_emb = update_corpus_dic_list(
-                expansion_word_list,
-                tw_emb,
-                metric_embedder,
-                emb_filename=expansion_filename,
-                emb_path=expansion_path,
-            )
 
-        self.n_intruders = n_intruders
-        self.corpus_dict = tw_emb
         self.n_words = n_words
-        self.embeddings = None
+        self.n_intruders = n_intruders
 
     def score_one_intr_per_topic(self, model_output, new_Embeddings=True):
         """
@@ -317,19 +264,10 @@ class INT(AbstractMetric):
             self.embeddings = None
         topics_tw = model_output["topics"]
 
-        if self.embeddings is None:
-            emb_tw = embed_topic(
-                topics_tw, self.corpus_dict, self.n_words
+        emb_tw = self.topword_embeddings.embed_topwords(
+                topics_tw,
+                n_topwords_to_use=self.n_words
             )  # embed the top words
-            emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-                :, : self.n_words, :
-            ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-            self.embeddings = emb_tw
-        else:
-            emb_tw = (
-                self.embeddings
-            )  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-
         avg_sim_topic_list = []
         for idx, topic in enumerate(emb_tw):
             mask = np.full(emb_tw.shape[0], True)  # mask out the current topic
@@ -458,55 +396,38 @@ class ISH(AbstractMetric):
     For each topic, draw several intruder words that are not from the same topic by first selecting some topics that are not the specific topic and
     then selecting one word from each of those topics.
     The embedding intruder distance to mean is then calculated as the average distance that each intruder word has to the mean of the other words.
+    Attributes:
+        n_words (int): The number of top words to consider for each topic.
+        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
+        n_intruders (int): The number of intruder words to draw for each topic.
     """
 
     def __init__(
         self,
-        dataset,
-        n_intruders=1,
         n_words=10,
-        metric_embedder=SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
+        n_intruders=1,
+        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
         emb_filename=None,
         emb_path="Embeddings/",
-        expansion_path="Embeddings/",
-        expansion_filename=None,
-        expansion_word_list=None,
     ):
         """
-        Initializes the ISH object with a dataset, number of intruders, number of words,
-        embedding model, and paths for storing embeddings.
+        Initializes the Embedding_Coherence object with the number of top words to consider
+        and the embedding model to use.
 
         Parameters:
-            dataset: The dataset to be used for ISIM calculation.
-            n_intruders (int, optional): The number of intruder words to draw for each topic. Defaults to 1.
-            n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-            metric_embedder (SentenceTransformer, optional): The embedding model to use.
-            Defaults to SentenceTransformer("paraphrase-MiniLM-L6-v2").
-            emb_filename (str, optional): Filename to store embeddings. Defaults to None.
-            emb_path (str, optional): Path to store embeddings. Defaults to "Embeddings/".
-            expansion_path (str, optional): Path for expansion embeddings. Defaults to "Embeddings/".
-            expansion_filename (str, optional): Filename for expansion embeddings. Defaults to None.
-            expansion_word_list (list, optional): List of words for expansion. Defaults to None.
+        ----------
+        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
         """
 
-        tw_emb = embed_corpus(
-            dataset,
-            metric_embedder,
+        self.topword_embeddings = TopwordEmbeddings(
+            word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
-        if expansion_word_list is not None:
-            tw_emb = update_corpus_dic_list(
-                expansion_word_list,
-                tw_emb,
-                metric_embedder,
-                emb_filename=expansion_filename,
-                emb_path=expansion_path,
-            )
-
-        self.n_intruders = n_intruders
-        self.corpus_dict = tw_emb
+S
         self.n_words = n_words
+
         self.embeddings = None
         # """
         # corpus_dict: dict that maps each word in the corpus to its embedding
@@ -530,16 +451,10 @@ class ISH(AbstractMetric):
 
         topics_tw = model_output["topics"]
 
-        if self.embeddings is None:
-            emb_tw = embed_topic(
-                topics_tw, self.corpus_dict, self.n_words
-            )  # embed the top words
-            emb_tw = np.dstack(emb_tw).transpose(2, 0, 1)[
-                :, : self.n_words, :
-            ]  # create tensor of size (n_topics, n_topwords, n_embedding_dims)
-            self.embeddings = emb_tw
-        else:
-            emb_tw = self.embeddings
+        emb_tw = self.topword_embeddings.embed_topwords(
+                topics_tw,
+                n_topwords_to_use=self.n_words
+            )
 
         score_topic_list = []
         for idx, topic in enumerate(emb_tw):
