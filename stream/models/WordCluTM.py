@@ -1,17 +1,19 @@
-import numpy as np
-from gensim.models import Word2Vec
-from .abstract_helper_models.base import BaseModel, TrainingStatus
-from loguru import logger
 from datetime import datetime
-from sklearn.mixture import GaussianMixture
-from ..utils.check_dataset_steps import check_dataset_steps
-from ..preprocessor._embedder import BaseEmbedder, GensimBackend
-from ..utils.dataset import TMDataset
+
+import numpy as np
 import pandas as pd
+from gensim.models import Word2Vec
+from loguru import logger
+from sklearn.mixture import GaussianMixture
+
+from ..preprocessor._embedder import BaseEmbedder, GensimBackend
+from ..utils.check_dataset_steps import check_dataset_steps
+from ..utils.dataset import TMDataset
+from .abstract_helper_models.base import BaseModel, TrainingStatus
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "WordCluTM"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class WordCluTM(BaseModel):
@@ -131,7 +133,8 @@ class WordCluTM(BaseModel):
         )
 
         # Initialize BaseEmbedder with GensimBackend
-        self.base_embedder = BaseEmbedder(GensimBackend(self.word2vec_model.wv))
+        self.base_embedder = BaseEmbedder(
+            GensimBackend(self.word2vec_model.wv))
 
     def _clustering(self):
         """
@@ -143,7 +146,8 @@ class WordCluTM(BaseModel):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -277,7 +281,8 @@ class WordCluTM(BaseModel):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
         corpus = dataset.get_corpus()
         n_documents = len(corpus)
-        document_scores_per_label = {label: [] for label in range(len(self.topic_dict))}
+        document_scores_per_label = {label: []
+                                     for label in range(len(self.topic_dict))}
         # Convert top_words_per_cluster to a more easily searchable structure
         word_scores_per_label = {}
         for label, words_scores in self.topic_dict.items():
@@ -298,7 +303,8 @@ class WordCluTM(BaseModel):
             # Average the scores for each label and store them
             for label in doc_scores:
                 if doc_scores[label]:  # Check if there are any scores to average
-                    document_scores_per_label[label].append(np.mean(doc_scores[label]))
+                    document_scores_per_label[label].append(
+                        np.mean(doc_scores[label]))
                 else:
                     # If no scores for this label, you might want to set a default value
                     document_scores_per_label[label].append(0)
@@ -335,7 +341,8 @@ class WordCluTM(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
-        unique_words = list(set(word for sentence in texts for word in sentence))
+        unique_words = list(
+            set(word for sentence in texts for word in sentence))
         word_to_index = {word: i for i, word in enumerate(unique_words)}
         word_embeddings = np.array(
             [

@@ -3,9 +3,8 @@ from .cbc import CBC
 from .CEDC import CEDC
 from .DCTE import DCTE
 from .KmeansTM import KmeansTM
-from .som import SOMTM
-from .WordCluTM import WordCluTM
 from .lda import LDA
+from .som import SOMTM
 from .WordCluTM import WordCluTM
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "SOMTM",
     "WordCluTM",
     "LDA",
-    "WordCluTM",
 ]

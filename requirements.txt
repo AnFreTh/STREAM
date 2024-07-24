@@ -20,7 +20,7 @@ wordcloud
 community
 networkx
 python_louvain
-pytorch_lightning
+lightning
 torch
 langdetect
 hdbscan

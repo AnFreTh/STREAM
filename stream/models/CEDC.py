@@ -1,13 +1,14 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-import umap.umap_ as umap
+from loguru import logger
 from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
-from loguru import logger
-from datetime import datetime
-from ..utils.check_dataset_steps import check_dataset_steps
+
 from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
@@ -16,16 +17,16 @@ DATADIR = "../datasets/preprocessed_datasets"
 MODEL_NAME = "CEDC"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class CEDC(BaseModel, SentenceEncodingMixin):
     """
     Class for Clustering-based Embedding-driven Document Clustering (CEDC).
-
     Inherits from BaseModel and SentenceEncodingMixin.
 
-    Attributes:
+
+    Parameters
     ----------
     n_topics : int or None
         Number of topics to extract.
@@ -44,20 +45,6 @@ class CEDC(BaseModel, SentenceEncodingMixin):
     save_embeddings : bool
         Whether to save generated embeddings.
 
-    Methods
-    -------
-    get_info()
-        Returns a dictionary containing information about the model.
-    fit(dataset, n_topics=20)
-        Trains the model on the provided dataset and extracts topics.
-    predict(texts)
-        Predicts topics for new documents.
-    get_topics(n_words=10)
-        Retrieves the top words for each topic.
-    get_topic_word_matrix()
-        Retrieves the topic-word distribution matrix.
-    get_topic_document_matrix()
-        Retrieves the topic-document distribution matrix.
     """
 
     def __init__(
@@ -73,6 +60,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
     ):
         """
         Initializes the CEDC model.
+
 
         Parameters
         ----------
@@ -146,6 +134,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         """
         Get information about the model.
 
+
         Returns
         -------
         dict
@@ -167,13 +156,15 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         """
         Applies GMM clustering to the reduced embeddings.
 
+
         Raises
         ------
         ValueError
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -221,6 +212,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         n_words : int, optional
             Number of top words to include in each topic (default is 20).
 
+
         Returns
         -------
         None
@@ -241,7 +233,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(
+                dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -292,15 +285,18 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         """
         Predict topics for new documents.
 
+
         Parameters
         ----------
         texts : list of str
             List of texts to predict topics for.
 
+
         Returns
         -------
         list of int
             List of predicted topic labels.
+
 
         Raises
         ------
@@ -333,10 +329,12 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         ndarray
             Topic-word matrix where rows represent topics and columns represent words.
 
+
         Notes
         -----
         The topic-word matrix is constructed by assigning prevalences of words in topics.
         Words are sorted alphabetically across all topics.
+
 
         Raises
         ------
@@ -349,7 +347,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
         # Extract all unique words and sort them
-        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
+        all_words = set(word for topic in self.topic_dict.values()
+                        for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns

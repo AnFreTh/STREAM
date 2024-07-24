@@ -177,7 +177,8 @@ class ISIM(BaseMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(
+                np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -364,7 +365,8 @@ class INT(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(
+                np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -423,16 +425,23 @@ class ISH(AbstractMetric):
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
-
+S
         self.n_words = n_words
+
+        self.embeddings = None
+        # """
+        # corpus_dict: dict that maps each word in the corpus to its embedding
+        # n_words: number of top words to consider
+        # """
+
         self.n_intruders = n_intruders
 
     def score(self, model_output, new_Embeddings=True):
-        if new_Embeddings:
-            self.embeddings = None
         """
         Calculate the score for all topics combined
         """
+        if new_Embeddings:
+            self.embeddings = None
 
         return float(np.mean(list(self.score_per_topic(model_output).values())))
 
@@ -460,7 +469,8 @@ class ISH(AbstractMetric):
             intruder_words_idx_word = np.random.choice(
                 np.arange(intruder_words.shape[1]), size=1
             )  # select one intruder word from each topic
-            intruder_words = intruder_words[:, intruder_words_idx_word, :].squeeze()
+            intruder_words = intruder_words[:,
+                                            intruder_words_idx_word, :].squeeze()
 
             topic_mean = np.mean(topic, axis=0)
 
