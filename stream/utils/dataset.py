@@ -2,7 +2,10 @@ import json
 import os
 import pickle
 import re
-
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import gensim.downloader as api
+import numpy as np
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -36,6 +39,9 @@ class TMDataset(Dataset):
         self.name = name
         self.dataframe = None
         self.embeddings = None
+        self.bow = None
+        self.tfidf = None
+        self.tokens = None
         self.texts = None
         self.labels = None
         self.language = language
@@ -115,8 +121,7 @@ class TMDataset(Dataset):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words)
-                                  for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -136,8 +141,7 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(
-            my_package_dir, "preprocessed_datasets", name)
+        dataset_path = os.path.join(my_package_dir, "preprocessed_datasets", name)
         return dataset_path
 
     def has_embeddings(self, embedding_model_name, path=None, file_name=None):
@@ -254,8 +258,7 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(
-            my_package_dir, "pre_embedded_datasets", name)
+        dataset_path = os.path.join(my_package_dir, "pre_embedded_datasets", name)
         return dataset_path
 
     def create_load_save_dataset(
@@ -292,21 +295,18 @@ class TMDataset(Dataset):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError(
-                    "doc_column must be specified for DataFrame input")
+                raise ValueError("doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [
-                    None] * len(documents)
+                data[label_column].tolist() if label_column else [None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError(
-                "data must be a pandas DataFrame or a list of documents")
+            raise TypeError("data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -386,8 +386,7 @@ class TMDataset(Dataset):
         `texts` attribute and updated in the `dataframe["text"]` column.
         """
         if model_type:
-            preprocessing_steps = self.load_model_preprocessing_steps(
-                model_type)
+            preprocessing_steps = self.load_model_preprocessing_steps(model_type)
         previous_steps = self.preprocessing_steps
 
         # Filter out steps that have already been applied
@@ -430,8 +429,7 @@ class TMDataset(Dataset):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(
-                    f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
@@ -478,8 +476,7 @@ class TMDataset(Dataset):
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
         if not os.path.exists(info_path):
-            raise FileNotFoundError(
-                f"Dataset info file {info_path} does not exist.")
+            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
 
         with open(info_path, "rb") as info_file:
             dataset_info = pickle.load(info_file)
@@ -536,37 +533,13 @@ class TMDataset(Dataset):
             item["label"] = self.labels[idx]
         if self.embeddings is not None:
             item["embedding"] = self.embeddings[idx]
+        if self.bow is not None:
+            item["bow"] = self.bow[idx]
+        if self.tokens is not None:
+            item["tokens"] = self.tokens[idx]
+        if self.tfidf is not None:
+            item["tfidf"] = self.tfidf[idx]
         return item
-
-    def get_data_loader(
-        self, batch_size=32, shuffle=True, num_workers=0, pin_memory=False
-    ):
-        """
-        Get a data loader for the dataset.
-
-        Parameters
-        ----------
-        batch_size : int, optional
-            Number of samples per batch, by default 32.
-        shuffle : bool, optional
-            Whether to shuffle the data, by default True.
-        num_workers : int, optional
-            Number of subprocesses to use for data loading, by default 0.
-        pin_memory : bool, optional
-            If True, the data loader will copy tensors into CUDA pinned memory, by default False.
-
-        Returns
-        -------
-        DataLoader
-            Data loader for the dataset.
-        """
-        return DataLoader(
-            self,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-        )
 
     def load_custom_dataset_from_folder(self, dataset_path):
         """
@@ -597,8 +570,7 @@ class TMDataset(Dataset):
                 }
             )
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(
-                lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -639,7 +611,7 @@ class TMDataset(Dataset):
         """
         return self.dataframe["labels"].tolist()
 
-    def split_dataset(self, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, seed=None):
+    def split_dataset(self, train_ratio=0.8, val_ratio=0.2, seed=None):
         """
         Split the dataset into train, validation, and test sets.
 
@@ -661,95 +633,87 @@ class TMDataset(Dataset):
         """
         total_size = len(self)
 
-        if train_ratio < 0 or val_ratio < 0 or test_ratio < 0:
+        if train_ratio < 0 or val_ratio < 0:
             raise ValueError("Train, val and test ratios must be positive")
 
-        if train_ratio == 0 and val_ratio == 0 and test_ratio == 0:
+        if train_ratio == 0 and val_ratio == 0:
             raise ValueError("Train, val and test ratios cannot all be 0")
 
-        if train_ratio > 1 or val_ratio > 1 or test_ratio > 1:
-            raise ValueError(
-                "Train, val and test ratios must be less than or equal to 1"
-            )
-
-        if train_ratio + val_ratio + test_ratio != 1.0:
+        if train_ratio + val_ratio != 1.0:
             raise ValueError("Train, validation and test ratios must sum to 1")
 
         train_size = int(train_ratio * total_size)
         val_size = int(val_ratio * total_size)
-        test_size = total_size - train_size - val_size
 
         if seed is not None:
             np.random.seed(seed)
 
-        train_dataset, val_dataset, test_dataset = random_split(
-            self, [train_size, val_size, test_size]
-        )
-        return train_dataset, val_dataset, test_dataset
+        train_dataset, val_dataset = random_split(self, [train_size, val_size])
+        return train_dataset, val_dataset
 
-    def get_data_loaders(
-        self,
-        train_ratio=0.8,
-        val_ratio=0.1,
-        test_ratio=0.1,
-        batch_size=32,
-        shuffle=True,
-        num_workers=0,
-        pin_memory=False,
-        seed=None,
-    ):
+    def get_bow(self, **kwargs):
         """
-        Get data loaders for train, validation, and test sets.
+        Get the Bag of Words representation of the corpus.
 
         Parameters
         ----------
-        train_ratio : float, optional
-            Ratio of the training set, by default 0.8.
-        val_ratio : float, optional
-            Ratio of the validation set, by default 0.1.
-        test_ratio : float, optional
-            Ratio of the test set, by default 0.1.
-        batch_size : int, optional
-            Number of samples per batch, by default 32.
-        shuffle : bool, optional
-            Whether to shuffle the data, by default True.
-        num_workers : int, optional
-            Number of subprocesses to use for data loading, by default 0.
-        pin_memory : bool, optional
-            If True, the data loader will copy tensors into CUDA pinned memory, by default False.
-        seed : int, optional
-            Random seed for shuffling, by default None.
+        **kwargs : dict, optional
+            Additional arguments to pass to CountVectorizer.
 
         Returns
         -------
-        tuple of DataLoader
-            Data loaders for train, validation, and test sets.
+        scipy.sparse.csr_matrix
+            BOW matrix.
+        list of str
+            Feature names.
         """
-        train_dataset, val_dataset, test_dataset = self.split_dataset(
-            train_ratio, val_ratio, test_ratio, seed
-        )
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-        )
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-        )
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-        )
-        return train_loader, val_loader, test_loader
+        corpus = [" ".join(tokens) for tokens in self.get_corpus()]
+        vectorizer = CountVectorizer(**kwargs)
+        self.bow = vectorizer.fit_transform(corpus).toarray()
+        return self.bow, vectorizer.get_feature_names_out()
+
+    def get_tfidf(self, **kwargs):
+        """
+        Get the TF-IDF representation of the corpus.
+
+        Parameters
+        ----------
+        **kwargs : dict, optional
+            Additional arguments to pass to TfidfVectorizer.
+
+        Returns
+        -------
+        scipy.sparse.csr_matrix
+            TF-IDF matrix.
+        list of str
+            Feature names.
+        """
+        corpus = [" ".join(tokens) for tokens in self.get_corpus()]
+        vectorizer = TfidfVectorizer(**kwargs)
+        self.tfidf = vectorizer.fit_transform(corpus).toarray()
+        return self.tfidf, vectorizer.get_feature_names_out()
+
+    def get_word_embeddings(self, model_name="glove-wiki-gigaword-100"):
+        """
+        Get the word embeddings for the vocabulary using a pre-trained model.
+
+        Parameters
+        ----------
+        model_name : str, optional
+            Name of the pre-trained model to use, by default 'glove-wiki-gigaword-100'.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping words to their embeddings.
+        """
+        # Load pre-trained model
+        model = api.load(model_name)
+
+        vocabulary = self.get_vocabulary()
+        embeddings = {word: model[word] for word in vocabulary if word in model}
+
+        return embeddings
 
     def _save_to_parquet(self, save_dir, dataset_name):
         """
@@ -777,7 +741,6 @@ class TMDataset(Dataset):
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(
-            lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
