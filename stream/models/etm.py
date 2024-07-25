@@ -22,6 +22,14 @@ class ETM(BaseModel):
         self,
         **kwargs,
     ):
+        """
+        Initialize the ETM model.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Additional keyword arguments to pass to the parent class constructor.
+        """
 
         super().__init__(use_pretrained_embeddings=True, **kwargs)
         self.save_hyperparameters()
@@ -47,6 +55,24 @@ class ETM(BaseModel):
     def _initialize_model(
         self, n_topics, lr, lr_patience, factor, weight_decay, **model_kwargs
     ):
+        """
+        Initialize the neural base model.
+
+        Parameters
+        ----------
+        n_topics : int
+            Number of topics.
+        lr : float
+            Learning rate.
+        lr_patience : int
+            Patience for learning rate scheduler.
+        factor : float
+            Factor for learning rate scheduler.
+        weight_decay : float
+            Weight decay for the optimizer.
+        **model_kwargs : dict
+            Additional keyword arguments for the model.
+        """
 
         self.model = NeuralBaseModel(
             model_class=ETMBase,
@@ -68,6 +94,24 @@ class ETM(BaseModel):
         checkpoint_path,
         **trainer_kwargs,
     ):
+        """
+        Initialize the PyTorch Lightning trainer.
+
+        Parameters
+        ----------
+        max_epochs : int
+            Maximum number of epochs for training.
+        monitor : str
+            Metric to monitor for early stopping and checkpointing.
+        patience : int
+            Patience for early stopping.
+        mode : str
+            Mode for the monitored metric (min or max).
+        checkpoint_path : str
+            Path to save model checkpoints.
+        **trainer_kwargs : dict
+            Additional keyword arguments for the trainer.
+        """
 
         logger.info(f"--- Initializing Trainer for {MODEL_NAME} ---")
         early_stop_callback = EarlyStopping(
@@ -92,6 +136,24 @@ class ETM(BaseModel):
     def _initialize_datamodule(
         self, dataset, batch_size, shuffle, val_size, random_state, **kwargs
     ):
+        """
+        Initialize the data module.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to be used for training.
+        batch_size : int
+            Batch size for training.
+        shuffle : bool
+            Whether to shuffle the data.
+        val_size : float
+            Proportion of the dataset to use for validation.
+        random_state : int
+            Random seed for reproducibility.
+        **kwargs : dict
+            Additional keyword arguments for data preprocessing.
+        """
 
         kwargs.setdefault("min_df", 3)
 
@@ -136,19 +198,28 @@ class ETM(BaseModel):
         **kwargs,
     ):
         """
-        Trains the K-Means topic model on the provided dataset.
+        Fits the ETM topic model to the given dataset.
 
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to train the model on.
-        n_topics : int, optional
-            Number of topics to extract, by default 20
+        Args:
+            dataset (TMDataset, optional): The dataset to train the topic model on. Defaults to None.
+            n_topics (int, optional): The number of topics to extract. Defaults to 20.
+            val_size (float, optional): The proportion of the dataset to use for validation. Defaults to 0.2.
+            lr (float, optional): The learning rate for the optimizer. Defaults to 1e-04.
+            lr_patience (int, optional): The number of epochs with no improvement after which the learning rate will be reduced. Defaults to 15.
+            patience (int, optional): The number of epochs with no improvement after which training will be stopped. Defaults to 15.
+            factor (float, optional): The factor by which the learning rate will be reduced. Defaults to 0.5.
+            weight_decay (float, optional): The weight decay (L2 penalty) for the optimizer. Defaults to 1e-07.
+            max_epochs (int, optional): The maximum number of epochs to train for. Defaults to 100.
+            batch_size (int, optional): The batch size for training. Defaults to 32.
+            shuffle (bool, optional): Whether to shuffle the training data. Defaults to True.
+            random_state (int, optional): The random seed for reproducibility. Defaults to 101.
+            checkpoint_path (str, optional): The path to save model checkpoints. Defaults to "checkpoints".
+            monitor (str, optional): The metric to monitor for early stopping. Defaults to "val_loss".
+            mode (str, optional): The mode for early stopping. Defaults to "min".
+            **kwargs: Additional keyword arguments to be passed to the trainer.
 
-        Raises
-        ------
-        AssertionError
-            If the dataset is not an instance of TMDataset.
+        Raises:
+            ValueError: If the dataset is not an instance of TMDataset.
         """
 
         assert isinstance(
