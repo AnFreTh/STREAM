@@ -669,7 +669,7 @@ class TMDataset(Dataset):
         """
         corpus = [" ".join(tokens) for tokens in self.get_corpus()]
         vectorizer = CountVectorizer(**kwargs)
-        self.bow = vectorizer.fit_transform(corpus).toarray()
+        self.bow = vectorizer.fit_transform(corpus).toarray().astype(np.float32)
         return self.bow, vectorizer.get_feature_names_out()
 
     def get_tfidf(self, **kwargs):
