@@ -8,6 +8,7 @@ from .som import SOMTM
 from .WordCluTM import WordCluTM
 from .etm import ETM
 from .prodlda import ProdLDA
+from .ctm import CTM
 
 __all__ = [
     "BERTopicTM",
@@ -20,4 +21,5 @@ __all__ = [
     "LDA",
     "ETM",  #
     "ProdLDA",
+    "CTM",
 ]
