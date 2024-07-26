@@ -14,6 +14,17 @@ from ._embedder import BaseEmbedder
 
 
 class TopicExtractor:
+    """
+    Class to extract topics from a given dataset and topic assignments.
+
+    Args:
+        dataset (Dataset): Dataset object
+        topic_assignments (list): List of topic assignments
+        n_topics (int): Number of topics
+        embedding_model (str): Path to the embedding model
+
+    """
+
     def __init__(
         self,
         dataset,
@@ -27,13 +38,11 @@ class TopicExtractor:
         self.n_topics = n_topics
 
     def _noun_extractor_haystack(self, embeddings, n, corpus="octis", only_nouns=True):
-        """extracts the topics most probable words, which are the words nearest to the topics centroid.
-        We extract all nouns from the corpus and the brown corpus.
+        """
+        Extracts the topics most probable words, which are the words nearest to the topics centroid.
+        We extract all nouns from the corpus and the brown corpus. Afterwards we compute the cosine similarity between every word and every centroid.
 
-
-        Afterwards we compute the cosine similarity between every word and every centroid.
-        Note, that here we did not use the  sklearn.metrics.pairwise cosine_similarity function due to
-        a faster computation when using numpy.
+        Note, that here we did not use the  sklearn.metrics.pairwise cosine_similarity function due to a faster computation when using numpy.
         Hecen we used:
             np.inner(centroids, nouns) / np.multiply.outer(
                 norm(centroids, axis=1), norm(nouns, axis=1)
