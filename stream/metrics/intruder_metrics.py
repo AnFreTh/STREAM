@@ -72,7 +72,7 @@ class ISIM(BaseMetric):
 
         return info
 
-    def score_one_intr_per_topic(self, topics, new_Embeddings=True):
+    def score_one_intr_per_topic(self, topics, new_embeddings=True):
         """
         Calculates the ISIM score for each topic individually using only one intruder word.
 
@@ -82,7 +82,7 @@ class ISIM(BaseMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             numpy.ndarray: An array of ISIM scores for each topic with one intruder word.
@@ -120,7 +120,7 @@ class ISIM(BaseMetric):
 
         return np.array(avg_sim_topic_list)
 
-    def score_one_intr(self, topics, new_Embeddings=True):
+    def score_one_intr(self, topics, new_embeddings=True):
         """
         Calculates the overall ISIM score for all topics combined using only one intruder word.
 
@@ -130,16 +130,16 @@ class ISIM(BaseMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             float: The overall ISIM score for all topics with one intruder word.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
-        return np.mean(self.score_one_intr_per_topic(topics, new_Embeddings))
+        return np.mean(self.score_one_intr_per_topic(topics, new_embeddings))
 
-    def score_per_topic(self, topics, new_Embeddings=True):
+    def score_per_topic(self, topics, new_embeddings=True):
         """
         Calculates the ISIM scores for each topic individually using several intruder words.
 
@@ -149,17 +149,17 @@ class ISIM(BaseMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             numpy.ndarray: An array of ISIM scores for each topic with several intruder words.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
         score_lis = []
         for _ in range(self.n_intruders):  # iterate over the number of intruder words
             score_per_topic = self.score_one_intr_per_topic(
-                topics, new_Embeddings=False
+                topics, new_embeddings=False
             )  # calculate the intruder score, but re-use embeddings
             score_lis.append(score_per_topic)  # and append to list
 
@@ -175,11 +175,12 @@ class ISIM(BaseMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(
+                np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
-    def score(self, topics, new_Embeddings=True):
+    def score(self, topics, new_embeddings=True):
         """
         Calculates the overall ISIM score for all topics combined using several intruder words.
 
@@ -189,12 +190,12 @@ class ISIM(BaseMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             float: The overall ISIM score for all topics with several intruder words.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
 
         topics = topics["topics"]
@@ -242,7 +243,7 @@ class INT(AbstractMetric):
         self.n_words = n_words
         self.n_intruders = n_intruders
 
-    def score_one_intr_per_topic(self, model_output, new_Embeddings=True):
+    def score_one_intr_per_topic(self, model_output, new_embeddings=True):
         """
         Calculates the INT score for each topic individually using only one intruder word.
 
@@ -252,12 +253,12 @@ class INT(AbstractMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             numpy.ndarray: An array of INT scores for each topic with one intruder word.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
         topics_tw = model_output["topics"]
 
@@ -305,7 +306,7 @@ class INT(AbstractMetric):
 
         return np.array(avg_sim_topic_list)
 
-    def score_one_intr(self, model_output, new_Embeddings=True):
+    def score_one_intr(self, model_output, new_embeddings=True):
         """
         Calculates the overall INT score for all topics combined using only one intruder word.
 
@@ -315,18 +316,18 @@ class INT(AbstractMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             float: The overall INT score for all topics with one intruder word.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
         self.embeddings = None
 
         return np.mean(self.score_one_intr_per_topic(model_output))
 
-    def score_per_topic(self, model_output, new_Embeddings=True):
+    def score_per_topic(self, model_output, new_embeddings=True):
         """
         Calculates the INT scores for each topic individually using several intruder words.
 
@@ -336,18 +337,18 @@ class INT(AbstractMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             numpy.ndarray: An array of INT scores for each topic with several intruder words.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
 
         score_lis = []
         for _ in range(self.n_intruders):
             score_per_topic = self.score_one_intr_per_topic(
-                model_output, new_Embeddings=False
+                model_output, new_embeddings=False
             )
             score_lis.append(score_per_topic)
         self.embeddings = None
@@ -361,11 +362,12 @@ class INT(AbstractMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(
+                np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
-    def score(self, model_output, new_Embeddings=True):
+    def score(self, model_output, new_embeddings=True):
         """
         Calculates the overall INT score for all topics combined using several intruder words.
 
@@ -375,12 +377,12 @@ class INT(AbstractMetric):
         Parameters:
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
         Returns:
             float: The overall INT score for all topics with several intruder words.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
 
         return float(np.mean(list(self.score_per_topic(model_output).values())))
@@ -426,17 +428,17 @@ class ISH(AbstractMetric):
         self.embeddings = None
         self.n_intruders = n_intruders
 
-    def score(self, model_output, new_Embeddings=True):
+    def score(self, model_output, new_embeddings=True):
         """
         Calculate the score for all topics combined
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
 
         return float(np.mean(list(self.score_per_topic(model_output).values())))
 
-    def score_per_topic(self, model_output, new_Embeddings=None):
-        if new_Embeddings:  # for this function, reuse embeddings per default
+    def score_per_topic(self, model_output, new_embeddings=None):
+        if new_embeddings:  # for this function, reuse embeddings per default
             self.embeddings = None
 
         topics_tw = model_output["topics"]
@@ -458,7 +460,8 @@ class ISH(AbstractMetric):
             intruder_words_idx_word = np.random.choice(
                 np.arange(intruder_words.shape[1]), size=1
             )  # select one intruder word from each topic
-            intruder_words = intruder_words[:, intruder_words_idx_word, :].squeeze()
+            intruder_words = intruder_words[:,
+                                            intruder_words_idx_word, :].squeeze()
 
             topic_mean = np.mean(topic, axis=0)
 
