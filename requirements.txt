@@ -12,6 +12,7 @@ scikit_learn
 scipy==1.10.1
 seaborn
 sentence_transformers
+huggingface_hub==0.23.5
 setfit
 setuptools
 tqdm
