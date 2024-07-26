@@ -13,6 +13,54 @@ from tqdm import tqdm
 
 
 class TextPreprocessor:
+    """
+    Text preprocessor class for cleaning and preprocessing text data.
+
+    Parameters
+    ----------
+    language : str, optional
+        Language of the text data (default is "en").
+    remove_stopwords : bool, optional
+        Whether to remove stopwords from the text data (default is False).
+    lowercase : bool, optional
+        Whether to convert text to lowercase (default is True).
+    remove_punctuation : bool, optional
+        Whether to remove punctuation from the text data (default is True).
+    remove_numbers : bool, optional
+        Whether to remove numbers from the text data (default is True).
+    lemmatize : bool, optional
+        Whether to lemmatize words in the text data (default is False).
+    stem : bool, optional
+        Whether to stem words in the text data (default is False).
+    expand_contractions : bool, optional
+        Whether to expand contractions in the text data (default is True).
+    remove_html_tags : bool, optional
+        Whether to remove HTML tags from the text data (default is True).
+    remove_special_chars : bool, optional
+        Whether to remove special characters from the text data (default is True).
+    remove_accents : bool, optional
+        Whether to remove accents from the text data (default is True).
+    custom_stopwords : set, optional
+        Custom stopwords to remove from the text data (default is []).
+    detokenize : bool, optional
+        Whether to detokenize the text data (default is False).
+    min_word_freq : int, optional
+        Minimum word frequency to keep in the text data (default is 2).
+    max_word_freq : int, optional
+        Maximum word frequency to keep in the text data (default is None).
+    min_word_length : int, optional
+        Minimum word length to keep in the text data (default is 3).
+    max_word_length : int, optional
+        Maximum word length to keep in the text data (default is None).
+    dictionary : set, optional
+        Dictionary of words to keep in the text data (default is []).
+    remove_words_with_numbers : bool, optional
+        Whether to remove words containing numbers from the text data (default is False).
+    remove_words_with_special_chars : bool, optional
+        Whether to remove words containing special characters from the text data (default is False). 
+
+    """
+
     def __init__(self, **kwargs):
         self.language = kwargs.get("language", "en")
         self.remove_stopwords = kwargs.get("remove_stopwords", False)
@@ -167,6 +215,20 @@ class TextPreprocessor:
         return text
 
     def preprocess_text(self, text):
+        """
+        Preprocess a single text document.
+
+        Parameters
+        ----------
+        text : str
+            Text document to preprocess.
+
+        Returns
+        -------
+        str
+            Preprocessed text document.
+
+        """
         try:
             language = detect(text)
             if language != self.language:
@@ -176,6 +238,22 @@ class TextPreprocessor:
         return self._clean_text(text)
 
     def preprocess_dataframe(self, df, text_column):
+        """
+        Preprocess a pandas DataFrame.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing text data.
+        text_column : str
+            Name of the column containing text data.
+
+        Returns
+        -------
+        pd.DataFrame
+            Preprocessed DataFrame.
+
+        """
         df[text_column] = df[text_column].apply(self.preprocess_text)
         return df
 
