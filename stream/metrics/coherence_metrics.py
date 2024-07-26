@@ -14,10 +14,11 @@ from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_topic,
 from .constants import NLTK_STOPWORD_LANGUAGE
 from .TopwordEmbeddings import TopwordEmbeddings
 
-gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
-nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-stopwords = list(
-    set(list(nltk_stopwords) + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS)))
+GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
+NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
+STOPWORDS = list(set(list(NLTK_STOPWORDS) +
+                     list(GENSIM_STOPWORDS) +
+                     list(ENGLISH_STOP_WORDS)))
 
 
 class NPMI(AbstractMetric):
@@ -38,17 +39,19 @@ class NPMI(AbstractMetric):
     def __init__(
         self,
         dataset,
-        stopwords=stopwords,
+        stopwords=list,
     ):
         """
         Initializes the NPMI object with a dataset, stopwords, and a specified number of topics.
 
         Parameters:
             dataset: The dataset to be used for NPMI calculation.
-            stopwords (list, optional): A list of stopwords to exclude from analysis.
+            stopwords (list, optional): A list of stopwords to exclude from analysis. Default includes GenSim, NLTK, and Scikit-learn stopwords.
             n_topics (int, optional): The number of topics to evaluate. Defaults to 20.
         """
         self.stopwords = stopwords
+        if stopwords is None:
+            self.stopwords = STOPWORDS
         self.dataset = dataset
 
         files = self.dataset.get_corpus()
@@ -299,7 +302,7 @@ class Embedding_Coherence(AbstractMetric):
         Returns:
             numpy.ndarray: An array of coherence scores for each topic.
         """
-        topics= model_output["topics"]
+        topics = model_output["topics"]
         n_topics = len(topics)
         topwords_embedded = self.topword_embeddings.embed_topwords(
             topics,
