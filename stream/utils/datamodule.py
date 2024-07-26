@@ -77,7 +77,11 @@ class TMDataModule(pl.LightningDataModule):
     ):
 
         if embeddings:
-            embs = dataset.get_embeddings(**kwargs)
+            if dataset.embeddings is None:
+                embs = dataset.get_embeddings(**kwargs)
+            else:
+                embs = dataset.embeddings
+
         if bow:
             b, self.vocab = dataset.get_bow(**kwargs)
         if tf_idf:
