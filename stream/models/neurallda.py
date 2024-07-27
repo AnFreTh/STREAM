@@ -1,4 +1,4 @@
-from .neural_base_models.ctm_base import CTMBase
+from .neural_base_models.prodlda_base import ProdLDABase
 import numpy as np
 from loguru import logger
 from datetime import datetime
@@ -13,49 +13,27 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSum
 
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-MODEL_NAME = "CTM"
+MODEL_NAME = "NeuralLDA"
 logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
-EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 
 
-class CTM(BaseModel):
+class NeuralLDA(BaseModel):
+    """
+    Initialize the NeuralLDA model.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Additional keyword arguments to pass to the parent class constructor.
+    """
+
     def __init__(
         self,
-        embedding_model_name: str = EMBEDDING_MODEL_NAME,
-        embeddings_folder_path: str = None,
-        embeddings_file_path: str = None,
-        save_embeddings: bool = False,
         **kwargs,
     ):
-        """
-        Initialize the ETM model.
 
-        Parameters
-        ----------
-        **kwargs : dict
-            Additional keyword arguments to pass to the parent class constructor.
-        """
-
-        super().__init__(use_pretrained_embeddings=True, **kwargs)
-        self.save_hyperparameters(
-            ignore=[
-                "embeddings_file_path",
-                "embeddings_folder_path",
-                "random_state",
-                "save_embeddings",
-            ]
-        )
-
-        self.embedding_model_name = self.hparams.get(
-            "embedding_model_name", embedding_model_name
-        )
-
-        self.embeddings_path = embeddings_folder_path
-        self.embeddings_file_path = embeddings_file_path
-        self.save_embeddings = save_embeddings
-        self.n_topics = None
-
-        self._status = TrainingStatus.NOT_STARTED
+        super().__init__(use_pretrained_embeddings=False, **kwargs)
+        self.save_hyperparameters()
 
     def get_info(self):
         """
@@ -98,7 +76,7 @@ class CTM(BaseModel):
         """
 
         self.model = NeuralBaseModel(
-            model_class=CTMBase,
+            model_class=ProdLDABase,
             dataset=self.dataset,
             n_topics=n_topics,
             lr=lr,
@@ -160,39 +138,6 @@ class CTM(BaseModel):
             **trainer_kwargs,
         )
 
-    def _prepare_embeddings(self, dataset):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.embedding_model_name):
-            logger.info(
-                f"--- Loading precomputed {EMBEDDING_MODEL_NAME} embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.embedding_model_name,
-                self.embeddings_path,
-                self.embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-        else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
-            )
-            if self.save_embeddings:
-                dataset.save_embeddings(
-                    self.embeddings,
-                    self.embedding_model_name,
-                    self.embeddings_path,
-                    self.embeddings_file_path,
-                )
-
     def _initialize_datamodule(
         self, dataset, batch_size, shuffle, val_size, random_state, **kwargs
     ):
@@ -215,6 +160,8 @@ class CTM(BaseModel):
             Additional keyword arguments for data preprocessing.
         """
 
+        kwargs.setdefault("min_df", 3)
+
         logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
         self.data_module = TMDataModule(
             batch_size=batch_size,
@@ -226,7 +173,7 @@ class CTM(BaseModel):
         self.data_module.preprocess_data(
             dataset=dataset,
             val=val_size,
-            embeddings=True,
+            embeddings=False,
             bow=True,
             tf_idf=False,
             word_embeddings=False,
@@ -250,17 +197,13 @@ class CTM(BaseModel):
         batch_size: int = 32,
         shuffle: bool = True,
         random_state: int = 101,
-        inferece_type="zeroshot",
-        model_type="ProdLDA",
-        rescale_loss=False,
-        rescale_factor=1e-2,
         checkpoint_path: str = "checkpoints",
         monitor: str = "val_loss",
         mode: str = "min",
         **kwargs,
     ):
         """
-        Fits the CTM topic model to the given dataset.
+        Fits the ProdLDA topic model to the given dataset.
 
         Args:
             dataset (TMDataset, optional): The dataset to train the topic model on. Defaults to None.
@@ -292,10 +235,6 @@ class CTM(BaseModel):
 
         try:
 
-            logger.info(f"--- Training {MODEL_NAME} topic model ---")
-            self._status = TrainingStatus.RUNNING
-            self.prepare_embeddings(dataset, logger)
-
             self._status = TrainingStatus.INITIALIZED
             self._initialize_datamodule(
                 dataset=dataset,
@@ -311,10 +250,6 @@ class CTM(BaseModel):
                 lr_patience=lr_patience,
                 factor=factor,
                 weight_decay=weight_decay,
-                inference_type=inferece_type,
-                model_type=model_type,
-                rescale_loss=rescale_loss,
-                rescale_factor=rescale_factor,
             )
 
             self._initialize_trainer(
@@ -359,7 +294,6 @@ class CTM(BaseModel):
         self._status = TrainingStatus.SUCCEEDED
 
         data = {
-            "embedding": torch.tensor(dataset.embeddings),
             "bow": torch.tensor(dataset.bow),
         }
 

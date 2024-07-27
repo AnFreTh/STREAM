@@ -5,9 +5,9 @@ import numpy as np
 from ..abstract_helper_models.inference_networks import InferenceNetwork
 
 
-class ProdLDABase(nn.Module):
+class NeuralLDABase(nn.Module):
     """
-    Product of Experts Latent Dirichlet Allocation (ProdLDA) model.
+    Product of Experts Latent Dirichlet Allocation (NeuralLDA) model.
 
     Parameters
     ----------
@@ -162,9 +162,8 @@ class ProdLDABase(nn.Module):
         """
 
         theta, mu, logvar = self.get_theta(x)
-        word_dist = F.softmax(
-            self.beta_batchnorm(torch.matmul(theta, self.beta)), dim=1
-        )
+        beta = F.softmax(self.beta_batchnorm(self.beta), dim=1)
+        word_dist = torch.matmul(theta, beta)
         return word_dist, mu, logvar
 
     def compute_loss(self, x):
