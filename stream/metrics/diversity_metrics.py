@@ -6,16 +6,19 @@ from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
-from .TopwordEmbeddings import TopwordEmbeddings
 
 from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_stopwords,
                             embed_topic, update_corpus_dic_list)
-from .constants import NLTK_STOPWORD_LANGUAGE, SENTENCE_TRANSFORMER_MODEL
+from .constants import (EMBEDDING_PATH, NLTK_STOPWORD_LANGUAGE,
+                        PARAPHRASE_TRANSFORMER_MODEL,
+                        SENTENCE_TRANSFORMER_MODEL)
+from .TopwordEmbeddings import TopwordEmbeddings
 
-gensim_stopwords = gensim.parsing.preprocessing.STOPWORDS
-nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-stopwords = list(
-    set(list(nltk_stopwords) + list(gensim_stopwords) + list(ENGLISH_STOP_WORDS)))
+GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
+NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
+STOPWORDS = list(set(list(NLTK_STOPWORDS) +
+                     list(GENSIM_STOPWORDS) +
+                     list(ENGLISH_STOP_WORDS)))
 
 
 class Embedding_Topic_Diversity(AbstractMetric):
@@ -24,7 +27,8 @@ class Embedding_Topic_Diversity(AbstractMetric):
     the mean cosine similarity of the mean vectors of the top words of all topics, providing
     a measure of how diverse the topics are in the embedding space.
 
-    Attributes:
+    Attributes
+    ----------
         n_words (int): The number of top words to consider for each topic.
         metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
     """
@@ -32,18 +36,20 @@ class Embedding_Topic_Diversity(AbstractMetric):
     def __init__(
         self,
         n_words=10,
-        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
         emb_filename=None,
-        emb_path="Embeddings/",
+        emb_path: str = EMBEDDING_PATH,
     ):
         """
         Initializes the Embedding_Coherence object with the number of top words to consider
         and the embedding model to use.
 
-        Parameters:
+        Parameters
         ----------
         n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
         metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
+        emb_filename (str, optional): The filename of the embeddings to load. Defaults to None.
+        emb_path (str, optional): The path to the embeddings file. Defaults to "/embeddings".
         """
 
         self.topword_embeddings = TopwordEmbeddings(
@@ -61,11 +67,13 @@ class Embedding_Topic_Diversity(AbstractMetric):
         This method computes the diversity of the topics by averaging the cosine similarity
         of the mean vectors of the top words of each topic. A lower score indicates higher diversity.
 
-        Parameters:
+        Parameters
+        ----------
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
 
-        Returns:
+        Returns
+        -------
             float: The overall diversity score for all topics.
         """
         topics_tw = model_output["topics"]  # size: (n_topics, voc_size)
@@ -98,11 +106,13 @@ class Embedding_Topic_Diversity(AbstractMetric):
         This method computes the diversity of each topic by calculating the cosine similarity
         of its mean vector with the mean vectors of other topics.
 
-        Parameters:
+        Parameters
+        ----------
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
 
-        Returns:
+        Returns
+        -------
             numpy.ndarray: An array of diversity scores for each topic.
         """
         topics_tw = model_output["topics"]  # size: (n_topics, voc_size)
@@ -153,7 +163,8 @@ class Expressivity(AbstractMetric):
     the stop words. Lower distances suggest higher expressivity, indicating that the topic's
     top words are distinct from common stopwords.
 
-    Attributes:
+    Attributes
+    ----------
         n_words (int): The number of top words to consider for each topic.
         metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
     """
@@ -161,23 +172,26 @@ class Expressivity(AbstractMetric):
     def __init__(
         self,
         n_words=10,
-        stopword_list=stopwords,
-        metric_embedder=SentenceTransformer("paraphrase-MiniLM-L6-v2"),
+        stopwords=list,
+        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
         emb_filename=None,
-        emb_path="Embeddings/",
+        emb_path: str = EMBEDDING_PATH,
     ):
         """
         Initializes the Embedding_Coherence object with the number of top words to consider
         and the embedding model to use.
 
-        Parameters:
+        Parameters
         ----------
         n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-        stopword_list (list, optional): A list of stopwords to use for the expressivity calculation. Defaults to the combined list of NLTK, Gensim, and Scikit-learn stopwords.
+        stopwords (list, optional): A list of stopwords to use for the expressivity calculation. Defaults includes list of NLTK, Gensim, and Scikit-learn stopwords.
         metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
         emb_filename (str, optional): The filename of the embeddings to load. Defaults to None.
-        emb_path (str, optional): The path to the embeddings file. Defaults to "Embeddings/".
+        emb_path (str, optional): The path to the embeddings file. Defaults to "/embeddings".
         """
+        self.stopwords = stopwords
+        if stopwords is None:
+            self.stopwords = STOPWORDS
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
@@ -188,13 +202,13 @@ class Expressivity(AbstractMetric):
         self.n_words = n_words
 
         self.stopword_emb = embed_stopwords(
-            stopword_list, metric_embedder
+            self.stopwords, metric_embedder
         )  # embed all the stopwords size: (n_stopwords, emb_dim)
         self.stopword_mean = np.mean(
             np.array(self.stopword_emb), axis=0
         )  # mean of stopword embeddings
 
-    def score(self, model_output, new_Embeddings=True):
+    def score(self, model_output, new_embeddings=True):
         """
         Calculates the overall expressivity score for the given model output.
 
@@ -202,37 +216,41 @@ class Expressivity(AbstractMetric):
         between the mean vectors of the top words of each topic and the mean vector of
         the stopwords. A lower score indicates higher expressivity.
 
-        Parameters:
+        Parameters
+        ----------
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
-        Returns:
+        Returns
+        -------
             float: The overall expressivity score for all topics.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
         return float(
             np.mean(list(self.score_per_topic(
-                model_output, new_Embeddings).values()))
+                model_output, new_embeddings).values()))
         )
 
-    def score_per_topic(self, model_output, new_Embeddings=True):
+    def score_per_topic(self, model_output, new_embeddings=True):
         """
         Calculates expressivity scores for each topic individually based on embedding distances.
 
         This method computes the expressivity of each topic by calculating the cosine similarity
         of its mean vector with the mean vector of the stopwords.
 
-        Parameters:
+        Parameters
+        ----------
             model_output (dict): The output of a topic model, containing a list of topics
                                  and a topic-word matrix.
-            new_Embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
 
-        Returns:
+        Returns
+        -------
             numpy.ndarray: An array of expressivity scores for each topic.
         """
-        if new_Embeddings:
+        if new_embeddings:
             self.embeddings = None
 
         # not used for now, but could be useful in the future
@@ -253,7 +271,6 @@ class Expressivity(AbstractMetric):
             topics_tw,
             n_topwords_to_use=self.n_words
         )
-
 
         weighted_vecs = (
             topic_weights[:, :, None] * emb_tw

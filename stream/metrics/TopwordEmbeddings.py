@@ -5,12 +5,14 @@ import pickle
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from .constants import SENTENCE_TRANSFORMER_MODEL
+from .constants import (EMBEDDING_PATH, PARAPHRASE_TRANSFORMER_MODEL,
+                        SENTENCE_TRANSFORMER_MODEL)
 
 
 class TopwordEmbeddings:
     """
     A class to compute and store the embeddings of topwords to use for embedding-based metrics.
+
     Attributes
     ----------
     word_embedding_model : SentenceTransformer
@@ -23,19 +25,15 @@ class TopwordEmbeddings:
         Path to save the embeddings to.
     embedding_dict : dict
         Dictionary to store the embeddings of the topwords.
-    Methods
-    -------
-    embed_topwords(topwords, n_topwords_to_use)
-        Get the embeddings of the n_topwords topwords.
-
     """
 
     def __init__(
             self,
-            word_embedding_model: SentenceTransformer = SentenceTransformer(SENTENCE_TRANSFORMER_MODEL),
+            word_embedding_model: SentenceTransformer = SentenceTransformer(
+                PARAPHRASE_TRANSFORMER_MODEL),
             cache_to_file: bool = False,
-            emb_filename:str = None,
-            emb_path: str ="Embeddings/",
+            emb_filename: str = None,
+            emb_path: str = EMBEDDING_PATH,
             create_new_file: bool = True
     ):
         """
@@ -50,7 +48,7 @@ class TopwordEmbeddings:
         emb_filename : str, optional
             Name of the file to save the embeddings to (default is None).
         emb_path : str, optional
-            Path to save the embeddings to (default is "Embeddings/").
+            Path to save the embeddings to (default is "/embeddings/").
         create_new_file : bool, optional
             Whether to create a new file to save the embeddings to (default is True).
         """
@@ -58,7 +56,7 @@ class TopwordEmbeddings:
         self.cache_to_file = cache_to_file
         self.emb_filename = emb_filename
         self.emb_path = emb_path
-        self.embedding_dict = {} # Dictionary to store the embeddings of the topwords
+        self.embedding_dict = {}  # Dictionary to store the embeddings of the topwords
 
         if self.emb_filename is None:
             self.emb_filename = str(f"Topword_embeddings")
@@ -66,13 +64,13 @@ class TopwordEmbeddings:
         if create_new_file:
             os.makedirs(self.emb_path, exist_ok=True)
 
-
     def _load_embedding_dict_from_disc(self):
         """
         Load the embedding dictionary from the disk.
         """
         try:
-            self.embedding_dict = pickle.load(open(f"{self.emb_path}{self.emb_filename}.pickle", "rb"))
+            self.embedding_dict = pickle.load(
+                open(f"{self.emb_path}{self.emb_filename}.pickle", "rb"))
         except FileNotFoundError:
             self.embedding_dict = {}
 
@@ -81,7 +79,8 @@ class TopwordEmbeddings:
         Save the embedding dictionary to the disk.
         """
         with open(f"{self.emb_path}{self.emb_filename}.pickle", "wb") as handle:
-            pickle.dump(self.embedding_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self.embedding_dict, handle,
+                        protocol=pickle.HIGHEST_PROTOCOL)
 
     def embed_topwords(
             self,
@@ -111,12 +110,14 @@ class TopwordEmbeddings:
         if not topwords.ndim == 2:
             topwords = topwords.reshape(-1, 1)
 
-        assert np.issubdtype(topwords.dtype, np.str_), "topwords should only contain strings."
+        assert np.issubdtype(
+            topwords.dtype, np.str_), "topwords should only contain strings."
         assert topwords.shape[1] >= n_topwords_to_use, "n_topwords_to_use should be less than or equal to the number of words in each topic."
 
-        topwords = topwords[:, :n_topwords_to_use] # Get the top n_topwords words
+        # Get the top n_topwords words
+        topwords = topwords[:, :n_topwords_to_use]
         if self.cache_to_file:
-            self._load_embedding_dict_from_disc() 
+            self._load_embedding_dict_from_disc()
 
         topword_embeddings = []
         for topic in topwords:

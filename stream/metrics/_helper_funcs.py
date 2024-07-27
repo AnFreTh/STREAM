@@ -5,20 +5,19 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 
+from .constants import EMBEDDING_PATH, SENTENCE_TRANSFORMER_MODEL
 
-def embed_corpus(
-    dataset,
-    embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
-    emb_filename: str = None,
-    emb_path: str = "Embeddings/",
-    save: bool = False,
-):
+
+def embed_corpus(dataset,
+                 embedder: SentenceTransformer = SentenceTransformer(
+                     SENTENCE_TRANSFORMER_MODEL),
+                 emb_filename: str = None,
+                 emb_path: str = EMBEDDING_PATH,
+                 save: bool = False):
     """
     Create a dictionary with the word embedding of every word in the dataset.
-    Use the embedder.
-    If the file 'Embeddings/{emb_filename}.pickle' is available, read the embeddings from this file.
-
-    Otherwise create new embeddings.
+    Use the embedder. If the file 'Embeddings/{emb_filename}.pickle' is available, 
+    read the embeddings from this file. Otherwise create new embeddings.
     Returns the embedding dict
     """
 
@@ -47,9 +46,10 @@ def embed_corpus(
 def update_corpus_dic_list(
     word_lis: list,
     emb_dic: dict,
-    embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
+    embedder: SentenceTransformer = SentenceTransformer(
+        SENTENCE_TRANSFORMER_MODEL),
     emb_filename: str = None,
-    emb_path: str = "Embeddings/",
+    emb_path: str = EMBEDDING_PATH,
     save: bool = False,
 ):
     """
@@ -78,7 +78,8 @@ def embed_topic(
     topics_tw,
     corpus_dict: dict,
     n_words: int = 10,
-    embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
+    embedder: SentenceTransformer = SentenceTransformer(
+        SENTENCE_TRANSFORMER_MODEL),
 ):
     """
     takes the list of topics and embed the top n_words words with the corpus dict
@@ -104,7 +105,8 @@ def embed_topic(
 
 def embed_stopwords(
     stopwords: list,
-    embedder: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2"),
+    embedder: SentenceTransformer = SentenceTransformer(
+        SENTENCE_TRANSFORMER_MODEL),
 ):
     """
     take the list of stopwords and embeds them with embedder
