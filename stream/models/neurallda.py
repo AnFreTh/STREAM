@@ -1,4 +1,4 @@
-from .neural_base_models.prodlda_base import ProdLDABase
+from .neural_base_models.neurallda_base import NeuralLDABase
 import numpy as np
 from loguru import logger
 from datetime import datetime
@@ -14,7 +14,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSum
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "NeuralLDA"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class NeuralLDA(BaseModel):
@@ -76,7 +76,7 @@ class NeuralLDA(BaseModel):
         """
 
         self.model = NeuralBaseModel(
-            model_class=ProdLDABase,
+            model_class=NeuralLDABase,
             dataset=self.dataset,
             n_topics=n_topics,
             lr=lr,

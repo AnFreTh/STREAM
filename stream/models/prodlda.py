@@ -14,7 +14,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSum
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "ProdLDA"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class ProdLDA(BaseModel):
