@@ -9,6 +9,7 @@ from .WordCluTM import WordCluTM
 from .etm import ETM
 from .prodlda import ProdLDA
 from .ctm import CTM
+from .neurallda import NeuralLDA
 
 __all__ = [
     "BERTopicTM",
@@ -22,4 +23,5 @@ __all__ = [
     "ETM",  #
     "ProdLDA",
     "CTM",
+    "NeuralLDA",
 ]

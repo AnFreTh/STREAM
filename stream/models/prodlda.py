@@ -9,7 +9,7 @@ import lightning as pl
 import pandas as pd
 import torch
 from ..utils.datamodule import TMDataModule
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -32,7 +32,7 @@ class ProdLDA(BaseModel):
         **kwargs,
     ):
 
-        super().__init__(use_pretrained_embeddings=True, **kwargs)
+        super().__init__(use_pretrained_embeddings=False, **kwargs)
         self.save_hyperparameters()
 
     def get_info(self):
@@ -130,7 +130,11 @@ class ProdLDA(BaseModel):
         # Initialize the trainer
         self.trainer = pl.Trainer(
             max_epochs=max_epochs,
-            callbacks=[early_stop_callback, checkpoint_callback],
+            callbacks=[
+                early_stop_callback,
+                checkpoint_callback,
+                ModelSummary(max_depth=2),
+            ],
             **trainer_kwargs,
         )
 
@@ -289,11 +293,12 @@ class ProdLDA(BaseModel):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
+        data = {
+            "bow": torch.tensor(dataset.bow),
+        }
+
         self.theta = (
-            self.model.model.get_theta(torch.tensor(self.dataset.bow), only_theta=True)
-            .detach()
-            .cpu()
-            .numpy()
+            self.model.model.get_theta(data, only_theta=True).detach().cpu().numpy()
         )
 
         self.theta = self.theta / self.theta.sum(axis=1, keepdims=True)

@@ -9,7 +9,7 @@ import lightning as pl
 import pandas as pd
 import torch
 from ..utils.datamodule import TMDataModule
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -129,7 +129,11 @@ class ETM(BaseModel):
         # Initialize the trainer
         self.trainer = pl.Trainer(
             max_epochs=max_epochs,
-            callbacks=[early_stop_callback, checkpoint_callback],
+            callbacks=[
+                early_stop_callback,
+                checkpoint_callback,
+                ModelSummary(max_depth=2),
+            ],
             **trainer_kwargs,
         )
 
