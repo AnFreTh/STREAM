@@ -1,4 +1,4 @@
-from .neural_base_models.ctm_base import CTMBase
+from .neural_base_models.ctmneg_base import CTMNegBase
 import numpy as np
 from loguru import logger
 from datetime import datetime
@@ -13,12 +13,12 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSum
 
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-MODEL_NAME = "CTM"
+MODEL_NAME = "CTMNeg"
 # logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 
 
-class CTM(BaseModel):
+class CTMNeg(BaseModel):
     def __init__(
         self,
         embedding_model_name: str = EMBEDDING_MODEL_NAME,
@@ -28,7 +28,7 @@ class CTM(BaseModel):
         **kwargs,
     ):
         """
-        Initialize the ETM model.
+        Initialize the CTMNeg model.
 
         Parameters
         ----------
@@ -98,7 +98,7 @@ class CTM(BaseModel):
         """
 
         self.model = NeuralBaseModel(
-            model_class=CTMBase,
+            model_class=CTMNegBase,
             dataset=self.dataset,
             n_topics=n_topics,
             lr=lr,

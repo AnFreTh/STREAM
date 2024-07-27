@@ -14,7 +14,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSum
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "ETM"
-logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+# logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
 class ETM(BaseModel):
@@ -31,7 +31,7 @@ class ETM(BaseModel):
             Additional keyword arguments to pass to the parent class constructor.
         """
 
-        super().__init__(use_pretrained_embeddings=True, **kwargs)
+        super().__init__(use_pretrained_embeddings=False, **kwargs)
         self.save_hyperparameters()
 
     def get_info(self):
