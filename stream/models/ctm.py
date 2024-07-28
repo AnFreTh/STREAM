@@ -6,11 +6,10 @@ from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.neural_basemodel import NeuralBaseModel
 import lightning as pl
-import pandas as pd
 import torch
 from ..utils.datamodule import TMDataModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
-
+from ..utils.check_dataset_steps import check_dataset_steps
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "CTM"
@@ -287,6 +286,11 @@ class CTM(BaseModel):
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
+        assert isinstance(
+            dataset, TMDataset
+        ), "The dataset must be an instance of TMDataset."
+
+        check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self.n_topics = n_topics
 
