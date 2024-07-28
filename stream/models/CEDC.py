@@ -163,8 +163,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -222,7 +221,12 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
+        assert isinstance(
+            dataset, TMDataset
+        ), "The dataset must be an instance of TMDataset."
+
         check_dataset_steps(dataset, logger, MODEL_NAME)
+        self.dataset = dataset
 
         self.n_topics = n_topics
         if self.n_topics <= 0:
@@ -233,8 +237,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -347,8 +350,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
         # Extract all unique words and sort them
-        all_words = set(word for topic in self.topic_dict.values()
-                        for word, _ in topic)
+        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns

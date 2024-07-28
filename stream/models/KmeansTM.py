@@ -4,7 +4,7 @@ import numpy as np
 from loguru import logger
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
-
+from ..utils.check_dataset_steps import check_dataset_steps
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
@@ -153,8 +153,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             )
             self.dataframe = dataset.dataframe
         else:
-            logger.info(
-                f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -177,14 +176,12 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
             logger.info("--- Creating document cluster ---")
-            self.clustering_model = KMeans(
-                n_clusters=self.n_topics, **self.kmeans_args)
+            self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
 
@@ -224,6 +221,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+        self.dataset = dataset
+
         self.n_topics = n_topics
 
         if self.n_topics <= 0:
@@ -233,8 +233,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -246,8 +245,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             tfidf, count = c_tf_idf(
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(

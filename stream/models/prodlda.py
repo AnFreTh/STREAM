@@ -6,7 +6,7 @@ from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.neural_basemodel import NeuralBaseModel
 import lightning as pl
-import pandas as pd
+from ..utils.check_dataset_steps import check_dataset_steps
 import torch
 from ..utils.datamodule import TMDataModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
@@ -230,6 +230,9 @@ class ProdLDA(BaseModel):
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
+
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+        self.dataset = dataset
 
         self.n_topics = n_topics
 
