@@ -70,8 +70,7 @@ class LDA(BaseModel):
         """
         # Ensure the 'tokens' column exists
         if "tokens" not in dataset.dataframe.columns:
-            raise ValueError(
-                f"Column 'tokens' does not exist in the dataframe.")
+            raise ValueError(f"Column 'tokens' does not exist in the dataframe.")
 
         # Define a helper function to check if an entry is tokenized
         def is_tokenized(entry):
@@ -81,8 +80,7 @@ class LDA(BaseModel):
 
         # Tokenize entries that are not tokenized
         dataset.dataframe["tokens"] = dataset.dataframe["tokens"].apply(
-            lambda entry: word_tokenize(
-                entry) if not is_tokenized(entry) else entry
+            lambda entry: word_tokenize(entry) if not is_tokenized(entry) else entry
         )
 
         return dataset
@@ -135,6 +133,7 @@ class LDA(BaseModel):
         ), "The dataset must be an instance of TMDataset."
 
         check_dataset_steps(dataset, logger, MODEL_NAME)
+        self.dataset = dataset
 
         self.n_topics = n_topics
 
