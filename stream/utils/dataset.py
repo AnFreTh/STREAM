@@ -190,17 +190,35 @@ class TMDataset(Dataset):
         file_name : str, optional
             File name for the embeddings.
         """
-        if path is None:
-            path = self.get_package_embeddings_path(self.name)
-        embeddings_file = (
-            os.path.join(path, file_name)
-            if file_name
-            else os.path.join(
-                path, f"{self.name}_embeddings_{embedding_model_name}.pkl"
+        try:
+            if path is None:
+                path = self.get_package_embeddings_path(self.name)
+
+            print(f"Saving embeddings to path: {path}")
+
+            if not os.path.exists(path):
+                os.makedirs(path)
+                print(f"Created directory: {path}")
+
+            embeddings_file = (
+                os.path.join(path, file_name)
+                if file_name
+                else os.path.join(
+                    path, f"{self.name}_embeddings_{embedding_model_name}.pkl"
+                )
             )
-        )
-        with open(embeddings_file, "wb") as file:
-            pickle.dump(embeddings, file)
+
+            print(f"Embeddings file path: {embeddings_file}")
+
+            with open(embeddings_file, "wb") as file:
+                pickle.dump(embeddings, file)
+
+            print("Embeddings saved successfully.")
+
+        except PermissionError as e:
+            print(f"PermissionError: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     def get_embeddings(self, embedding_model_name, path=None, file_name=None):
         """
