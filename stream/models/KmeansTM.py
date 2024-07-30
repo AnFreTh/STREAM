@@ -4,7 +4,7 @@ import numpy as np
 from loguru import logger
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
-
+import optuna
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
@@ -101,6 +101,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         )
         self.kmeans_args = self.hparams.get("kmeans_args", kmeans_args or {})
 
+        self.hparams.update(self.umap_args)
+        self.hparams.update(self.kmeans_args)
+
         if random_state is not None:
             self.umap_args["random_state"] = random_state
 
@@ -153,8 +156,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             )
             self.dataframe = dataset.dataframe
         else:
-            logger.info(
-                f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -177,14 +179,12 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
             logger.info("--- Creating document cluster ---")
-            self.clustering_model = KMeans(
-                n_clusters=self.n_topics, **self.kmeans_args)
+            self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
 
@@ -233,8 +233,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -246,8 +245,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             tfidf, count = c_tf_idf(
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
@@ -296,3 +294,211 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         reduced_embeddings = self.reducer.transform(embeddings)
         labels = self.clustering_model.predict(reduced_embeddings)
         return labels
+
+    @staticmethod
+    def calculate_aic(n, k, wcss):
+        """
+        Calculate the AIC for a given model.
+
+        Parameters
+        ----------
+        n : int
+            Number of samples.
+        k : int
+            Number of clusters.
+        wcss : float
+            Within-cluster sum of squares.
+
+        Returns
+        -------
+        float
+            AIC score.
+        """
+        return n * np.log(wcss / n) + 2 * k
+
+    @staticmethod
+    def calculate_bic(n, k, wcss):
+        """
+        Calculate the BIC for a given model.
+
+        Parameters
+        ----------
+        n : int
+            Number of samples.
+        k : int
+            Number of clusters.
+        wcss : float
+            Within-cluster sum of squares.
+
+        Returns
+        -------
+        float
+            BIC score.
+        """
+        return n * np.log(wcss / n) + k * np.log(n)
+
+    def optimize_hyperparameters(
+        self,
+        dataset: TMDataset,
+        min_topics: int = 2,
+        max_topics: int = 20,
+        criterion: str = "aic",
+        n_trials: int = 100,
+        custom_metric=None,
+    ):
+        """
+        Optimize UMAP and K-Means parameters along with the number of topics using AIC, BIC, or a custom metric with Optuna.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        assert criterion in [
+            "aic",
+            "bic",
+            "custom",
+        ], "Criterion must be either 'aic', 'bic', or 'custom'."
+        if criterion == "custom":
+            assert (
+                custom_metric is not None
+            ), "Custom metric must be provided for criterion 'custom'."
+
+        self._prepare_embeddings(dataset)
+
+        def objective(trial):
+            # Suggest UMAP parameters
+            umap_n_neighbors = trial.suggest_int("umap_n_neighbors", 10, 50)
+            umap_n_components = trial.suggest_int("umap_n_components", 5, 50)
+            umap_metric = trial.suggest_categorical(
+                "umap_metric", ["cosine", "euclidean"]
+            )
+
+            # Suggest K-Means parameters
+            kmeans_init = trial.suggest_categorical(
+                "kmeans_init", ["k-means++", "random"]
+            )
+            kmeans_n_init = trial.suggest_int("kmeans_n_init", 10, 30)
+            kmeans_max_iter = trial.suggest_int("kmeans_max_iter", 100, 1000)
+
+            # Suggest number of topics
+            n_topics = trial.suggest_int("n_topics", min_topics, max_topics)
+
+            # Update UMAP and K-Means arguments
+            self.umap_args.update(
+                {
+                    "n_neighbors": umap_n_neighbors,
+                    "n_components": umap_n_components,
+                    "metric": umap_metric,
+                }
+            )
+            self.kmeans_args.update(
+                {
+                    "init": kmeans_init,
+                    "n_init": kmeans_n_init,
+                    "max_iter": kmeans_max_iter,
+                }
+            )
+
+            self.hparams.update(self.kmeans_args)
+            self.hparams.update(self.umap_args)
+
+            # Perform dimensionality reduction
+            self.fit(dataset)
+            wcss = self.clustering_model.inertia_
+
+            # Calculate AIC, BIC, or custom metric score
+            if criterion in ["aic", "bic"]:
+                n_samples = self.reduced_embeddings.shape[0]
+                if criterion == "aic":
+                    score = self.calculate_aic(n_samples, n_topics, wcss)
+                else:
+                    score = self.calculate_bic(n_samples, n_topics, wcss)
+            else:
+                # Compute the custom metric score
+                topics = self.get_topics()
+                score = -custom_metric.score(
+                    topics
+                )  # Assuming higher metric score is better, negate for minimization
+
+            return score
+
+        # Create an Optuna study and optimize the objective function
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=n_trials)
+
+        best_params = study.best_params
+        best_score = study.best_value
+        best_n_topics = best_params.pop("n_topics")
+
+        logger.info(
+            f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
+        )
+
+        return {
+            "best_params": best_params,
+            "optimal_n_topics": best_n_topics,
+            "best_score": best_score,
+        }
+
+    def fit_with_optimized_params(
+        self,
+        dataset: TMDataset,
+        min_topics: int = 2,
+        max_topics: int = 20,
+        criterion: str = "aic",
+        n_trials: int = 100,
+        custom_metric=None,
+    ):
+        """
+        Optimize hyperparameters and train the model with the optimal parameters using Optuna.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+        """
+        optimal_params = self.optimize_hyperparameters(
+            dataset, min_topics, max_topics, criterion, n_trials, custom_metric
+        )
+
+        self.umap_args.update(
+            {
+                "n_neighbors": optimal_params["best_params"]["umap_n_neighbors"],
+                "n_components": optimal_params["best_params"]["umap_n_components"],
+                "metric": optimal_params["best_params"]["umap_metric"],
+            }
+        )
+        self.kmeans_args.update(
+            {
+                "init": optimal_params["best_params"]["kmeans_init"],
+                "n_init": optimal_params["best_params"]["kmeans_n_init"],
+                "max_iter": optimal_params["best_params"]["kmeans_max_iter"],
+            }
+        )
+        self.fit(dataset, n_topics=optimal_params["optimal_n_topics"])
