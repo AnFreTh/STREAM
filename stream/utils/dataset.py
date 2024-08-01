@@ -2,12 +2,12 @@ import json
 import os
 import pickle
 import re
-import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+
 import gensim.downloader as api
 import numpy as np
-import numpy as np
 import pandas as pd
+from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from ..preprocessor import TextPreprocessor
@@ -707,11 +707,17 @@ class TMDataset(Dataset):
         dict
             Dictionary mapping words to their embeddings.
         """
-        # Load pre-trained model
-        model = api.load(model_name)
 
-        vocabulary = self.get_vocabulary()
-        embeddings = {word: model[word] for word in vocabulary if word in model}
+        if model_name == "glove_wiki_gigaword_100":
+            # Load pre-trained model
+            model = api.load(model_name)
+
+            vocabulary = self.get_vocabulary()
+            embeddings = {word: model[word] for word in vocabulary if word in model}
+
+        if model_name == "paraphrase-MiniLM-L3-v2":
+            model = SentenceTransformer(encoder_model)
+            embeddings = model.encode(documents, convert_to_tensor=True, show_progress_bar=True)
 
         return embeddings
 
