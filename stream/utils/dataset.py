@@ -693,7 +693,41 @@ class TMDataset(Dataset):
         self.tfidf = vectorizer.fit_transform(corpus).toarray()
         return self.tfidf, vectorizer.get_feature_names_out()
 
-    def get_word_embeddings(self, model_name="glove-wiki-gigaword-100"):
+    def has_word_embeddings(self, model_name):
+        """
+        Check if word embeddings are available for the dataset.
+
+        Parameters
+        ----------
+        model_name : str
+            Name of the pre-trained model.
+
+        Returns
+        -------
+        bool
+            True if word embeddings are available, False otherwise.
+        """
+        return self.has_embeddings(model_name, "word_embeddings")
+    
+    def save_word_embeddings(self, word_embeddings, model_name,  path=None, file_name=None):
+        """
+        Save word embeddings for the dataset.
+
+        Parameters
+        ----------
+        word_embeddings : dict
+            Word embeddings to save.
+        model_name : str
+            Name of the pre-trained model.
+        """
+        self.save_embeddings(
+            embeddings=word_embeddings,
+            embedding_model_name=model_name,
+            path=path,
+            file_name=file_name,
+        )
+
+    def get_word_embeddings(self, model_name="glove-wiki-gigaword-100", vocab = None):
         """
         Get the word embeddings for the vocabulary using a pre-trained model.
 
@@ -701,6 +735,7 @@ class TMDataset(Dataset):
         ----------
         model_name : str, optional
             Name of the pre-trained model to use, by default 'glove-wiki-gigaword-100'.
+        vocab : list of str, optional
 
         Returns
         -------
@@ -708,16 +743,33 @@ class TMDataset(Dataset):
             Dictionary mapping words to their embeddings.
         """
 
+        assert model_name in [
+            "glove-wiki-gigaword-100",
+            "paraphrase-MiniLM-L3-v2",
+        ], f"model name {model_name} not supported. Can be 'glove-wiki-gigaword-100' and 'paraphrase-MiniLM-L3-v2'"
+
+        if vocab is None:
+            vocabulary = self.get_vocabulary()
+        else:
+            vocabulary = vocab
+
+        if self.has_word_embeddings(model_name):
+            return self.get_embeddings(model_name, "word_embeddings")
+
         if model_name == "glove_wiki_gigaword_100":
             # Load pre-trained model
             model = api.load(model_name)
 
-            vocabulary = self.get_vocabulary()
             embeddings = {word: model[word] for word in vocabulary if word in model}
 
         if model_name == "paraphrase-MiniLM-L3-v2":
-            model = SentenceTransformer(encoder_model)
-            embeddings = model.encode(documents, convert_to_tensor=True, show_progress_bar=True)
+            model = SentenceTransformer(model_name)
+            vocabulary = list(vocabulary)
+            embeddings = model.encode(vocabulary, convert_to_tensor=True, show_progress_bar=True)
+
+            embeddings = {word: embeddings[i] for i, word in enumerate(vocabulary)}
+
+            assert len(embeddings) == len(vocabulary), "Embeddings and vocabulary length mismatch"
 
         return embeddings
 
