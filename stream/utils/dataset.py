@@ -654,14 +654,11 @@ class TMDataset(Dataset):
         if train_ratio < 0 or val_ratio < 0:
             raise ValueError("Train, val and test ratios must be positive")
 
-        if train_ratio == 0 and val_ratio == 0:
-            raise ValueError("Train, val and test ratios cannot all be 0")
-
         if train_ratio + val_ratio != 1.0:
             raise ValueError("Train, validation and test ratios must sum to 1")
 
         train_size = int(train_ratio * total_size)
-        val_size = int(val_ratio * total_size)
+        val_size = total_size - train_size
 
         if seed is not None:
             np.random.seed(seed)
