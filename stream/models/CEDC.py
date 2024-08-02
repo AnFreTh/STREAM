@@ -163,8 +163,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -233,8 +232,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -347,8 +345,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
         # Extract all unique words and sort them
-        all_words = set(word for topic in self.topic_dict.values()
-                        for word, _ in topic)
+        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns
@@ -363,3 +360,78 @@ class CEDC(BaseModel, SentenceEncodingMixin):
                     topic_word_matrix.at[word, topic] = prevalence
         self.beta = np.array(topic_word_matrix)
         return self.beta
+
+    def suggest_hyperparameters(self, trial):
+        # Suggest UMAP parameters
+        self.hparams["umap_n_neighbors"] = trial.suggest_int("umap_n_neighbors", 10, 50)
+        self.hparams["umap_n_components"] = trial.suggest_int(
+            "umap_n_components", 5, 50
+        )
+        self.hparams["umap_metric"] = trial.suggest_categorical(
+            "umap_metric", ["cosine", "euclidean"]
+        )
+
+        # Suggest GMM parameters
+        self.hparams["gmm_covariance_type"] = trial.suggest_categorical(
+            "gmm_covariance_type", ["full", "tied", "diag", "spherical"]
+        )
+        self.hparams["gmm_tol"] = trial.suggest_float("gmm_tol", 1e-4, 1e-1, log=True)
+        self.hparams["gmm_reg_covar"] = trial.suggest_float(
+            "gmm_reg_covar", 1e-6, 1e-3, log=True
+        )
+        self.hparams["gmm_max_iter"] = trial.suggest_int("gmm_max_iter", 100, 1000)
+        self.hparams["gmm_n_init"] = trial.suggest_int("gmm_n_init", 1, 10)
+        self.hparams["gmm_init_params"] = trial.suggest_categorical(
+            "gmm_init_params", ["kmeans", "random"]
+        )
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="aic",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        A new method in the child class that optimizes and fits the model.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        best_params = super().optimize_hyperparameters(
+            dataset=dataset,
+            min_topics=min_topics,
+            max_topics=max_topics,
+            criterion=criterion,
+            n_trials=n_trials,
+            custom_metric=custom_metric,
+        )
+
+        return best_params
+
+    def calculate_aic(self, n_topics=None):
+
+        return self.GMM.aic(self.reduced_embeddings)
+
+    def calculate_bic(self, n_topics=None):
+
+        return self.GMM.bic(self.reduced_embeddings)

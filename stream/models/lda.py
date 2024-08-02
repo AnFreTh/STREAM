@@ -18,7 +18,7 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 class LDA(BaseModel):
 
-    def __init__(self, id2word=None, id_corpus=None, random_state=None):
+    def __init__(self, id2word=None, id_corpus=None, random_state=None, **kwargs):
         """
         Initialize the LDA model.
 
@@ -31,6 +31,8 @@ class LDA(BaseModel):
         random_state : int or None, optional
             Seed for random number generation.
         """
+        super().__init__(use_pretrained_embeddings=True, **kwargs)
+        self.save_hyperparameters(ignore=["id2word", "id_corpus"])
 
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
@@ -70,8 +72,7 @@ class LDA(BaseModel):
         """
         # Ensure the 'tokens' column exists
         if "tokens" not in dataset.dataframe.columns:
-            raise ValueError(
-                f"Column 'tokens' does not exist in the dataframe.")
+            raise ValueError(f"Column 'tokens' does not exist in the dataframe.")
 
         # Define a helper function to check if an entry is tokenized
         def is_tokenized(entry):
@@ -81,8 +82,7 @@ class LDA(BaseModel):
 
         # Tokenize entries that are not tokenized
         dataset.dataframe["tokens"] = dataset.dataframe["tokens"].apply(
-            lambda entry: word_tokenize(
-                entry) if not is_tokenized(entry) else entry
+            lambda entry: word_tokenize(entry) if not is_tokenized(entry) else entry
         )
 
         return dataset
@@ -142,7 +142,13 @@ class LDA(BaseModel):
             self._status = TrainingStatus.INITIALIZED
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self._prepare_documents(dataset)
+            if not self.id_corpus and not self.id2word:
+                self._prepare_documents(dataset)
+            lda_params = {
+                key: value
+                for key, value in {**self.hparams, **lda_params}.items()
+                if key != "n_topics"
+            }
             self.model = ldamodel.LdaModel(
                 self.id_corpus, num_topics=n_topics, **lda_params
             )
@@ -162,6 +168,48 @@ class LDA(BaseModel):
         self.labels = np.array(np.argmax(self.theta, axis=1))
 
         self.topic_dict = self._get_topic_word_dict()
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        metric,
+        min_topics=2,
+        max_topics=20,
+        n_trials=100,
+    ):
+        """
+        A new method in the child class that calls the parent class's optimize_hyperparameters method.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        best_params = super().optimize_hyperparameters(
+            dataset=dataset,
+            min_topics=min_topics,
+            max_topics=max_topics,
+            criterion="custom",
+            n_trials=n_trials,
+            custom_metric=metric,
+        )
+
+        return best_params
 
     def predict(self, dataset):
         pass
@@ -289,3 +337,8 @@ class LDA(BaseModel):
             ]
 
         return topic_word_dict
+
+    def suggest_hyperparameters(self, trial):
+        # Suggest LDA-specific hyperparameters (e.g., alpha, beta)
+        self.hparams["alpha"] = trial.suggest_float("alpha", 0.01, 1.0)
+        self.hparams["eta"] = trial.suggest_float("eta", 0.01, 1.0)

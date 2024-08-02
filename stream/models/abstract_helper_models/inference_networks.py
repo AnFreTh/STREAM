@@ -42,7 +42,7 @@ class InferenceNetwork(nn.Module):
         self.norm = norm
 
         if self.inference_type == "combined":
-            self.input_layer = nn.Linear(input_size + bert_size, hidden_sizes[0])
+            self.input_layer = nn.Linear(input_size + input_size, hidden_sizes[0])
             self.adapt_bert = nn.Linear(bert_size, input_size)
         elif self.inference_type == "zeroshot":
             self.adapt_bert = nn.Linear(bert_size, hidden_sizes[0])
@@ -75,7 +75,7 @@ class InferenceNetwork(nn.Module):
         """Forward pass."""
         if self.inference_type == "combined":
             x_bert = self.adapt_bert(x["embedding"])
-            x = torch.cat((x, x_bert), 1)
+            x = torch.cat((x["bow"], x_bert), 1)
             x = self.input_layer(x)
         elif self.inference_type == "zeroshot":
             x_bert = self.adapt_bert(x["embedding"])
