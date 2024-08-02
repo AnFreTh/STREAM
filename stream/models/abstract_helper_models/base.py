@@ -3,7 +3,7 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from enum import Enum
-
+import optuna
 import umap.umap_ as umap
 from loguru import logger
 
@@ -109,8 +109,7 @@ class BaseModel(ABC):
         Parameters:
             ignore (list, optional): List of keys to ignore while saving hyperparameters. Defaults to [].
         """
-        self.hparams = {k: v for k, v in self.hparams.items()
-                        if k not in ignore}
+        self.hparams = {k: v for k, v in self.hparams.items() if k not in ignore}
         for key, value in self.hparams.items():
             setattr(self, key, value)
 
@@ -126,8 +125,7 @@ class BaseModel(ABC):
                 self.hparams = json.load(file)
         else:
             logger.error(f"Hyperparameters file not found at: {path}")
-            raise FileNotFoundError(
-                f"Hyperparameters file not found at: {path}")
+            raise FileNotFoundError(f"Hyperparameters file not found at: {path}")
 
     def get_hyperparameters(self):
         """
@@ -190,15 +188,13 @@ class BaseModel(ABC):
         assert hasattr(
             self, "embeddings"
         ), "Model has no embeddings to reduce dimensions."
-        assert hasattr(
-            self, "umap_args"), "Model has no UMAP arguments specified."
+        assert hasattr(self, "umap_args"), "Model has no UMAP arguments specified."
         try:
             logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise RuntimeError(
-                f"Error in dimensionality reduction: {e}") from e
+            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
 
         return reduced_embeddings
 
@@ -300,13 +296,112 @@ class BaseModel(ABC):
         """
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
-        assert hasattr(
-            self, "theta"), "Model has no topic-document distribution."
+        assert hasattr(self, "theta"), "Model has no topic-document distribution."
         return self.theta
 
     @abstractmethod
     def fit(self, dataset):
         pass
+
+    def optimize_hyperparameters(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="aic",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        Optimize model parameters using Optuna.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        assert criterion in [
+            "aic",
+            "bic",
+            "custom",
+        ], "Criterion must be either 'aic', 'bic', or 'custom'."
+        if criterion == "custom":
+            assert (
+                custom_metric is not None
+            ), "Custom metric must be provided for criterion 'custom'."
+
+        def objective(trial):
+            # Suggest number of topics
+            self.hparams["n_topics"] = trial.suggest_int(
+                "n_topics", min_topics, max_topics
+            )
+
+            # Call the model-specific parameter suggestion method
+            self.suggest_hyperparameters(trial)
+
+            # Perform dimensionality reduction and clustering
+            self.fit(dataset)
+
+            # Calculate the score based on the criterion
+            if criterion in ["aic", "bic"]:
+
+                if criterion == "aic":
+                    score = self.calculate_aic(n_topics=self.hparams["n_topics"])
+                else:
+                    score = self.calculate_bic(n_topics=self.hparams["n_topics"])
+            else:
+                # Compute the custom metric score
+                topics = self.get_topics()
+                score = -custom_metric.score(
+                    topics
+                )  # Assuming higher metric score is better, negate for minimization
+
+            return score
+
+        # Create an Optuna study and optimize the objective function
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=n_trials)
+
+        best_params = study.best_params
+        best_score = study.best_value
+        best_n_topics = best_params.pop("n_topics")
+
+        logger.info(
+            f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
+        )
+
+        # Update self.hparams with the best parameters
+        self.hparams.update(best_params)
+        self.hparams["n_topics"] = best_n_topics
+
+        self.fit(dataset, n_topics=best_n_topics)
+
+        return {
+            "best_params": best_params,
+            "optimal_n_topics": best_n_topics,
+            "best_score": best_score,
+        }
+
+    def suggest_hyperparameters(self, trial):
+        """
+        This method should be overridden in the child class to suggest model-specific hyperparameters.
+        """
+        raise NotImplementedError("Child class should implement this method.")
 
 
 class TrainingStatus(str, Enum):
