@@ -2,3 +2,4 @@ recursive-exclude notebooks *
 recursive-include stream/datasets/preprocessed_datasets/*
 recursive-include stream/datasets/pre_embedded_datasets/*
 recursive-include stream/preprocessed_datasets/*
+include stream/preprocessor/default_preprocessing_steps.json
