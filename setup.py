@@ -57,6 +57,7 @@ setup(
             "datasets/preprocessed_datasets/**/*",
             "datasets/pre_embedded_datasets/**/*",
             "preprocessed_datasets/**/*",
+            "preprocessor/default_preprocessing_steps.json"
         ],
     },
     classifiers=[
