@@ -1,3 +1,4 @@
 recursive-exclude notebooks *
-recursive-include ExpandedTM/preprocessed_datasets *
-recursive-include ExpandedTM/pre_embedded_datasets *
+recursive-include stream/datasets/preprocessed_datasets/*
+recursive-include stream/datasets/pre_embedded_datasets/*
+recursive-include stream/preprocessed_datasets/*
