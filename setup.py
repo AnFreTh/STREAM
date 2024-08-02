@@ -50,11 +50,13 @@ setup(
     packages=find_packages(
         exclude=["examples", "examples.*", "tests", "tests.*"]),
     include_package_data=True,
+    # package_dir={"stream": "stream"},
     package_data={
         # Use '**' to include all files within subdirectories recursively
         "stream": [
-            "../datasets/preprocessed_datasets/**/*",
-            "../datasets/pre_embedded_datasets/**/*",
+            "datasets/preprocessed_datasets/**/*",
+            "datasets/pre_embedded_datasets/**/*",
+            "preprocessed_datasets/**/*",
         ],
     },
     classifiers=[
