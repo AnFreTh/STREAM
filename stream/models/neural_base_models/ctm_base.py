@@ -222,6 +222,7 @@ class CTMBase(nn.Module):
         tuple of torch.Tensors
             Word distribution, mu, and logvar.
         """
+
         theta, mu, logvar = self.get_theta(x)
 
         # prodLDA vs LDA

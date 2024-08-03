@@ -6,6 +6,8 @@ from enum import Enum
 import optuna
 import umap.umap_ as umap
 from loguru import logger
+from optuna.integration import PyTorchLightningPruningCallback
+import torch.nn as nn
 
 
 class BaseModel(ABC):
@@ -390,6 +392,124 @@ class BaseModel(ABC):
         self.hparams["n_topics"] = best_n_topics
 
         self.fit(dataset, n_topics=best_n_topics)
+
+        return {
+            "best_params": best_params,
+            "optimal_n_topics": best_n_topics,
+            "best_score": best_score,
+        }
+
+    def optimize_hyperparameters_neural(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="val_loss",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        Optimize model parameters using Optuna.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', 'val_loss', or 'custom'), by default 'val_loss'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        assert criterion in [
+            "val_loss",
+            "custom",
+        ], "Criterion must be either 'val_loss', or 'custom'."
+        if criterion == "custom":
+            assert (
+                custom_metric is not None
+            ), "Custom metric must be provided for criterion 'custom'."
+
+        def objective(trial):
+            # Suggest number of topics
+            self.hparams["n_topics"] = trial.suggest_int(
+                "n_topics", min_topics, max_topics
+            )
+
+            # Call the model-specific parameter suggestion method
+            self.suggest_hyperparameters(trial)
+
+            # Perform dimensionality reduction and clustering
+            self.fit(dataset, trial=trial, optimize=True)
+
+            if criterion == "val_loss":
+
+                score = self.trainer.validate(self.model, self.data_module)[0][
+                    "val_loss_epoch"
+                ]
+
+            else:
+                topics = self.get_topics()
+                score = -custom_metric.score(
+                    topics
+                )  # Assuming higher metric score is better, negate for minimization
+
+            return score
+
+        # Create an Optuna study and optimize the objective function
+        study = optuna.create_study(
+            direction="minimize", pruner=optuna.pruners.MedianPruner()
+        )
+        study.optimize(objective, n_trials=n_trials)
+
+        best_params = study.best_params
+        best_score = study.best_value
+        best_n_topics = best_params.pop("n_topics")
+
+        logger.info(
+            f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
+        )
+
+        def update_hparams(hparams, best_params):
+            activation_mapping = {
+                "Softplus": nn.Softplus(),
+                "ReLU": nn.ReLU(),
+                "LeakyReLU": nn.LeakyReLU(),
+                "Tanh": nn.Tanh(),
+            }
+            # First, update the nested dictionary parameters
+            for k, v in best_params.items():
+                if isinstance(hparams.get(k), dict) and isinstance(v, dict):
+                    update_hparams(hparams[k], v)
+
+            # Next, update the top-level parameters, skipping keys that belong to nested dictionaries
+            for k, v in best_params.items():
+                if k in hparams and isinstance(hparams[k], dict):
+                    continue
+                if not any(
+                    k in hparams.get(sub_key, {})
+                    for sub_key in hparams
+                    if isinstance(hparams[sub_key], dict)
+                ):
+                    if k == "inference_activation" and isinstance(v, str):
+                        hparams[k] = activation_mapping[v]
+                    else:
+                        hparams[k] = v
+
+        update_hparams(self.hparams, best_params)
+        self.hparams["n_topics"] = best_n_topics
+
+        self.fit(dataset, n_topics=best_n_topics, optimize=False)
 
         return {
             "best_params": best_params,

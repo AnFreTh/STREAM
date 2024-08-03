@@ -10,7 +10,8 @@ import pandas as pd
 import torch
 from ..utils.datamodule import TMDataModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
-
+import torch.nn as nn
+from optuna.integration import PyTorchLightningPruningCallback
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "CTM"
@@ -25,7 +26,17 @@ class CTM(BaseModel):
         embeddings_folder_path: str = None,
         embeddings_file_path: str = None,
         save_embeddings: bool = False,
-        **kwargs,
+        encoder_dim=128,
+        dropout=0.1,
+        inference_type="combined",
+        inference_activation=nn.Softplus(),
+        model_type="ProdLDA",
+        rescale_loss=False,
+        rescale_factor=1e-2,
+        batch_size=64,
+        val_size=0.2,
+        shuffle=True,
+        random_state=42,
     ):
         """
         Initialize the ETM model.
@@ -36,7 +47,16 @@ class CTM(BaseModel):
             Additional keyword arguments to pass to the parent class constructor.
         """
 
-        super().__init__(use_pretrained_embeddings=False, **kwargs)
+        super().__init__(
+            use_pretrained_embeddings=False,
+            dropout=dropout,
+            inference_type=inference_type,
+            encoder_dim=encoder_dim,
+            inference_activation=inference_activation,
+            model_type=model_type,
+            rescale_loss=rescale_loss,
+            rescale_factor=rescale_factor,
+        )
         self.save_hyperparameters(
             ignore=[
                 "embeddings_file_path",
@@ -57,6 +77,20 @@ class CTM(BaseModel):
 
         self._status = TrainingStatus.NOT_STARTED
 
+        self.hparams["datamodule_args"] = {
+            "batch_size": batch_size,
+            "val_size": val_size,
+            "shuffle": shuffle,
+            "random_state": random_state,
+            "embeddings": True,
+            "bow": True,
+            "tf_idf": False,
+            "word_embeddings": False,
+        }
+
+        self.embeddings_prepared = False
+        self.optimize = False
+
     def get_info(self):
         """
         Get information about the model.
@@ -76,7 +110,7 @@ class CTM(BaseModel):
         return info
 
     def _initialize_model(
-        self, n_topics, lr, lr_patience, factor, weight_decay, **model_kwargs
+        self,
     ):
         """
         Initialize the neural base model.
@@ -100,12 +134,11 @@ class CTM(BaseModel):
         self.model = NeuralBaseModel(
             model_class=CTMBase,
             dataset=self.dataset,
-            n_topics=n_topics,
-            lr=lr,
-            lr_patience=lr_patience,
-            lr_factor=factor,
-            weight_decay=weight_decay,
-            **model_kwargs,
+            **{
+                k: v
+                for k, v in self.hparams.items()
+                if k not in ["datamodule_args", "max_epochs", "factor"]
+            },
         )
 
     def _initialize_trainer(
@@ -115,6 +148,7 @@ class CTM(BaseModel):
         patience,
         mode,
         checkpoint_path,
+        trial=None,
         **trainer_kwargs,
     ):
         """
@@ -149,16 +183,65 @@ class CTM(BaseModel):
             filename="best_model",
         )
 
+        model_callbacks = [
+            early_stop_callback,
+            checkpoint_callback,
+            ModelSummary(max_depth=2),
+        ]
+
+        if self.optimize:
+            model_callbacks.append(
+                PyTorchLightningPruningCallback(trial, monitor="val_loss")
+            )
+
         # Initialize the trainer
         self.trainer = pl.Trainer(
             max_epochs=max_epochs,
-            callbacks=[
-                early_stop_callback,
-                checkpoint_callback,
-                ModelSummary(max_depth=2),
-            ],
+            callbacks=model_callbacks,
             **trainer_kwargs,
         )
+
+    def _initialize_datamodule(
+        self,
+        dataset,
+    ):
+        """
+        Initialize the data module.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to be used for training.
+        batch_size : int
+            Batch size for training.
+        shuffle : bool
+            Whether to shuffle the data.
+        val_size : float
+            Proportion of the dataset to use for validation.
+        random_state : int
+            Random seed for reproducibility.
+        **kwargs : dict
+            Additional keyword arguments for data preprocessing.
+        """
+
+        logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
+        self.data_module = TMDataModule(
+            batch_size=self.hparams["datamodule_args"]["batch_size"],
+            shuffle=self.hparams["datamodule_args"]["shuffle"],
+            val_size=self.hparams["datamodule_args"]["val_size"],
+            random_state=self.hparams["datamodule_args"]["random_state"],
+        )
+
+        self.data_module.preprocess_data(
+            dataset=dataset,
+            **{
+                k: v
+                for k, v in self.hparams["datamodule_args"].items()
+                if k not in ["batch_size", "shuffle", "val_size"]
+            },
+        )
+
+        self.dataset = dataset
 
     def _prepare_embeddings(self, dataset):
         """
@@ -193,48 +276,7 @@ class CTM(BaseModel):
                     self.embeddings_file_path,
                 )
 
-    def _initialize_datamodule(
-        self, dataset, batch_size, shuffle, val_size, random_state, **kwargs
-    ):
-        """
-        Initialize the data module.
-
-        Parameters
-        ----------
-        dataset : TMDataset
-            The dataset to be used for training.
-        batch_size : int
-            Batch size for training.
-        shuffle : bool
-            Whether to shuffle the data.
-        val_size : float
-            Proportion of the dataset to use for validation.
-        random_state : int
-            Random seed for reproducibility.
-        **kwargs : dict
-            Additional keyword arguments for data preprocessing.
-        """
-
-        logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
-        self.data_module = TMDataModule(
-            batch_size=batch_size,
-            shuffle=shuffle,
-            val_size=val_size,
-            random_state=random_state,
-        )
-
-        self.data_module.preprocess_data(
-            dataset=dataset,
-            val=val_size,
-            embeddings=True,
-            bow=True,
-            tf_idf=False,
-            word_embeddings=False,
-            random_state=random_state,
-            **kwargs,
-        )
-
-        self.dataset = dataset
+        self.embeddings_prepared = True
 
     def fit(
         self,
@@ -250,13 +292,11 @@ class CTM(BaseModel):
         batch_size: int = 32,
         shuffle: bool = True,
         random_state: int = 101,
-        inferece_type="zeroshot",
-        model_type="ProdLDA",
-        rescale_loss=False,
-        rescale_factor=1e-2,
         checkpoint_path: str = "checkpoints",
         monitor: str = "val_loss",
         mode: str = "min",
+        trial=None,
+        optimize=False,
         **kwargs,
     ):
         """
@@ -283,44 +323,51 @@ class CTM(BaseModel):
         Raises:
             ValueError: If the dataset is not an instance of TMDataset.
         """
-
+        self.optimize = optimize
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
         self.n_topics = n_topics
 
+        self.hparams.update(
+            {
+                "n_topics": n_topics,
+                "lr": lr,
+                "lr_patience": lr_patience,
+                "patience": patience,
+                "factor": factor,
+                "weight_decay": weight_decay,
+                "max_epochs": max_epochs,
+            }
+        )
+
+        self.hparams["datamodule_args"].update(
+            {
+                "batch_size": batch_size,
+                "val_size": val_size,
+                "shuffle": shuffle,
+                "random_state": random_state,
+            }
+        )
+
         try:
             self._status = TrainingStatus.RUNNING
-            self.prepare_embeddings(dataset, logger)
+            if not self.embeddings_prepared:
+                self.prepare_embeddings(dataset, logger)
 
             self._status = TrainingStatus.INITIALIZED
-            self._initialize_datamodule(
-                dataset=dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                val_size=val_size,
-                random_state=random_state,
-            )
+            self._initialize_datamodule(dataset=dataset)
 
-            self._initialize_model(
-                lr=lr,
-                n_topics=n_topics,
-                lr_patience=lr_patience,
-                factor=factor,
-                weight_decay=weight_decay,
-                inference_type=inferece_type,
-                model_type=model_type,
-                rescale_loss=rescale_loss,
-                rescale_factor=rescale_factor,
-            )
+            self._initialize_model()
 
             self._initialize_trainer(
-                max_epochs=max_epochs,
+                max_epochs=self.hparams["max_epochs"],
                 monitor=monitor,
                 patience=patience,
                 mode=mode,
                 checkpoint_path=checkpoint_path,
+                trial=trial,
                 **kwargs,
             )
 
@@ -398,3 +445,75 @@ class CTM(BaseModel):
 
     def predict(self, dataset):
         pass
+
+    def suggest_hyperparameters(self, trial, max_topics=100):
+        self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)
+        self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
+        self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
+        self.hparams["inference_type"] = trial.suggest_categorical(
+            "inference_type", ["combined", "zeroshot"]
+        )
+        self.hparams["inference_activation"] = trial.suggest_categorical(
+            "inference_activation", ["Softplus", "ReLU", "LeakyReLU", "Tanh"]
+        )
+        self.hparams["model_type"] = trial.suggest_categorical(
+            "model_type", ["ProdLDA", "LDA"]
+        )
+
+        # Map string to actual PyTorch activation function
+        activation_mapping = {
+            "Softplus": nn.Softplus(),
+            "ReLU": nn.ReLU(),
+            "LeakyReLU": nn.LeakyReLU(),
+            "Tanh": nn.Tanh(),
+        }
+        self.hparams["inference_activation"] = activation_mapping[
+            self.hparams["inference_activation"]
+        ]
+
+        self.hparams["datamodule_args"]["batch_size"] = trial.suggest_int(
+            "batch_size", 12, 512
+        )
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="val_loss",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        A new method in the child class that calls the parent class's optimize_hyperparameters method.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        best_params = super().optimize_hyperparameters_neural(
+            dataset=dataset,
+            min_topics=min_topics,
+            max_topics=max_topics,
+            criterion=criterion,
+            n_trials=n_trials,
+            custom_metric=custom_metric,
+        )
+
+        return best_params
