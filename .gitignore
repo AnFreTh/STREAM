@@ -178,3 +178,7 @@ vocab.txt
 
 # Ignore the following directories
 dev/*
+post-checkout
+post-commit
+post-merge
+pre-push
