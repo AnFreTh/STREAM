@@ -1,7 +1,7 @@
 from collections import OrderedDict
-from torch import nn
+
 import torch
-import numpy as np
+from torch import nn
 
 
 class InferenceNetwork(nn.Module):
@@ -42,7 +42,8 @@ class InferenceNetwork(nn.Module):
         self.norm = norm
 
         if self.inference_type == "combined":
-            self.input_layer = nn.Linear(input_size + input_size, hidden_sizes[0])
+            self.input_layer = nn.Linear(
+                input_size + input_size, hidden_sizes[0])
             self.adapt_bert = nn.Linear(bert_size, input_size)
         elif self.inference_type == "zeroshot":
             self.adapt_bert = nn.Linear(bert_size, hidden_sizes[0])
