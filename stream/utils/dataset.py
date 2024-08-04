@@ -2,14 +2,14 @@ import json
 import os
 import pickle
 import re
-import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+
 import gensim.downloader as api
 import numpy as np
-import numpy as np
 import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import DataLoader, Dataset, random_split
 
+from ..commons.load_steps import load_model_preprocessing_steps
 from ..preprocessor import TextPreprocessor
 
 
@@ -63,32 +63,6 @@ class TMDataset(Dataset):
             "detokenize": True,
         }
 
-    def load_model_preprocessing_steps(self, model_type, filepath=None):
-        """
-        Load the default preprocessing steps from a JSON file.
-
-        Parameters
-        ----------
-        filepath : str
-            The path to the JSON file containing the default preprocessing steps.
-
-        Returns
-        -------
-        dict
-            The default preprocessing steps.
-        """
-        if filepath is None:
-            # Determine the absolute path based on the current file's location
-            current_dir = os.path.dirname(__file__)
-            filepath = os.path.join(
-                current_dir, "..", "preprocessor", "default_preprocessing_steps.json"
-            )
-            filepath = os.path.abspath(filepath)
-
-        with open(filepath, "r") as file:
-            all_steps = json.load(file)
-        return all_steps.get(model_type, {})
-
     def fetch_dataset(self, name, dataset_path=None):
         """
         Fetch a dataset by name.
@@ -121,7 +95,8 @@ class TMDataset(Dataset):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words)
+                                  for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -141,7 +116,8 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(my_package_dir, "preprocessed_datasets", name)
+        dataset_path = os.path.join(
+            my_package_dir, "preprocessed_datasets", name)
         return dataset_path
 
     def has_embeddings(self, embedding_model_name, path=None, file_name=None):
@@ -276,7 +252,8 @@ class TMDataset(Dataset):
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
         my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(my_package_dir, "pre_embedded_datasets", name)
+        dataset_path = os.path.join(
+            my_package_dir, "pre_embedded_datasets", name)
         return dataset_path
 
     def create_load_save_dataset(
@@ -313,18 +290,21 @@ class TMDataset(Dataset):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError("doc_column must be specified for DataFrame input")
+                raise ValueError(
+                    "doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [None] * len(documents)
+                data[label_column].tolist() if label_column else [
+                    None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError("data must be a pandas DataFrame or a list of documents")
+            raise TypeError(
+                "data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -365,32 +345,12 @@ class TMDataset(Dataset):
 
         Parameters
         ----------
-        language : str, optional
-            The language to use for preprocessing (default is "english").
-        remove_stopwords : bool, optional
-            Whether to remove stopwords (default is False).
-        lowercase : bool, optional
-            Whether to convert text to lowercase (default is True).
-        remove_punctuation : bool, optional
-            Whether to remove punctuation (default is True).
-        remove_numbers : bool, optional
-            Whether to remove numbers (default is True).
-        lemmatize : bool, optional
-            Whether to lemmatize words (default is False).
-        stem : bool, optional
-            Whether to stem words (default is False).
-        expand_contractions : bool, optional
-            Whether to expand contractions (default is False).
-        remove_html_tags : bool, optional
-            Whether to remove HTML tags (default is False).
-        remove_special_chars : bool, optional
-            Whether to remove special characters (default is False).
-        remove_accents : bool, optional
-            Whether to remove accents (default is False).
+        model_type : str, optional
+            The model type to load the preprocessing steps for.
         custom_stopwords : list of str, optional
-            List of custom stopwords to remove (default is an empty list).
-        detokenize : bool, optional
-            Whether to detokenize the text after processing (default is True).
+            Custom stopwords to remove.
+        **preprocessing_steps : dict
+            Preprocessing steps to apply
 
         Returns
         -------
@@ -404,7 +364,8 @@ class TMDataset(Dataset):
         `texts` attribute and updated in the `dataframe["text"]` column.
         """
         if model_type:
-            preprocessing_steps = self.load_model_preprocessing_steps(model_type)
+            preprocessing_steps = load_model_preprocessing_steps(
+                model_type)
         previous_steps = self.preprocessing_steps
 
         # Filter out steps that have already been applied
@@ -447,7 +408,8 @@ class TMDataset(Dataset):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(
+                    f"Error in dataset preprocessing: {e}") from e
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
@@ -494,7 +456,8 @@ class TMDataset(Dataset):
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
         if not os.path.exists(info_path):
-            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
+            raise FileNotFoundError(
+                f"Dataset info file {info_path} does not exist.")
 
         with open(info_path, "rb") as info_file:
             dataset_info = pickle.load(info_file)
@@ -588,7 +551,8 @@ class TMDataset(Dataset):
                 }
             )
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(
+                lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -684,7 +648,8 @@ class TMDataset(Dataset):
         """
         corpus = [" ".join(tokens) for tokens in self.get_corpus()]
         vectorizer = CountVectorizer(**kwargs)
-        self.bow = vectorizer.fit_transform(corpus).toarray().astype(np.float32)
+        self.bow = vectorizer.fit_transform(
+            corpus).toarray().astype(np.float32)
         return self.bow, vectorizer.get_feature_names_out()
 
     def get_tfidf(self, **kwargs):
@@ -726,7 +691,8 @@ class TMDataset(Dataset):
         model = api.load(model_name)
 
         vocabulary = self.get_vocabulary()
-        embeddings = {word: model[word] for word in vocabulary if word in model}
+        embeddings = {word: model[word]
+                      for word in vocabulary if word in model}
 
         return embeddings
 
@@ -756,6 +722,7 @@ class TMDataset(Dataset):
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(
+            lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
