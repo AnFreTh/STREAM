@@ -27,3 +27,5 @@ langdetect
 hdbscan
 loguru
 pre-commit
+optuna
+optuna-integration
