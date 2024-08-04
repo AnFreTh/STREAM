@@ -181,7 +181,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         """
         assert (
             hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
