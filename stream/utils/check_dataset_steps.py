@@ -48,6 +48,8 @@ def load_model_preprocessing_steps(model_type, filepath=None):
 
     Parameters
     ----------
+    model_type : str
+        The model type to load the preprocessing steps for.
     filepath : str
         The path to the JSON file containing the default preprocessing steps.
 
