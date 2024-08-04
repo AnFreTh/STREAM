@@ -133,12 +133,11 @@ class WordCluTM(BaseModel):
         )
 
         # Initialize BaseEmbedder with GensimBackend
-        self.base_embedder = BaseEmbedder(
-            GensimBackend(self.word2vec_model.wv))
+        self.base_embedder = BaseEmbedder(GensimBackend(self.word2vec_model.wv))
 
     def _clustering(self):
         """
-        Applies GMM clustering to the reduced embeddings.
+        Applies GMM clustering to the reduced Word embeddings.
 
         Raises
         ------
@@ -146,21 +145,19 @@ class WordCluTM(BaseModel):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
 
         try:
-            logger.info("--- Creating document cluster ---")
+            logger.info("--- Creating Word cluster ---")
             self.GMM = GaussianMixture(
                 **self.gmm_args,
             ).fit(self.reduced_embeddings)
 
             gmm_predictions = self.GMM.predict_proba(self.reduced_embeddings)
-            self.theta = pd.DataFrame(gmm_predictions)
-            self.labels = self.GMM.predict(self.reduced_embeddings)
+            self.beta = pd.DataFrame(gmm_predictions)
 
         except Exception as e:
             raise RuntimeError(f"Error in clustering: {e}") from e
@@ -209,7 +206,7 @@ class WordCluTM(BaseModel):
                 set(word for sentence in sentences for word in sentence)
             )
             word_to_index = {word: i for i, word in enumerate(unique_words)}
-            word_embeddings = np.array(
+            self.embeddings = np.array(
                 [
                     (
                         self.word2vec_model.wv[word]
@@ -220,45 +217,53 @@ class WordCluTM(BaseModel):
                 ]
             )
 
-            logger.info(f"--- Compute document embeddings ---")
-            # Initialize an empty list to hold document embeddings
-            self.embeddings = []
-
-            # Iterate over each document to compute its embedding
-            for doc in sentences:
-                doc_embedding = np.mean(
-                    [
-                        word_embeddings[word_to_index[word]]
-                        for word in doc
-                        if word in word_to_index
-                    ],
-                    axis=0,
-                )
-                if doc_embedding.shape == (vector_size,):
-                    self.embeddings.append(doc_embedding)
-
-            # Convert the list of document embeddings to a numpy array
-            self.embeddings = np.array(self.embeddings)
-            # self.embeddings = self.embeddings[~np.isnan(self.embeddings).any(axis=1)]
-
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
+            doc_topic_distributions = []
+            self.doc_embeddings = []
+            logger.info(f"--- Compute doc embeddings ---")
+            for doc in sentences:
+                # Collect word embeddings for the document
+                word_embeddings = [
+                    self.word2vec_model.wv[word]
+                    for word in doc
+                    if word in self.word2vec_model.wv
+                ]
+                # Compute the mean embedding for the document if there are valid word embeddings
+                if word_embeddings:
+                    self.doc_embeddings.append(np.mean(word_embeddings, axis=0))
+                else:
+                    # Append a zero array if no valid word embeddings are found
+                    self.doc_embeddings.append(np.zeros(self.vector_size))
+
+            # Replace any NaN values in the final list with zero arrays
+            self.doc_embeddings = [
+                arr if not np.isnan(arr).any() else np.zeros(arr.shape)
+                for arr in self.doc_embeddings
+            ]
+            if len(self.doc_embeddings) > 0:
+                # Reduce the dimensionality of the document embedding
+                reduced_doc_embedding = self.reducer.transform(self.doc_embeddings)
+                # Predict the topic distribution for the reduced document embedding
+                doc_topic_distribution = self.GMM.predict_proba(reduced_doc_embedding)
+                # Add the topic distribution to the list
+                doc_topic_distributions.append(doc_topic_distribution[0])
+
+            self.theta = pd.DataFrame(doc_topic_distributions)
+
+            # Create topic_dict
             self.topic_dict = {}
-
-            # Iterate over each cluster
-            for cluster_idx in range(self.theta.shape[1]):
-                # Get the indices of the words sorted by their probability of belonging to this cluster, in descending order
-                sorted_indices = np.argsort(self.theta[:, cluster_idx])[::-1]
-
-                # Get the top n_words for this cluster based on the sorted indices
+            for topic_idx in range(self.beta.shape[1]):
+                # Get the indices of the words sorted by their probability of belonging to this topic, in descending order
+                sorted_indices = np.argsort(self.beta.iloc[:, topic_idx])[::-1]
+                # Get the top n_words for this topic based on the sorted indices
                 top_words = [
-                    (unique_words[i], self.theta[i, cluster_idx])
+                    (unique_words[i], self.beta.iloc[i, topic_idx])
                     for i in sorted_indices[:n_words]
                 ]
-
                 # Store the top words and their probabilities in the dictionary
-                self.topic_dict[cluster_idx] = top_words
+                self.topic_dict[topic_idx] = top_words
 
         except Exception as e:
             logger.error(f"Error in training: {e}")
@@ -272,116 +277,5 @@ class WordCluTM(BaseModel):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
-    def get_theta(self):
-        return self.beta
-
-    def get_beta(self, dataset):
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-        assert hasattr(self, "topic_dict"), "Model has no topic_dict."
-        corpus = dataset.get_corpus()
-        n_documents = len(corpus)
-        document_scores_per_label = {label: []
-                                     for label in range(len(self.topic_dict))}
-        # Convert top_words_per_cluster to a more easily searchable structure
-        word_scores_per_label = {}
-        for label, words_scores in self.topic_dict.items():
-            for word, score in words_scores:
-                if word not in word_scores_per_label:
-                    word_scores_per_label[word] = {}
-                word_scores_per_label[word][label] = score
-        # Iterate over each document
-        for doc in corpus:
-            # Initialize a score accumulator for each label for the current document
-            doc_scores = {label: [] for label in range(len(self.topic_dict))}
-            # Iterate over each word in the document
-            for word in doc:
-                if word in word_scores_per_label:
-                    # If the word has scores for any label, add those scores to the accumulator
-                    for label, score in word_scores_per_label[word].items():
-                        doc_scores[label].append(score)
-            # Average the scores for each label and store them
-            for label in doc_scores:
-                if doc_scores[label]:  # Check if there are any scores to average
-                    document_scores_per_label[label].append(
-                        np.mean(doc_scores[label]))
-                else:
-                    # If no scores for this label, you might want to set a default value
-                    document_scores_per_label[label].append(0)
-
-        # Initialize the final array with zeros
-        final_scores = np.zeros((self.n_topics, n_documents))
-        # Populate the array with the computed scores
-        for label, scores in document_scores_per_label.items():
-            # Ensure there are as many scores as there are documents
-            assert (
-                len(scores) == n_documents
-            ), "The number of scores must match the number of documents"
-            # Assign the scores for this label (topic) to the corresponding row in the final array
-            final_scores[label, :] = scores
-
-        return final_scores
-
-    def predict(self, texts, proba=True):
-        """
-        Predict topics for new documents.
-
-        Parameters
-        ----------
-        texts : list of str
-            List of texts to predict topics for.
-
-        Returns
-        -------
-        list of int
-            List of predicted topic labels.
-
-        Raises
-        ------
-        ValueError
-            If the model has not been trained yet.
-        """
-        unique_words = list(
-            set(word for sentence in texts for word in sentence))
-        word_to_index = {word: i for i, word in enumerate(unique_words)}
-        word_embeddings = np.array(
-            [
-                (
-                    self.word2vec_model.wv[word]
-                    if word in self.word2vec_model.wv
-                    else np.zeros(self.vector_size)
-                )
-                for word in unique_words
-            ]
-        )
-
-        logger.info(f"--- Compute document embeddings ---")
-        # Initialize an empty list to hold document embeddings
-        self.doc_embeddings = []
-
-        # Iterate over each document to compute its embedding
-        for doc in texts:
-            doc_embedding = np.mean(
-                [
-                    word_embeddings[word_to_index[word]]
-                    for word in doc
-                    if word in word_to_index
-                ],
-                axis=0,
-            )
-            self.doc_embeddings.append(doc_embedding)
-
-        # Convert the list of document embeddings to a numpy array
-        embeddings = np.array(self.doc_embeddings)
-
-        reduced_embeddings = self.dim_reduction(logger)
-
-        if self._status != TrainingStatus.SUCCEEDED:
-            raise RuntimeError("Model has not been trained yet or failed.")
-
-        reduced_embeddings = self.reducer.transform(embeddings)
-        if proba:
-            labels = self.GMM.predict_proba(reduced_embeddings)
-        else:
-            labels = self.GMM.predict(reduced_embeddings)
-        return labels
+    def predict(self, texts):
+        pass
