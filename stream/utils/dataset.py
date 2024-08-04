@@ -107,7 +107,7 @@ class TMDataset(Dataset):
             self.load_custom_dataset_from_folder(dataset_path)
         else:
             raise ValueError(f"Dataset path {dataset_path} does not exist.")
-        self._load_data_to_dataframe()
+        # self._load_data_to_dataframe()
 
         self.info = self.get_info(dataset_path)
 

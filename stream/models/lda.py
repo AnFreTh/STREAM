@@ -135,6 +135,7 @@ class LDA(BaseModel):
         ), "The dataset must be an instance of TMDataset."
 
         check_dataset_steps(dataset, logger, MODEL_NAME)
+        self.dataset = dataset
 
         self.n_topics = n_topics
 

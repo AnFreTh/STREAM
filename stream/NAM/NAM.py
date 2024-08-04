@@ -218,10 +218,8 @@ class NeuralAdditiveModel(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        feature_outputs = [nn(x[:, i: i + 1])
-                           for i, nn in enumerate(self.feature_nns)]
-        output = torch.cat(feature_outputs, dim=1).sum(
-            dim=1, keepdim=True) + self.bias
+        feature_outputs = [nn(x[:, i : i + 1]) for i, nn in enumerate(self.feature_nns)]
+        output = torch.cat(feature_outputs, dim=1).sum(dim=1, keepdim=True) + self.bias
         return self.out_activation(output)
 
     def plot(self):
@@ -234,8 +232,7 @@ class NeuralAdditiveModel(nn.Module):
         self.eval()
         with torch.no_grad():
             if len(self.feature_nns) > 1:
-                fig, axes = plt.subplots(
-                    len(self.feature_nns), 1, figsize=(10, 7))
+                fig, axes = plt.subplots(len(self.feature_nns), 1, figsize=(10, 7))
                 for i, ax in enumerate(axes.flat):
                     component = self.feature_nns[i]
                     component.plot(ax)
@@ -256,8 +253,7 @@ class NeuralAdditiveModel(nn.Module):
         self.eval()
         with torch.no_grad():
             if len(self.feature_nns) > 1:
-                fig, axes = plt.subplots(
-                    len(self.feature_nns), 1, figsize=(10, 7))
+                fig, axes = plt.subplots(len(self.feature_nns), 1, figsize=(10, 7))
                 for i, ax in enumerate(axes.flat):
                     component = self.feature_nns[i]
                     component.plot_data(ax, x[i], y)
@@ -301,7 +297,6 @@ class DownstreamModel(pl.LightningModule):
         trained_topic_model,
         target_column,
         dataset=None,
-        structured_data=None,
         task="regression",
         batch_size=128,
         lr=0.0005,
@@ -319,12 +314,15 @@ class DownstreamModel(pl.LightningModule):
         self.loss_fn = nn.MSELoss() if task == "regression" else nn.CrossEntropyLoss()
 
         if dataset is None:
-            self.structured_data = (
-                self.trained_topic_model.dataset.get_structured_data()
-            )
+            self.structured_data = self.trained_topic_model.dataset
         else:
-            self.structured_data = dataset.get_structured_data(
-                data=structured_data)
+            self.structured_data = dataset.dataframe.copy()
+
+        # Drop the columns "text" and "tokens" if they exist
+        self.structured_data = self.structured_data.drop(
+            columns=["text", "tokens"], errors="ignore"
+        )
+
         self.target_column = target_column
 
         # Combine topic probabilities with structured data
@@ -344,8 +342,7 @@ class DownstreamModel(pl.LightningModule):
             self.metric = torchmetrics.MeanSquaredError()
         elif task == "classification":
             # Determine the number of unique target values
-            num_classes = len(
-                np.unique(self.combined_data[self.target_column]))
+            num_classes = len(np.unique(self.combined_data[self.target_column]))
             if num_classes == 2:
                 # Binary classification
                 self.metric = BinaryAccuracy()
@@ -368,18 +365,21 @@ class DownstreamModel(pl.LightningModule):
             self.structured_data
         )
 
-        # Assert that trained_topic_model has the _get_topic_document_matrix method
-        assert hasattr(
-            self.trained_topic_model, "_get_topic_document_matrix"
-        ), "trained_topic_model must have a method called _get_topic_document_matrix."
-
-        # Use _get_topic_document_matrix function to get the topic-document matrix
-        topic_document_matrix = self.trained_topic_model._get_topic_document_matrix()
+        # Check if the trained model has attribute 'theta' or method 'get_theta'
+        if hasattr(self.trained_topic_model, "theta"):
+            # Use the 'theta' attribute to get the topic-document matrix
+            topic_document_matrix = self.trained_topic_model.theta
+        elif hasattr(self.trained_topic_model, "get_theta"):
+            # Call the 'get_theta' method to get the topic-document matrix
+            topic_document_matrix = self.trained_topic_model.get_theta()
+        else:
+            raise AttributeError(
+                "The trained model does not have 'theta' attribute or 'get_theta' method."
+            )
 
         # Convert the matrix to a DataFrame and transpose it to shape (n, k)
-        topic_probabilities = pd.DataFrame(topic_document_matrix).transpose()
-        new_column_names = [f"Topic_{i}" for i in range(
-            topic_probabilities.shape[1])]
+        topic_probabilities = pd.DataFrame(topic_document_matrix)
+        new_column_names = [f"Topic_{i}" for i in range(topic_probabilities.shape[1])]
         topic_probabilities.columns = new_column_names
 
         preprocessed_structured_data = preprocessed_structured_data.reset_index(
@@ -422,8 +422,7 @@ class DownstreamModel(pl.LightningModule):
         categorical_cols = features.select_dtypes(
             include=["object", "category"]
         ).columns
-        numerical_cols = features.select_dtypes(
-            include=["int64", "float64"]).columns
+        numerical_cols = features.select_dtypes(include=["int64", "float64"]).columns
 
         transformers = []
 
@@ -443,8 +442,7 @@ class DownstreamModel(pl.LightningModule):
                     ("onehot", OneHotEncoder(handle_unknown="ignore")),
                 ]
             )
-            transformers.append(
-                ("cat", categorical_transformer, categorical_cols))
+            transformers.append(("cat", categorical_transformer, categorical_cols))
 
         preprocessor = ColumnTransformer(transformers=transformers)
 
@@ -522,6 +520,7 @@ class DownstreamModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        print(y)
         y_hat = self(x)
         loss = self.loss_fn(y_hat, y)
 
@@ -647,8 +646,7 @@ class DownstreamModel(pl.LightningModule):
         # Train-validation split
         train_size = int(0.8 * len(dataset))
         val_size = len(dataset) - train_size
-        train_dataset, val_dataset = random_split(
-            dataset, [train_size, val_size])
+        train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
         # Assign to use in dataloaders
         self.train_dataset = train_dataset
@@ -689,8 +687,7 @@ class DownstreamModel(pl.LightningModule):
         feature_names = self.get_feature_names()  # Retrieve feature names
         num_features = len(self.model.feature_nns)
 
-        fig, axs = plt.subplots(
-            num_features, 1, figsize=(10, num_features * 2))
+        fig, axs = plt.subplots(num_features, 1, figsize=(10, num_features * 2))
 
         for i, feature_nn in enumerate(self.model.feature_nns):
             ax = axs[i] if num_features > 1 else axs
