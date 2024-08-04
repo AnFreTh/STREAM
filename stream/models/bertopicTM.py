@@ -5,8 +5,8 @@ import numpy as np
 from loguru import logger
 from sklearn.preprocessing import OneHotEncoder
 
+from ..commons.check_steps import check_dataset_steps
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
-from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin

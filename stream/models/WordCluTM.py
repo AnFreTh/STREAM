@@ -6,8 +6,8 @@ from gensim.models import Word2Vec
 from loguru import logger
 from sklearn.mixture import GaussianMixture
 
+from ..commons.check_steps import check_dataset_steps
 from ..preprocessor._embedder import BaseEmbedder, GensimBackend
-from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 
@@ -133,7 +133,8 @@ class WordCluTM(BaseModel):
         )
 
         # Initialize BaseEmbedder with GensimBackend
-        self.base_embedder = BaseEmbedder(GensimBackend(self.word2vec_model.wv))
+        self.base_embedder = BaseEmbedder(
+            GensimBackend(self.word2vec_model.wv))
 
     def _clustering(self):
         """
@@ -145,7 +146,8 @@ class WordCluTM(BaseModel):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -232,7 +234,8 @@ class WordCluTM(BaseModel):
                 ]
                 # Compute the mean embedding for the document if there are valid word embeddings
                 if word_embeddings:
-                    self.doc_embeddings.append(np.mean(word_embeddings, axis=0))
+                    self.doc_embeddings.append(
+                        np.mean(word_embeddings, axis=0))
                 else:
                     # Append a zero array if no valid word embeddings are found
                     self.doc_embeddings.append(np.zeros(self.vector_size))
@@ -244,9 +247,11 @@ class WordCluTM(BaseModel):
             ]
             if len(self.doc_embeddings) > 0:
                 # Reduce the dimensionality of the document embedding
-                reduced_doc_embedding = self.reducer.transform(self.doc_embeddings)
+                reduced_doc_embedding = self.reducer.transform(
+                    self.doc_embeddings)
                 # Predict the topic distribution for the reduced document embedding
-                doc_topic_distribution = self.GMM.predict_proba(reduced_doc_embedding)
+                doc_topic_distribution = self.GMM.predict_proba(
+                    reduced_doc_embedding)
                 # Add the topic distribution to the list
                 doc_topic_distributions.append(doc_topic_distribution[0])
 

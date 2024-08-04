@@ -1,6 +1,8 @@
 import json
 import os
 
+from .load_steps import load_model_preprocessing_steps
+
 
 def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None):
     """
@@ -10,6 +12,8 @@ def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None):
     ----------
     dataset : TMDataset
         The dataset object that has been preprocessed.
+    logger : logger object from the script
+        The logger object to use for logging messages.
     model_type : str
         The model type to check the preprocessing steps for.
     preprocessing_steps : dict, optional
@@ -40,32 +44,3 @@ def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None):
                 model_type, ",\n".join(missing_steps), model_type
             )
         )
-
-
-def load_model_preprocessing_steps(model_type, filepath=None):
-    """
-    Load the default preprocessing steps from a JSON file.
-
-    Parameters
-    ----------
-    model_type : str
-        The model type to load the preprocessing steps for.
-    filepath : str
-        The path to the JSON file containing the default preprocessing steps.
-
-    Returns
-    -------
-    dict
-        The default preprocessing steps.
-    """
-    if filepath is None:
-        # Determine the absolute path based on the current file's location
-        current_dir = os.path.dirname(__file__)
-        filepath = os.path.join(
-            current_dir, "..", "preprocessor", "default_preprocessing_steps.json"
-        )
-        filepath = os.path.abspath(filepath)
-
-    with open(filepath, "r") as file:
-        all_steps = json.load(file)
-    return all_steps.get(model_type, {})
