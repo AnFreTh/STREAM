@@ -1,4 +1,5 @@
 import numpy as np
+from loguru import logger
 from sklearn.feature_extraction.text import CountVectorizer
 
 
@@ -18,7 +19,14 @@ def c_tf_idf(documents, m, ngram_range=(1, 1)):
     )
     t = count.transform(documents).toarray()
     w = t.sum(axis=1)
-    tf = np.divide(t.T, w)
+
+    # Suppress divide by zero warning
+    with np.errstate(divide='ignore', invalid='ignore'):
+        tf = np.divide(t.T, w)
+        if np.any(np.isnan(tf)) or np.any(np.isinf(tf)):
+            logger.warning("NaNs or inf in tf matrix")
+            tf[~np.isfinite(tf)] = 0
+
     sum_t = t.sum(axis=0)
     idf = np.log(np.divide(m, sum_t)).reshape(-1, 1)
     tf_idf = np.multiply(tf, idf)
