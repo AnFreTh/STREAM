@@ -6,9 +6,9 @@ from loguru import logger
 from sentence_transformers import SentenceTransformer
 from sklearn.mixture import GaussianMixture
 
+from ..commons.check_steps import check_dataset_steps
 from ..preprocessor import clean_topics
 from ..preprocessor.topic_extraction import TopicExtractor
-from ..utils.check_dataset_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
@@ -163,7 +163,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(
+                self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -237,7 +238,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(
+                dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -350,7 +352,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
         # Extract all unique words and sort them
-        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
+        all_words = set(word for topic in self.topic_dict.values()
+                        for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns
@@ -368,7 +371,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
     def suggest_hyperparameters(self, trial):
         # Suggest UMAP parameters
-        self.hparams["umap_n_neighbors"] = trial.suggest_int("umap_n_neighbors", 10, 50)
+        self.hparams["umap_n_neighbors"] = trial.suggest_int(
+            "umap_n_neighbors", 10, 50)
         self.hparams["umap_n_components"] = trial.suggest_int(
             "umap_n_components", 5, 50
         )
@@ -380,11 +384,13 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         self.hparams["gmm_covariance_type"] = trial.suggest_categorical(
             "gmm_covariance_type", ["full", "tied", "diag", "spherical"]
         )
-        self.hparams["gmm_tol"] = trial.suggest_float("gmm_tol", 1e-4, 1e-1, log=True)
+        self.hparams["gmm_tol"] = trial.suggest_float(
+            "gmm_tol", 1e-4, 1e-1, log=True)
         self.hparams["gmm_reg_covar"] = trial.suggest_float(
             "gmm_reg_covar", 1e-6, 1e-3, log=True
         )
-        self.hparams["gmm_max_iter"] = trial.suggest_int("gmm_max_iter", 100, 1000)
+        self.hparams["gmm_max_iter"] = trial.suggest_int(
+            "gmm_max_iter", 100, 1000)
         self.hparams["gmm_n_init"] = trial.suggest_int("gmm_n_init", 1, 10)
         self.hparams["gmm_init_params"] = trial.suggest_categorical(
             "gmm_init_params", ["kmeans", "random"]

@@ -1,16 +1,18 @@
-from .neural_base_models.ctmneg_base import CTMNegBase
-import numpy as np
-from loguru import logger
 from datetime import datetime
+
+import lightning as pl
+import numpy as np
+import torch
+from lightning.pytorch.callbacks import (EarlyStopping, ModelCheckpoint,
+                                         ModelSummary)
+from loguru import logger
+
+from ..commons.check_steps import check_dataset_steps
+from ..utils.datamodule import TMDataModule
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.neural_basemodel import NeuralBaseModel
-import lightning as pl
-from ..utils.check_dataset_steps import check_dataset_steps
-import torch
-from ..utils.datamodule import TMDataModule
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
-
+from .neural_base_models.ctmneg_base import CTMNegBase
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "CTMNeg"
@@ -181,7 +183,8 @@ class CTMNeg(BaseModel):
             )
             self.dataframe = dataset.dataframe
         else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
+            logger.info(
+                f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -364,7 +367,8 @@ class CTMNeg(BaseModel):
         }
 
         self.theta = (
-            self.model.model.get_theta(data, only_theta=True).detach().cpu().numpy()
+            self.model.model.get_theta(
+                data, only_theta=True).detach().cpu().numpy()
         )
 
         self.theta = self.theta / self.theta.sum(axis=1, keepdims=True)
@@ -394,7 +398,8 @@ class CTMNeg(BaseModel):
         topic_word_dict = {}
         for topic_idx, topic_dist in enumerate(self.beta):
             top_word_indices = topic_dist.argsort()[-num_words:][::-1]
-            top_words_probs = [(vocab[i], topic_dist[i]) for i in top_word_indices]
+            top_words_probs = [(vocab[i], topic_dist[i])
+                               for i in top_word_indices]
             topic_word_dict[topic_idx] = top_words_probs
         return topic_word_dict
 
