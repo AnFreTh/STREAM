@@ -171,7 +171,7 @@ examples/lightning_logs/
 __pycache__/
 *.pyc
 *.pyo
-*.json
+# *.json # for default preprocessing steps
 model_head.pkl
 model.safetensors
 vocab.txt
