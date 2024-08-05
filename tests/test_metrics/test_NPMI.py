@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from stream.metrics.coherence_metrics import NPMI
-from stream.utils.dataset import TMDataset
+from stream_topic.metrics.coherence_metrics import NPMI
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestNPMI(unittest.TestCase):
