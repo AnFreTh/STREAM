@@ -158,8 +158,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             )
             self.dataframe = dataset.dataframe
         else:
-            logger.info(
-                f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
+            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
             self.embeddings = self.encode_documents(
                 dataset.texts, encoder_model=self.embedding_model_name, use_average=True
             )
@@ -182,14 +181,12 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
             logger.info("--- Creating document cluster ---")
-            self.clustering_model = KMeans(
-                n_clusters=self.n_topics, **self.kmeans_args)
+            self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
 
@@ -241,10 +238,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -256,10 +250,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             tfidf, count = c_tf_idf(
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
@@ -355,8 +347,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
 
     def suggest_hyperparameters(self, trial):
         # Suggest UMAP parameters
-        self.hparams["umap_n_neighbors"] = trial.suggest_int(
-            "umap_n_neighbors", 10, 50)
+        self.hparams["umap_n_neighbors"] = trial.suggest_int("umap_n_neighbors", 10, 50)
         self.hparams["umap_n_components"] = trial.suggest_int(
             "umap_n_components", 5, 50
         )
@@ -368,8 +359,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self.hparams["kmeans_init"] = trial.suggest_categorical(
             "kmeans_init", ["k-means++", "random"]
         )
-        self.hparams["kmeans_n_init"] = trial.suggest_int(
-            "kmeans_n_init", 10, 30)
+        self.hparams["kmeans_n_init"] = trial.suggest_int("kmeans_n_init", 10, 30)
         self.hparams["kmeans_max_iter"] = trial.suggest_int(
             "kmeans_max_iter", 100, 1000
         )
