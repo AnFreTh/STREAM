@@ -28,6 +28,17 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
 - [Available Metrics](#available-metrics)
 - [Available Datasets](#available-datasets)
 - [Usage](#usage)
+  - [Preprocessing](#preprocessing)
+  - [Model fitting](#model-fitting)
+  - [Evaluation](#evaluation)
+    - [Expressivity](#expressivity)
+    - [Intruder Accuracy (INT)](#intruder-accuracy-int)
+    - [Average Intruder Similarity (ISIM)](#average-intruder-similarity-isim)
+    - [Intruder Shift (ISH)](#intruder-shift-ish)
+  - [Hyperparameter optimization](#hyperparameter-optimization)
+  - [Visualization](#visualization)
+  - [Downstream Tasks](#downstream-tasks)
+    - [How to use](#how-to-use)
   - [Contributing and Testing New Models](#contributing-and-testing-new-models)
     - [Steps for Contributing](#steps-for-contributing)
       - [Example Model Structure](#example-model-structure)
@@ -40,6 +51,7 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
     - [TNTM](#tntm)
     - [DCTE](#dcte)
     - [CBC](#cbc)
+
 
 
 For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
@@ -55,12 +67,15 @@ Additionally, once a user fits a model that leverages document embeddings, the e
 
 Installation
 =============
-Since we are currently under review and wish to maintain anonymity, STREAM is not yet available on PyPI. To install STREAM, you can install it directly from the GitHub repository using the following command:
+stream_topic is available on PyPI. To install STREAM, you can either install it directly from the GitHub repository using the following command:
 
 ```sh
 pip install git+https://github.com/AnFreTh/STREAM.git
 ```
-
+or simply install via:
+```sh
+pip install stream_topic
+```
 Make additionally sure to download the necessary [nltk](https://www.nltk.org/) ressources, e.g. via:
 
 ```python
@@ -68,8 +83,9 @@ import nltk
 nltk.download('averaged_perceptron_tagger')
 ```
 
-Available Models
-=================
+# Available Models
+STREAM offers a variety of neural as well as non-neural topic models and we are always trying to incorporate more and new models. If you wish to incorporate your own model, or want another model incorporated please raise an issue with the required information. Currently, the following models are implemented:
+
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
     <thead>
@@ -138,7 +154,7 @@ Available Models
 
 
 # Available Metrics
-======================
+Since evaluating topic models, especially automatically, STREAM implements numerous evaluation metrics. Especially, the intruder based metrics, while they might take some time to compute, have shown great correlation with human evaluation. 
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
   <thead>
@@ -183,8 +199,8 @@ Available Models
 
 
 
-Available Datasets
-======================
+# Available Datasets
+To integrate custom datasets for modeling with STREAM, please follow the example notebook in the examples folder. For benchmarking new models, STREAM already includes the following datasets:
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
   <thead>
@@ -270,87 +286,140 @@ Available Datasets
   </tbody>
 </table>
 </div>
+If you wish yo include and publish one of your datasets directly into the package, feel free to contact us.
+
+
 
 # Usage
-To use these models, follow the steps below:
-
+To use one of the available models, follow the simple steps below:
 1. Import the necessary modules:
 
     ```python
     from stream_topic.models import KmeansTM
     from stream_topic.utils import TMDataset
     ```
-
+## Preprocessing
 2. Get your dataset and preprocess for your model:
-
     ```python
     dataset = TMDataset()
     dataset.fetch_dataset("20NewsGroup")
     dataset.preprocess(model_type="KmeansTM")
     ```
-    The specified model_type is optional and further arguments can be specified. Default steps are predefined for all included models.
+
+The specified model_type is optional and further arguments can be specified. Default steps are predefined for all included models.
+Steps like stopword removal and lemmatizing are automatically performed for models like e.g. LDA.
+
+## Model fitting
+Fitting a model from STREAM follows a simple, sklearn-like logic and every model can be fit identically.
 
 3. Choose the model you want to use and train it:
-
+   
     ```python
     model = KmeansTM()
-    model.fit(dataset)
+    model.fit(dataset, n_topics=20)
     ```
 
-4. Get the topics:
-   ```python
+Depending on the model, check the documentation for hyperparameter settings. To get the topics, simply run:
+
+1. Get the topics:
+    ```python
     topics = model.get_topics()
-    ``` 
-
-5. Evaluate the model using one of the metrics available in stream_topic such as INT or ISIM:
-
-    ```python
-    from stream_topic.metrics import ISIM, INT
-
-    metric = ISIM(dataset)
-    metric.score(topics)
     ```
 
-6. Score per topic
+## Evaluation
+
+In this section, we describe the three metrics used to evaluate topic models' performance: **Intruder Shift (ISH)**, **Intruder Accuracy (INT)**, and **Average Intruder Similarity (ISIM)**.
+
+### Expressivity
+**Expressivity**,  evaluates the meaningfulness of a topic by leveraging stopwords. Stopwords primarily serve a grammatical role and don't contribute to the document's meaning. The steps to calculate Expressivity are as follows:
+
+1. Compute vector embeddings for all stopwords and calculate their centroid embedding, ${\psi}$.
+2. For each topic, compute the weighted centroid of the top $Z$ words, normalized so that their weights sum up to 1: ${\gamma}_k = \frac{1}{Z}\sum_{i=1}^{Z} \phi_{k,i}{\omega_i}$.
+3. Calculate the cosine similarity between each topic centroid ${\gamma}_k$ and the stopword centroid ${\psi}$.
+4. The Expressivity metric is then defined as the average similarity across all $K$ topics:
+
+$$\small{EXPRS({\gamma}, {\psi}) = \frac{1}{K} \sum_{k=1}^{K} sim({\gamma}_k, {\psi})}$$
+
+Note that ${\gamma}_k$ is different from ${\mu}_k$, where the latter is the centroid of the document cluster associated with topic $t_k$. Expressivity can vary based on the chosen stopwords, allowing for domain-specific adjustments to evaluate a topic's expressivity based on a custom stopword set.
+
+This approach provides a quantifiable measure of how well a topic conveys meaningful information, distinct from grammatical structure alone.
 
 
-    ```python
-    metric.score_per_topic(topics)
-    ```
+### Intruder Accuracy (INT)
 
-7. If you want to optimize the hyperparameters, simply run:
-    ```python
-    model.optimize_and_fit(
-        dataset,
-        min_topics=2,
-        max_topics=20,
-        criterion="aic",
-        n_trials=20,
-    )
-    ```
+The **Intruder Accuracy (INT)** metric aims to improve the identification of intruder words within a topic. Here's how it works:
 
+1. Given the top Z words of a topic, randomly select an intruder word from another topic.
+2. Calculate the cosine similarity between all possible pairs of words within the set of the top Z words and the intruder word.
+3. Compute the fraction of top words for which the intruder has the least similar word embedding using the following formula:
+ 
+$$\small{INT(t_k) = \frac{1}{Z}\sum_{i=1}^Z {1}(\forall j: sim({\omega}_i, {\hat{\omega}}) < sim({\omega}_i, {\omega}_j))}$$
+
+
+INT measures how effectively the intruder word can be distinguished from the top words in a topic. A larger value is better.
+
+### Average Intruder Similarity (ISIM)
+
+The **Average Intruder Similarity (ISIM)** metric calculates the average cosine similarity between each word in a topic and an intruder word:
+$$ISIM(t_k) = \frac{1}{Z} \sum_{i=1}^{Z} sim({\omega}_i, {\hat{\omega}})$$
+
+To enhance the metrics' robustness against the specific selection of intruder words, ISH, INT, and ISIM are computed multiple times with different randomly chosen intruder words, and the results are averaged.
+
+These metrics provide insights into the performance of topic models and their ability to maintain topic coherence and diversity. A smaller value is better.
+
+### Intruder Shift (ISH)
+
+The **Intruder Shift (ISH)** metric quantifies the shift in a topic's centroid when an intruder word is substituted. This process involves the following steps:
+
+1. Compute the unweighted centroid of a topic and denote it as $\tilde{\boldsymbol{\gamma}}_i$.
+2. Randomly select a word from that topic and replace it with a randomly selected word from a different topic.
+3. Recalculate the centroid of the resulting words and denote it as $\hat{\boldsymbol{\gamma}}_i$.
+4. Calculate the ISH score for a topic by averaging the cosine similarity between $\tilde{{\gamma}}_i$ and $\hat{\boldsymbol{\gamma}}_i$ for all topics using the formula:
+5. 
+$$ISH(T) = \frac{1}{K} \sum_{i=1}^{K} sim(\tilde{{\gamma}}_i, \hat{{\gamma}}_i)$$
+A lower ISH score indicates a more coherent and diverse topic model.
+
+To evaluate your model simply use one of the metrics.
+```python
+from stream_topic.metrics import ISIM, INT, ISH,Expressivity, NPMI
+
+metric = ISIM(dataset)
+metric.score(topics)
+```
+
+Scores for each topic are available via:
+```python
+metric.score_per_topic(topics)
+```
+
+## Hyperparameter optimization
+If you want to optimize the hyperparameters, simply run:
+```python
+model.optimize_and_fit(
+    dataset,
+    min_topics=2,
+    max_topics=20,
+    criterion="aic",
+    n_trials=20,
+)
+```
+## Visualization
 You can also specify to optimize with respect to any evaluation metric from stream_topic.
-
-8. Visualize the results:
-    ```python
-    from stream.visuals import visualize_topic_model, visualize_topics
-
-    visualize_topic_model(
-        model, 
-        reduce_first=True, 
-        port=8051,
-        )
-    ```
+Visualize the results:
+```python
+from stream.visuals import visualize_topic_model,visualize_topics
+visualize_topic_model(
+    model, 
+    reduce_first=True, 
+    port=8051,
+    )
+```
 
 <p align="center">
     <img src="assets/topical_distances.png" alt="Figure Description" width="600"/>
 </p>
 
 ## Downstream Tasks
-
-<p align="center">
-    <img src="assets/stream_figure.png" alt="Figure Description" width="400"/>
-</p>
 
 The general formulation of a Neural Additive Model (NAM) can be summarized by the equation:
 
@@ -372,7 +441,7 @@ In this setup, visualizing the shape function `k` reveals the impact of a topic 
 
 Fitting a downstream model with a pre-trained topic model is straightforward using the PyTorch Trainer class. Subsequently, visualizing all shape functions can be done similarly to the approach described by Agarwal et al. (2021).
 
-## Python Example
+### How to use
 
 ```python
 from pytorch_lightning import Trainer
