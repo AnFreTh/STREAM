@@ -28,68 +28,71 @@ nltk.download('averaged_perceptron_tagger')
 
 Available Models
 =================
-<table style="margin-left:auto; margin-right:auto;">
-  <thead>
-    <tr>
-      <th><strong>Name</strong></th>
-      <th><strong>Implementation</strong></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><a href="https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf?ref=http://githubhelp.com">LDA</a></td>
-      <td>Latent Dirichlet Allocation</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/abs/2004.14914">WordCluTM</a></td>
-      <td>Tired of topic models?</td>
-    </tr>
-    <tr>
-      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">CEDC</a></td>
-      <td>Topics in the Haystack</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/pdf/2212.09422.pdf">DCTE</a></td>
-      <td>Human in the Loop</td>
-    </tr>
-    <tr>
-      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">KMeansTM</a></td>
-      <td>Simple Kmeans followed by c-tfidf</td>
-    </tr>
-    <tr>
-      <td><a href="https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54">SomTM</a></td>
-      <td>Self organizing map followed by c-tfidf</td>
-    </tr>
-    <tr>
-      <td><a href="https://ieeexplore.ieee.org/abstract/document/10066754">CBC</a></td>
-      <td>Coherence based document clustering</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/pdf/2403.03737">TNTM</a></td>
-      <td>Transformer-Representation Neural Topic Model</td>
-    </tr>
-    <tr>
-      <td><a href="https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00325/96463/Topic-Modeling-in-Embedding-Spaces">ETM</a></td>
-      <td>Topic modeling in embedding spaces</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/abs/2004.03974">CTM</a></td>
-      <td>Combined Topic Model</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/abs/2303.14951">CTMNeg</a></td>
-      <td>Contextualized Topic Models with Negative Sampling</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/abs/1703.01488">ProdLDA</a></td>
-      <td>Autoencoding Variational Inference For Topic Models</td>
-    </tr>
-    <tr>
-      <td><a href="https://arxiv.org/abs/1703.01488">NeuralLDA</a></td>
-      <td>Autoencoding Variational Inference For Topic Models</td>
-    </tr>
-  </tbody>
-</table>
+<div style="display: flex; justify-content: center;">
+  <table>
+    <thead>
+      <tr>
+        <th><strong>Name</strong></th>
+        <th><strong>Implementation</strong></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf?ref=http://githubhelp.com">LDA</a></td>
+        <td>Latent Dirichlet Allocation</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/abs/2004.14914">WordCluTM</a></td>
+        <td>Tired of topic models?</td>
+      </tr>
+      <tr>
+        <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">CEDC</a></td>
+        <td>Topics in the Haystack</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/pdf/2212.09422.pdf">DCTE</a></td>
+        <td>Human in the Loop</td>
+      </tr>
+      <tr>
+        <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">KMeansTM</a></td>
+        <td>Simple Kmeans followed by c-tfidf</td>
+      </tr>
+      <tr>
+        <td><a href="https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54">SomTM</a></td>
+        <td>Self organizing map followed by c-tfidf</td>
+      </tr>
+      <tr>
+        <td><a href="https://ieeexplore.ieee.org/abstract/document/10066754">CBC</a></td>
+        <td>Coherence based document clustering</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/pdf/2403.03737">TNTM</a></td>
+        <td>Transformer-Representation Neural Topic Model</td>
+      </tr>
+      <tr>
+        <td><a href="https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00325/96463/Topic-Modeling-in-Embedding-Spaces">ETM</a></td>
+        <td>Topic modeling in embedding spaces</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/abs/2004.03974">CTM</a></td>
+        <td>Combined Topic Model</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/abs/2303.14951">CTMNeg</a></td>
+        <td>Contextualized Topic Models with Negative Sampling</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/abs/1703.01488">ProdLDA</a></td>
+        <td>Autoencoding Variational Inference For Topic Models</td>
+      </tr>
+      <tr>
+        <td><a href="https://arxiv.org/abs/1703.01488">NeuralLDA</a></td>
+        <td>Autoencoding Variational Inference For Topic Models</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
 
 Available (Additional) Metrics
 =================
