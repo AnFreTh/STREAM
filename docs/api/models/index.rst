@@ -1,5 +1,5 @@
-stream.models
-================
+stream_topic.models
+====================
 
 This module contains various topic models such as BERTopicTM, CBC, CEDC, DCTE, KmeansTM, SOMTM, WordCluTM, and LDA.
 

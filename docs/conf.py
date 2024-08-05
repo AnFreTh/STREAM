@@ -14,10 +14,10 @@ sys.path.insert(0, os.path.abspath("../"))
 sys.path.insert(1, os.path.dirname(
     os.path.abspath("../")) + os.sep + "stream")
 
-project = "stream"
+project = "stream_topic"
 author = "Anton Frederik Thielmann"
 
-VERSION_PATH = "../stream/__version__.py"
+VERSION_PATH = "../stream_topic/__version__.py"
 with open(VERSION_PATH) as f:
     VERSION = f.readlines()[-1].split()[-1].strip("\"'")
 release = VERSION
