@@ -28,6 +28,8 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
 - [Available Metrics](#available-metrics)
 - [Available Datasets](#available-datasets)
 - [Usage](#usage)
+  - [Preprocessing](#preprocessing)
+  - [Model fitting](#model-fitting)
   - [Contributing and Testing New Models](#contributing-and-testing-new-models)
     - [Steps for Contributing](#steps-for-contributing)
       - [Example Model Structure](#example-model-structure)
@@ -55,12 +57,15 @@ Additionally, once a user fits a model that leverages document embeddings, the e
 
 Installation
 =============
-Since we are currently under review and wish to maintain anonymity, STREAM is not yet available on PyPI. To install STREAM, you can install it directly from the GitHub repository using the following command:
+stream_topic is available on PyPI. To install STREAM, you can either install it directly from the GitHub repository using the following command:
 
 ```sh
 pip install git+https://github.com/AnFreTh/STREAM.git
 ```
-
+or simply install via:
+```sh
+pip install stream_topic
+```
 Make additionally sure to download the necessary [nltk](https://www.nltk.org/) ressources, e.g. via:
 
 ```python
@@ -68,8 +73,9 @@ import nltk
 nltk.download('averaged_perceptron_tagger')
 ```
 
-Available Models
-=================
+# Available Models
+STREAM offers a variety of neural as well as non-neural topic models and we are always trying to incorporate more and new models. If you wish to incorporate your own model, or want another model incorporated please raise an issue with the required information. Currently, the following models are implemented:
+
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
     <thead>
@@ -138,7 +144,7 @@ Available Models
 
 
 # Available Metrics
-======================
+Since evaluating topic models, especially automatically, STREAM implements numerous evaluation metrics. Especially, the intruder based metrics, while they might take some time to compute, have shown great correlation with human evaluation. 
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
   <thead>
@@ -183,8 +189,8 @@ Available Models
 
 
 
-Available Datasets
-======================
+# Available Datasets
+To integrate custom datasets for modeling with STREAM, please follow the example notebook in the examples folder. For benchmarking new models, STREAM already includes the following datasets:
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
   <thead>
@@ -270,9 +276,10 @@ Available Datasets
   </tbody>
 </table>
 </div>
+If you wish yo include and publish one of your datasets directly into the package, feel free to contact us.
 
 # Usage
-To use these models, follow the steps below:
+To use one of the available models, follow the simple steps below:
 
 1. Import the necessary modules:
 
@@ -280,7 +287,7 @@ To use these models, follow the steps below:
     from stream_topic.models import KmeansTM
     from stream_topic.utils import TMDataset
     ```
-
+## Preprocessing
 2. Get your dataset and preprocess for your model:
 
     ```python
@@ -288,20 +295,27 @@ To use these models, follow the steps below:
     dataset.fetch_dataset("20NewsGroup")
     dataset.preprocess(model_type="KmeansTM")
     ```
-    The specified model_type is optional and further arguments can be specified. Default steps are predefined for all included models.
+The specified model_type is optional and further arguments can be specified. Default steps are predefined for all included models.
+Steps like stopword removal and lemmatizing are automatically performed for models like e.g. LDA.
 
+## Model fitting
+Fitting a model from STREAM follows a simple, sklearn-like logic and every model can be fit identically.
 3. Choose the model you want to use and train it:
 
     ```python
     model = KmeansTM()
-    model.fit(dataset)
+    model.fit(dataset, n_topics=20)
     ```
 
+Depending on the model, check the documentation for hyperparameter settings. To get the topics, simply run:
+
 4. Get the topics:
+   
    ```python
     topics = model.get_topics()
     ``` 
 
+## Model Evaluation
 5. Evaluate the model using one of the metrics available in stream_topic such as INT or ISIM:
 
     ```python
@@ -313,11 +327,11 @@ To use these models, follow the steps below:
 
 6. Score per topic
 
-
     ```python
     metric.score_per_topic(topics)
     ```
 
+## Hyperparameter optimization
 7. If you want to optimize the hyperparameters, simply run:
     ```python
     model.optimize_and_fit(
@@ -328,7 +342,7 @@ To use these models, follow the steps below:
         n_trials=20,
     )
     ```
-
+## Visualization
 You can also specify to optimize with respect to any evaluation metric from stream_topic.
 
 8. Visualize the results:
