@@ -16,7 +16,7 @@ REQUIRES_PYTHON = ">=3.6, <=3.11"
 
 # Load the package's verison file and its content.
 ROOT_DIR = Path(__file__).resolve().parent
-PACKAGE_DIR = ROOT_DIR / "stream"
+PACKAGE_DIR = ROOT_DIR / "stream_topic"
 
 with open(PACKAGE_DIR / "__version__.py") as f:
     VERSION = f.readlines()[-1].split()[-1].strip("\"'")
@@ -53,7 +53,7 @@ setup(
     # package_dir={"stream": "stream"},
     package_data={
         # Use '**' to include all files within subdirectories recursively
-        "stream": [
+        "stream_topic": [
             "datasets/preprocessed_datasets/**/*",
             "datasets/pre_embedded_datasets/**/*",
             "preprocessed_datasets/**/*",

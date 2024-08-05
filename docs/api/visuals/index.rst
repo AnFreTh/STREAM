@@ -1,5 +1,5 @@
-stream.visuals
-================
+stream_topic.visuals
+====================
 
 This module contains functions for topic modeling visualizations.
 

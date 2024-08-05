@@ -1,5 +1,5 @@
-stream.NAM
-================
+stream_topic.NAM
+=================
 
 This module contains NAM model for downstream tasks.
 
