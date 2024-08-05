@@ -1,6 +1,48 @@
-# STREAM
-We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
+<div align="center">
+  <img src="./docs/images/logos/STREAM_2.jpg" width="400"/>
 
+
+[![PyPI](tbd)](tbd)
+![PyPI - Downloads](tbd)
+[![docs build](https://readthedocs.org/projects/mambular/badge/?version=latest)](tbd)
+[![docs](https://img.shields.io/badge/docs-latest-blue)](tbd)
+[![open issues](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/AnFreTh/STREAM/issues)
+
+
+[📘Documentation](tbd) |
+[🛠️Installation](#installation) |
+[Models](#available-models) |
+[🤔Report Issues](https://github.com/AnFreTh/STREAM/issues)
+</div>
+
+
+# STREAM
+We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. 
+
+# Table of Contents
+- [STREAM](#stream)
+- [Table of Contents](#table-of-contents)
+      - [Speed](#speed)
+- [Installation](#installation)
+- [Available Models](#available-models)
+- [Available Metrics](#available-metrics)
+- [Available Datasets](#available-datasets)
+- [Usage](#usage)
+  - [Contributing and Testing New Models](#contributing-and-testing-new-models)
+    - [Steps for Contributing](#steps-for-contributing)
+      - [Example Model Structure](#example-model-structure)
+      - [Testing Your Model](#testing-your-model)
+      - [Validation Criteria](#validation-criteria)
+      - [Submitting Your Contribution](#submitting-your-contribution)
+- [Citation](#citation)
+    - [Paper 1 TBD](#paper-1-tbd)
+    - [Metrics and CEDC](#metrics-and-cedc)
+    - [TNTM](#tntm)
+    - [DCTE](#dcte)
+    - [CBC](#cbc)
+
+
+For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
 
 #### Speed
 Since most of STREAMs models are centered around Document embeddings, STREAM comes along with a set of pre-embedded datasets.
@@ -95,9 +137,10 @@ Available Models
 
 
 
-Available (Additional) Metrics
-=================
-<table style="margin-left:auto; margin-right:auto;">
+# Available Metrics
+======================
+<div align="center" style="width: 100%;">
+  <table style="margin: 0 auto;">
   <thead>
     <tr>
       <th><strong>Name</strong></th>
@@ -135,14 +178,15 @@ Available (Additional) Metrics
     </tr>
   </tbody>
 </table>
-
+</div>
 
 
 
 
 Available Datasets
-=================
-<table style="margin-left:auto; margin-right:auto;">
+======================
+<div align="center" style="width: 100%;">
+  <table style="margin: 0 auto;">
   <thead>
     <tr>
       <th>Name</th>
@@ -225,10 +269,9 @@ Available Datasets
     </tr>
   </tbody>
 </table>
+</div>
 
-
-## Usage
-
+# Usage
 To use these models, follow the steps below:
 
 1. Import the necessary modules:
@@ -329,7 +372,7 @@ In this setup, visualizing the shape function `k` reveals the impact of a topic 
 
 Fitting a downstream model with a pre-trained topic model is straightforward using the PyTorch Trainer class. Subsequently, visualizing all shape functions can be done similarly to the approach described by Agarwal et al. (2021).
 
-### Python Example
+## Python Example
 
 ```python
 from pytorch_lightning import Trainer
@@ -360,7 +403,7 @@ plot_downstream_model(downstream_model)
 
 We welcome contributions to enhance the functionality of our topic modeling package. To ensure your new models integrate seamlessly, please follow the guidelines and testing instructions provided below.
 
-#### Steps for Contributing
+### Steps for Contributing
 
 1. **Fork the Repository**:
    - Fork the repository to your GitHub account.
@@ -473,7 +516,7 @@ If you want to include a new model where these guidelines are not approriate ple
 
 
 
-## Citation
+# Citation
 
 If you use this project in your research, please consider citing:
 
