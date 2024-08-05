@@ -28,9 +28,6 @@ nltk.download('averaged_perceptron_tagger')
 
 Available Models
 =================
-
-<h2 style="text-align: center;">Available Models</h2>
-
 <table style="margin-left:auto; margin-right:auto;">
   <thead>
     <tr>
@@ -96,8 +93,6 @@ Available Models
 
 Available (Additional) Metrics
 =================
-<h2 style="text-align: center;">Available (Additional) Metrics</h2>
-
 <table style="margin-left:auto; margin-right:auto;">
   <thead>
     <tr>
@@ -143,9 +138,6 @@ Available (Additional) Metrics
 
 Available Datasets
 =================
-
-<h2 style="text-align: center;">Available Datasets</h2>
-
 <table style="margin-left:auto; margin-right:auto;">
   <thead>
     <tr>
