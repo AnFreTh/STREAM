@@ -1,8 +1,6 @@
 # STREAM
 We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
 
-#### Octis
-The core of the STREAM package is built on top of the [OCTIS](https://aclanthology.org/2021.eacl-demos.31.pdf) framework and allows seamless integration of all of OCTIS' multitude of models, datasets, evaluation metrics and hyperparameter optimization techniques. See the [Octis Github](https://github.com/MIND-Lab/OCTIS) repository for an overview.
 
 #### Speed
 Since most of STREAMs models are centered around Document embeddings, STREAM comes along with a set of pre-embedded datasets.
@@ -30,14 +28,21 @@ nltk.download('averaged_perceptron_tagger')
 Available Models
 =================
 
-| **Name**                                                                                                                                      | **Implementation**                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| [WordCluTM](https://arxiv.org/abs/2004.14914)                                                                                                 | Tired of topic models?                  |
-| [CEDC](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)     | Topics in the Haystack                  |
-| [DCTE](https://arxiv.org/pdf/2212.09422.pdf)                                                                                                  | Human in the Loop                       |
-| [KMeansTM](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Simple Kmeans followed by c-tfidf       |
-| [SomTM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54)                              | Self organizing map followed by c-tfidf |
-| [CBC](https://ieeexplore.ieee.org/abstract/document/10066754)                                                                                 | Coherence based document clustering     |
+| **Name**                                                                                                                                      | **Implementation**                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [LDA](https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf?ref=http://githubhelp.com)                                                      | Latent Dirichlet Allocation                         |
+| [WordCluTM](https://arxiv.org/abs/2004.14914)                                                                                                 | Tired of topic models?                              |
+| [CEDC](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)     | Topics in the Haystack                              |
+| [DCTE](https://arxiv.org/pdf/2212.09422.pdf)                                                                                                  | Human in the Loop                                   |
+| [KMeansTM](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Simple Kmeans followed by c-tfidf                   |
+| [SomTM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54)                              | Self organizing map followed by c-tfidf             |
+| [CBC](https://ieeexplore.ieee.org/abstract/document/10066754)                                                                                 | Coherence based document clustering                 |
+| [TNTM](https://arxiv.org/pdf/2403.03737)                                                                                                      | Transformer-Representation Neural Topic Model       |
+| [ETM](https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00325/96463/Topic-Modeling-in-Embedding-Spaces)                                  | Topic modeling in embedding spaces                  |
+| [CTM](https://arxiv.org/abs/2004.03974)                                                                                                       | Combined Topic Model                                |
+| [CTMNeg](https://arxiv.org/abs/2303.14951)                                                                                                    | Contextualized Topic Models with Negative Sampling  |
+| [ProdLDA](https://arxiv.org/abs/1703.01488)                                                                                                   | Autoencoding Variational Inference For Topic Models |
+| [NeuralLDA](https://arxiv.org/abs/1703.01488)                                                                                                 | Autoencoding Variational Inference For Topic Models |
 
 Available (Additional) Metrics
 =================
@@ -68,6 +73,8 @@ Available Datasets
 | Stocktwits_GME_large  | 136,138 | 80,435  | 3          | Larger Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021. |
 | Reuters               | 8,929   | 24,803  | -          | Preprocessed Reuters dataset well suited for comparing topic model outputs.                      |
 | Poliblogs             | 13,246  | 70,726  | 4          | Preprocessed Poliblogs dataset well suited for comparing topic model outputs.                    |
+| 20NewsGroup           | tbd     | tbd     | tbd        | tbd                                                                                              |
+| BBCNews               | tbd     | tbd     | tbd        | tbd                                                                                              |
 |                       |
 
 ## Usage
@@ -77,39 +84,45 @@ To use these models, follow the steps below:
 1. Import the necessary modules:
 
     ```python
-    from stream.models import CEDC, KmeansTM, DCTE
-    from stream.data_utils import TMDataset
+    from stream_topic.models import KmeansTM
+    from stream_topic.utils import TMDataset
     ```
 
-2. Get your dataset and data directory:
+2. Get your dataset and preprocess for your model:
 
     ```python
     dataset = TMDataset()
-
     dataset.fetch_dataset("20NewsGroup")
+    dataset.preprocess(model_type="KmeansTM")
     ```
+    The specified model_type is optional and further arguments can be specified. Default steps are predefined for all included models.
 
 3. Choose the model you want to use and train it:
 
     ```python
-    model = CEDC(num_topics=20)
-    output = model.train_model(dataset)
+    model = KmeansTM()
+    model.fit(dataset)
     ```
 
-4. Evaluate the model using either Octis evaluation metrics or newly defined ones such as INT or ISIM:
+4. Get the topics:
+   ```python
+    topics = model.get_topics()
+    ``` 
+
+5. Evaluate the model using either Octis evaluation metrics or newly defined ones such as INT or ISIM:
 
     ```python
     from stream.metrics import ISIM, INT
 
     metric = ISIM(dataset)
-    metric.score(output)
+    metric.score(topics)
     ```
 
-5. Score per topic
+6. Score per topic
 
 
     ```python
-    metric.score_per_topic(output)
+    metric.score_per_topic(topics)
     ```
 
 6. Visualize the results:
@@ -123,17 +136,28 @@ To use these models, follow the steps below:
         )
     ```
 
-<div style="text-align: center;">
-    <img src="assets/topical_distances.png" alt="Figure Description" width="600"/>
-</div>
+7. If you want to optimize the hyperparameters, simply run:
+    ```python
+    model.optimize_and_fit(
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="aic",
+        n_trials=100,
+    )
+    ```
 
+    You can also specify to optimize with respect to any evaluation metric from stream_topic.
+
+<p align="center">
+    <img src="assets/topical_distances.png" alt="Figure Description" width="600"/>
+</p>
 
 ## Downstream Tasks
 
-
-<div style="text-align: center;">
+<p align="center">
     <img src="assets/stream_figure.png" alt="Figure Description" width="400"/>
-</div>
+</p>
 
 The general formulation of a Neural Additive Model (NAM) can be summarized by the equation:
 
@@ -159,12 +183,12 @@ Fitting a downstream model with a pre-trained topic model is straightforward usi
 
 ```python
 from pytorch_lightning import Trainer
-from stream.NAM import DownstreamModel
+from stream_topic.NAM import DownstreamModel
 
 # Instantiate the DownstreamModel
 downstream_model = DownstreamModel(
     trained_topic_model=topic_model,
-    target_column='popularity',  # Target variable
+    target_column='target',  # Target variable
     task='regression',  # or 'classification'
     dataset=dataset,  
     batch_size=128,
@@ -176,7 +200,7 @@ trainer = Trainer(max_epochs=10)
 trainer.fit(downstream_model)
 
 # Plotting
-from stream.visuals import plot_downstream_model
+from stream_topic.visuals import plot_downstream_model
 plot_downstream_model(downstream_model)
 ```
 
@@ -296,3 +320,60 @@ Refer to the `tests/model_validation.py` script for detailed validation logic.
 We appreciate your contributions and strive to make the integration process as smooth as possible. If you encounter any issues or have questions, feel free to open an issue on GitHub. Happy coding!
 
 If you want to include a new model where these guidelines are not approriate please mark this in your review request.
+
+
+
+## Citation
+
+If you use this project in your research, please consider citing:
+
+### Paper 1 TBD
+
+```bibtex
+@article{your_paper_key1,
+  title={Your Paper Title},
+  author={Your Name and Co-Author's Name},
+  journal={Journal/Conference Name},
+  year={Year},
+  volume={Volume},
+  number={Number},
+  pages={Pages},
+  doi={link_to_doi}
+}
+```
+
+###  Metrics and CEDC
+
+```bibtex
+@article{thielmann2024topics,
+  title={Topics in the haystack: Enhancing topic quality through corpus expansion},
+  author={Thielmann, Anton and Reuter, Arik and Seifert, Quentin and Bergherr, Elisabeth and S{\"a}fken, Benjamin},
+  journal={Computational Linguistics},
+  pages={1--37},
+  year={2024},
+  publisher={MIT Press One Broadway, 12th Floor, Cambridge, Massachusetts 02142, USA~…}
+}
+```
+
+### TNTM
+
+```bibtex
+@article{reuter2024probabilistic,
+  title={Probabilistic Topic Modelling with Transformer Representations},
+  author={Reuter, Arik and Thielmann, Anton and Weisser, Christoph and S{\"a}fken, Benjamin and Kneib, Thomas},
+  journal={arXiv preprint arXiv:2403.03737},
+  year={2024}
+}
+```
+
+
+### DCTE
+
+```bibtex
+@article{thielmann2022human,
+  title={Human in the loop: How to effectively create coherent topics by manually labeling only a few documents per class},
+  author={Thielmann, Anton and Weisser, Christoph and S{\"a}fken, Benjamin},
+  journal={arXiv preprint arXiv:2212.09422},
+  year={2022}
+}
+```
