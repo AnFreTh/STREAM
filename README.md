@@ -6,9 +6,10 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
 Since most of STREAMs models are centered around Document embeddings, STREAM comes along with a set of pre-embedded datasets.
 Additionally, once a user fits a model that leverages document embeddings, the embeddings are saved and automatically loaded the next time the user wants to fit any model with the same set of embeddings.
 
-<div style="text-align: center;">
-    <img src="assets/model_plot.png" alt="Figure Description" width="600"/>
-</div>
+
+<p align="center">
+    <img src="assets/model_plot.png" alt="Figure Description" width="400"/>
+</p>
 
 Installation
 =============
@@ -28,34 +29,114 @@ nltk.download('averaged_perceptron_tagger')
 Available Models
 =================
 
-| **Name**                                                                                                                                      | **Implementation**                                  |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| [LDA](https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf?ref=http://githubhelp.com)                                                      | Latent Dirichlet Allocation                         |
-| [WordCluTM](https://arxiv.org/abs/2004.14914)                                                                                                 | Tired of topic models?                              |
-| [CEDC](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)     | Topics in the Haystack                              |
-| [DCTE](https://arxiv.org/pdf/2212.09422.pdf)                                                                                                  | Human in the Loop                                   |
-| [KMeansTM](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Simple Kmeans followed by c-tfidf                   |
-| [SomTM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54)                              | Self organizing map followed by c-tfidf             |
-| [CBC](https://ieeexplore.ieee.org/abstract/document/10066754)                                                                                 | Coherence based document clustering                 |
-| [TNTM](https://arxiv.org/pdf/2403.03737)                                                                                                      | Transformer-Representation Neural Topic Model       |
-| [ETM](https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00325/96463/Topic-Modeling-in-Embedding-Spaces)                                  | Topic modeling in embedding spaces                  |
-| [CTM](https://arxiv.org/abs/2004.03974)                                                                                                       | Combined Topic Model                                |
-| [CTMNeg](https://arxiv.org/abs/2303.14951)                                                                                                    | Contextualized Topic Models with Negative Sampling  |
-| [ProdLDA](https://arxiv.org/abs/1703.01488)                                                                                                   | Autoencoding Variational Inference For Topic Models |
-| [NeuralLDA](https://arxiv.org/abs/1703.01488)                                                                                                 | Autoencoding Variational Inference For Topic Models |
+<h2 style="text-align: center;">Available Models</h2>
+
+<table style="margin-left:auto; margin-right:auto;">
+  <thead>
+    <tr>
+      <th><strong>Name</strong></th>
+      <th><strong>Implementation</strong></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf?ref=http://githubhelp.com">LDA</a></td>
+      <td>Latent Dirichlet Allocation</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/abs/2004.14914">WordCluTM</a></td>
+      <td>Tired of topic models?</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">CEDC</a></td>
+      <td>Topics in the Haystack</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/pdf/2212.09422.pdf">DCTE</a></td>
+      <td>Human in the Loop</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">KMeansTM</a></td>
+      <td>Simple Kmeans followed by c-tfidf</td>
+    </tr>
+    <tr>
+      <td><a href="https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=b3c81b523b1f03c87192aa2abbf9ffb81a143e54">SomTM</a></td>
+      <td>Self organizing map followed by c-tfidf</td>
+    </tr>
+    <tr>
+      <td><a href="https://ieeexplore.ieee.org/abstract/document/10066754">CBC</a></td>
+      <td>Coherence based document clustering</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/pdf/2403.03737">TNTM</a></td>
+      <td>Transformer-Representation Neural Topic Model</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00325/96463/Topic-Modeling-in-Embedding-Spaces">ETM</a></td>
+      <td>Topic modeling in embedding spaces</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/abs/2004.03974">CTM</a></td>
+      <td>Combined Topic Model</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/abs/2303.14951">CTMNeg</a></td>
+      <td>Contextualized Topic Models with Negative Sampling</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/abs/1703.01488">ProdLDA</a></td>
+      <td>Autoencoding Variational Inference For Topic Models</td>
+    </tr>
+    <tr>
+      <td><a href="https://arxiv.org/abs/1703.01488">NeuralLDA</a></td>
+      <td>Autoencoding Variational Inference For Topic Models</td>
+    </tr>
+  </tbody>
+</table>
 
 Available (Additional) Metrics
 =================
+<h2 style="text-align: center;">Available (Additional) Metrics</h2>
 
-| **Name**                                                                                                                                                 | **Description**                                                                                                                                                        |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ISIM](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)                | Average cosine similarity of top words of a topic to an intruder word.                                                                                                 |
-| [INT](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)                 | For a given topic and a given intruder word, Intruder Accuracy is the fraction of top words to which the intruder has the least similar embedding among all top words. |
-| [ISH](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)                 | calculates the shift in the centroid of a topic when an intruder word is replaced.                                                                                     |
-| [Expressivity](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1)        | Cosine Distance of topics to meaningless (stopword) embedding centroid                                                                                                 |
-| [Embedding Topic Diversity](https://link.springer.com/chapter/10.1007/978-3-030-80599-9_4)                                                               | Topic diversity in the embedding space                                                                                                                                 |
-| [Embedding Coherence](https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1) | Cosine similarity between the centroid of the embeddings of the stopwords and the centroid of the topic.                                                               |
-| [NPMI](https://aclanthology.org/E14-1056.pdf)                                                                                                            | Classical NPMi coherence computed on the scource corpus.                                                                                                               |
+<table style="margin-left:auto; margin-right:auto;">
+  <thead>
+    <tr>
+      <th><strong>Name</strong></th>
+      <th><strong>Description</strong></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">ISIM</a></td>
+      <td>Average cosine similarity of top words of a topic to an intruder word.</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">INT</a></td>
+      <td>For a given topic and a given intruder word, Intruder Accuracy is the fraction of top words to which the intruder has the least similar embedding among all top words.</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">ISH</a></td>
+      <td>Calculates the shift in the centroid of a topic when an intruder word is replaced.</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">Expressivity</a></td>
+      <td>Cosine Distance of topics to meaningless (stopword) embedding centroid</td>
+    </tr>
+    <tr>
+      <td><a href="https://link.springer.com/chapter/10.1007/978-3-030-80599-9_4">Embedding Topic Diversity</a></td>
+      <td>Topic diversity in the embedding space</td>
+    </tr>
+    <tr>
+      <td><a href="https://direct.mit.edu/coli/article/doi/10.1162/coli_a_00506/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality?searchresult=1">Embedding Coherence</a></td>
+      <td>Cosine similarity between the centroid of the embeddings of the stopwords and the centroid of the topic.</td>
+    </tr>
+    <tr>
+      <td><a href="https://aclanthology.org/E14-1056.pdf">NPMI</a></td>
+      <td>Classical NPMi coherence computed on the source corpus.</td>
+    </tr>
+  </tbody>
+</table>
+
 
 
 
@@ -63,19 +144,92 @@ Available (Additional) Metrics
 Available Datasets
 =================
 
-| Name                  | # Docs  | # Words | # Features | Description                                                                                      |
-| --------------------- | ------- | ------- | ---------- | ------------------------------------------------------------------------------------------------ |
-| Spotify_most_popular  | 4,538   | 53,181  | 14         | Spotify dataset comprised of popular song lyrics and various tabular features.                   |
-| Spotify_least_popular | 4,374   | 111,738 | 14         | Spotify dataset comprised of less popular song lyrics and various tabular features.              |
-| Spotify               | 4,185   | 80,619  | 14         | General Spotify dataset with song lyrics and various tabular features.                           |
-| Reddit_GME            | 21,549  | 21,309  | 6          | Reddit dataset filtered for "Gamestop" (GME) from the Subreddit "r/wallstreetbets".              |
-| Stocktwits_GME        | 11,114  | 19,383  | 3          | Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.        |
-| Stocktwits_GME_large  | 136,138 | 80,435  | 3          | Larger Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021. |
-| Reuters               | 8,929   | 24,803  | -          | Preprocessed Reuters dataset well suited for comparing topic model outputs.                      |
-| Poliblogs             | 13,246  | 70,726  | 4          | Preprocessed Poliblogs dataset well suited for comparing topic model outputs.                    |
-| 20NewsGroup           | tbd     | tbd     | tbd        | tbd                                                                                              |
-| BBCNews               | tbd     | tbd     | tbd        | tbd                                                                                              |
-|                       |
+<h2 style="text-align: center;">Available Datasets</h2>
+
+<table style="margin-left:auto; margin-right:auto;">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th># Docs</th>
+      <th># Words</th>
+      <th># Features</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Spotify_most_popular</td>
+      <td>4,538</td>
+      <td>53,181</td>
+      <td>14</td>
+      <td>Spotify dataset comprised of popular song lyrics and various tabular features.</td>
+    </tr>
+    <tr>
+      <td>Spotify_least_popular</td>
+      <td>4,374</td>
+      <td>111,738</td>
+      <td>14</td>
+      <td>Spotify dataset comprised of less popular song lyrics and various tabular features.</td>
+    </tr>
+    <tr>
+      <td>Spotify</td>
+      <td>4,185</td>
+      <td>80,619</td>
+      <td>14</td>
+      <td>General Spotify dataset with song lyrics and various tabular features.</td>
+    </tr>
+    <tr>
+      <td>Reddit_GME</td>
+      <td>21,549</td>
+      <td>21,309</td>
+      <td>6</td>
+      <td>Reddit dataset filtered for "Gamestop" (GME) from the Subreddit "r/wallstreetbets".</td>
+    </tr>
+    <tr>
+      <td>Stocktwits_GME</td>
+      <td>11,114</td>
+      <td>19,383</td>
+      <td>3</td>
+      <td>Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.</td>
+    </tr>
+    <tr>
+      <td>Stocktwits_GME_large</td>
+      <td>136,138</td>
+      <td>80,435</td>
+      <td>3</td>
+      <td>Larger Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.</td>
+    </tr>
+    <tr>
+      <td>Reuters</td>
+      <td>8,929</td>
+      <td>24,803</td>
+      <td>-</td>
+      <td>Preprocessed Reuters dataset well suited for comparing topic model outputs.</td>
+    </tr>
+    <tr>
+      <td>Poliblogs</td>
+      <td>13,246</td>
+      <td>70,726</td>
+      <td>4</td>
+      <td>Preprocessed Poliblogs dataset well suited for comparing topic model outputs.</td>
+    </tr>
+    <tr>
+      <td>20NewsGroup</td>
+      <td>tbd</td>
+      <td>tbd</td>
+      <td>tbd</td>
+      <td>tbd</td>
+    </tr>
+    <tr>
+      <td>BBCNews</td>
+      <td>tbd</td>
+      <td>tbd</td>
+      <td>tbd</td>
+      <td>tbd</td>
+    </tr>
+  </tbody>
+</table>
+
 
 ## Usage
 
@@ -109,10 +263,10 @@ To use these models, follow the steps below:
     topics = model.get_topics()
     ``` 
 
-5. Evaluate the model using either Octis evaluation metrics or newly defined ones such as INT or ISIM:
+5. Evaluate the model using one of the metrics available in stream_topic such as INT or ISIM:
 
     ```python
-    from stream.metrics import ISIM, INT
+    from stream_topic.metrics import ISIM, INT
 
     metric = ISIM(dataset)
     metric.score(topics)
@@ -125,7 +279,20 @@ To use these models, follow the steps below:
     metric.score_per_topic(topics)
     ```
 
-6. Visualize the results:
+7. If you want to optimize the hyperparameters, simply run:
+    ```python
+    model.optimize_and_fit(
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="aic",
+        n_trials=20,
+    )
+    ```
+
+You can also specify to optimize with respect to any evaluation metric from stream_topic.
+
+8. Visualize the results:
     ```python
     from stream.visuals import visualize_topic_model, visualize_topics
 
@@ -135,19 +302,6 @@ To use these models, follow the steps below:
         port=8051,
         )
     ```
-
-7. If you want to optimize the hyperparameters, simply run:
-    ```python
-    model.optimize_and_fit(
-        dataset,
-        min_topics=2,
-        max_topics=20,
-        criterion="aic",
-        n_trials=100,
-    )
-    ```
-
-    You can also specify to optimize with respect to any evaluation metric from stream_topic.
 
 <p align="center">
     <img src="assets/topical_distances.png" alt="Figure Description" width="600"/>
@@ -370,10 +524,38 @@ If you use this project in your research, please consider citing:
 ### DCTE
 
 ```bibtex
-@article{thielmann2022human,
-  title={Human in the loop: How to effectively create coherent topics by manually labeling only a few documents per class},
-  author={Thielmann, Anton and Weisser, Christoph and S{\"a}fken, Benjamin},
-  journal={arXiv preprint arXiv:2212.09422},
-  year={2022}
+@inproceedings{thielmann2024human,
+  title={Human in the Loop: How to Effectively Create Coherent Topics by Manually Labeling Only a Few Documents per Class},
+  author={Thielmann, Anton F and Weisser, Christoph and S{\"a}fken, Benjamin},
+  booktitle={Proceedings of the 2024 Joint International Conference on Computational Linguistics, Language Resources and Evaluation (LREC-COLING 2024)},
+  pages={8395--8405},
+  year={2024}
+}
+```
+
+### CBC
+
+```bibtex
+@inproceedings{thielmann2023coherence,
+  title={Coherence based document clustering},
+  author={Thielmann, Anton and Weisser, Christoph and Kneib, Thomas and S{\"a}fken, Benjamin},
+  booktitle={2023 IEEE 17th International Conference on Semantic Computing (ICSC)},
+  pages={9--16},
+  year={2023},
+  organization={IEEE}
+
+```
+
+If you use one of the Reddit or GME datasets, consider citing:
+```bibtex
+@article{kant2024one,
+  title={One-way ticket to the moon? An NLP-based insight on the phenomenon of small-scale neo-broker trading},
+  author={Kant, Gillian and Zhelyazkov, Ivan and Thielmann, Anton and Weisser, Christoph and Schlee, Michael and Ehrling, Christoph and S{\"a}fken, Benjamin and Kneib, Thomas},
+  journal={Social Network Analysis and Mining},
+  volume={14},
+  number={1},
+  pages={121},
+  year={2024},
+  publisher={Springer}
 }
 ```
