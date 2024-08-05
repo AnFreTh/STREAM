@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from stream.models.DCTE import DCTE
-from stream.utils.dataset import TMDataset
+from stream_topic.models.DCTE import DCTE
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestDCTE(unittest.TestCase):

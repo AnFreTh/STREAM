@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from stream.metrics.diversity_metrics import Embedding_Topic_Diversity
-from stream.utils.dataset import TMDataset
+from stream_topic.metrics.diversity_metrics import Embedding_Topic_Diversity
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestEmbeddingTopicDiversity(unittest.TestCase):
