@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from stream.metrics.intruder_metrics import ISIM
-from stream.utils.dataset import TMDataset
+from stream_topic.metrics.intruder_metrics import ISIM
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestISIM(unittest.TestCase):
