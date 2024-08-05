@@ -333,14 +333,14 @@ In this section, we describe the three metrics used to evaluate topic models' pe
 ### Expressivity
 **Expressivity**,  evaluates the meaningfulness of a topic by leveraging stopwords. Stopwords primarily serve a grammatical role and don't contribute to the document's meaning. The steps to calculate Expressivity are as follows:
 
-1. Compute vector embeddings for all stopwords and calculate their centroid embedding, $\bm{\psi}$.
-2. For each topic, compute the weighted centroid of the top $Z$ words, normalized so that their weights sum up to 1: $\bm{\gamma}_k = \frac{1}{Z}\sum_{i=1}^{Z} \phi_{k,i}\bm{\omega_i}$.
-3. Calculate the cosine similarity between each topic centroid $\bm{\gamma}_k$ and the stopword centroid $\bm{\psi}$.
+1. Compute vector embeddings for all stopwords and calculate their centroid embedding, ${\psi}$.
+2. For each topic, compute the weighted centroid of the top $Z$ words, normalized so that their weights sum up to 1: ${\gamma}_k = \frac{1}{Z}\sum_{i=1}^{Z} \phi_{k,i}{\omega_i}$.
+3. Calculate the cosine similarity between each topic centroid ${\gamma}_k$ and the stopword centroid ${\psi}$.
 4. The Expressivity metric is then defined as the average similarity across all $K$ topics:
 
-$$\small{EXPRS(\bm{\gamma}, \bm{\psi}) = \frac{1}{K} \sum_{k=1}^{K} sim(\bm{\gamma}_k, \bm{\psi})}$$
+$$\small{EXPRS({\gamma}, {\psi}) = \frac{1}{K} \sum_{k=1}^{K} sim({\gamma}_k, {\psi})}$$
 
-Note that $\bm{\gamma}_k$ is different from $\bm{\mu}_k$, where the latter is the centroid of the document cluster associated with topic $t_k$. Expressivity can vary based on the chosen stopwords, allowing for domain-specific adjustments to evaluate a topic's expressivity based on a custom stopword set.
+Note that ${\gamma}_k$ is different from ${\mu}_k$, where the latter is the centroid of the document cluster associated with topic $t_k$. Expressivity can vary based on the chosen stopwords, allowing for domain-specific adjustments to evaluate a topic's expressivity based on a custom stopword set.
 
 This approach provides a quantifiable measure of how well a topic conveys meaningful information, distinct from grammatical structure alone.
 
@@ -353,7 +353,7 @@ The **Intruder Accuracy (INT)** metric aims to improve the identification of int
 2. Calculate the cosine similarity between all possible pairs of words within the set of the top Z words and the intruder word.
 3. Compute the fraction of top words for which the intruder has the least similar word embedding using the following formula:
  
-$$\small{INT(t_k) = \frac{1}{Z}\sum_{i=1}^Z {1}(\forall j: sim(\bm{\omega}_i, \bm{\hat{\omega}}) < sim(\bm{\omega}_i, \bm{\omega}_j))}$$
+$$\small{INT(t_k) = \frac{1}{Z}\sum_{i=1}^Z {1}(\forall j: sim({\omega}_i, {\hat{\omega}}) < sim({\omega}_i, {\omega}_j))}$$
 
 
 INT measures how effectively the intruder word can be distinguished from the top words in a topic. A larger value is better.
@@ -361,7 +361,7 @@ INT measures how effectively the intruder word can be distinguished from the top
 ### Average Intruder Similarity (ISIM)
 
 The **Average Intruder Similarity (ISIM)** metric calculates the average cosine similarity between each word in a topic and an intruder word:
-$$ISIM(t_k) = \frac{1}{Z} \sum_{i=1}^{Z} sim(\bm{\omega}_i, \bm{\hat{\omega}})$$
+$$ISIM(t_k) = \frac{1}{Z} \sum_{i=1}^{Z} sim({\omega}_i, {\hat{\omega}})$$
 
 To enhance the metrics' robustness against the specific selection of intruder words, ISH, INT, and ISIM are computed multiple times with different randomly chosen intruder words, and the results are averaged.
 
@@ -374,9 +374,9 @@ The **Intruder Shift (ISH)** metric quantifies the shift in a topic's centroid w
 1. Compute the unweighted centroid of a topic and denote it as $\tilde{\boldsymbol{\gamma}}_i$.
 2. Randomly select a word from that topic and replace it with a randomly selected word from a different topic.
 3. Recalculate the centroid of the resulting words and denote it as $\hat{\boldsymbol{\gamma}}_i$.
-4. Calculate the ISH score for a topic by averaging the cosine similarity between $\tilde{\bm{\gamma}}_i$ and $\hat{\boldsymbol{\gamma}}_i$ for all topics using the formula:
+4. Calculate the ISH score for a topic by averaging the cosine similarity between $\tilde{{\gamma}}_i$ and $\hat{\boldsymbol{\gamma}}_i$ for all topics using the formula:
 5. 
-$$ISH(T) = \frac{1}{K} \sum_{i=1}^{K} sim(\tilde{\bm{\gamma}}_i, \hat{\bm{\gamma}}_i)$$
+$$ISH(T) = \frac{1}{K} \sum_{i=1}^{K} sim(\tilde{{\gamma}}_i, \hat{{\gamma}}_i)$$
 A lower ISH score indicates a more coherent and diverse topic model.
 
 To evaluate your model simply use one of the metrics.
