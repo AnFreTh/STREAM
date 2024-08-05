@@ -1,7 +1,9 @@
 import inspect
+
 import numpy as np
-from stream.utils import TMDataset
-from stream.models.abstract_helper_models.base import TrainingStatus
+
+from stream_topic.models.abstract_helper_models.base import TrainingStatus
+from stream_topic.utils import TMDataset
 
 
 class ModelLoggerValidator:
