@@ -28,8 +28,8 @@ nltk.download('averaged_perceptron_tagger')
 
 Available Models
 =================
-<div style="display: flex; justify-content: center;">
-  <table>
+<div align="center" style="width: 100%;">
+  <table style="margin: 0 auto;">
     <thead>
       <tr>
         <th><strong>Name</strong></th>
@@ -92,6 +92,7 @@ Available Models
     </tbody>
   </table>
 </div>
+
 
 
 Available (Additional) Metrics
