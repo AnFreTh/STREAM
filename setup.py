@@ -6,7 +6,7 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 # Package meta-data.
-NAME = "stream"
+NAME = "stream_topic"
 DESCRIPTION = "A python package for expanded topic modeling and metrics"
 HOMEPAGE = "https://github.com/AnFreTh/STREAM"
 DOCS = "https://stream.readthedocs.io/en/"
