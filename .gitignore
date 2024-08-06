@@ -171,10 +171,14 @@ examples/lightning_logs/
 __pycache__/
 *.pyc
 *.pyo
-*.json
+# *.json # for default preprocessing steps
 model_head.pkl
 model.safetensors
 vocab.txt
 
 # Ignore the following directories
 dev/*
+post-checkout
+post-commit
+post-merge
+pre-push

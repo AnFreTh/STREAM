@@ -3,7 +3,7 @@ sphinx-autodoc-typehints==1.23.0
 numpydoc==1.7.0
 nbsphinx==0.9.4
 ipython
-myst-parser==3.0.1
+# myst-parser==3.0.1
 myst_nb
 m2r2==0.3.3.post2
 sphinx-copybutton==0.5.2
@@ -16,6 +16,6 @@ pydata-sphinx-theme==0.15.2
 sphinx-design
 ipykernel
 jupytext
+myst_nb
 
 # notebooks
-einops
