@@ -124,6 +124,9 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         if random_state is not None:
             self.umap_args["random_state"] = random_state
 
+        self.hparams["umap_args"] = self.umap_args
+        self.hparams["gmm_args"] = self.gmm_args
+
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
         self.save_embeddings = save_embeddings
@@ -163,8 +166,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -238,8 +240,8 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe = self.dataset.dataframe
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -352,8 +354,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         assert hasattr(self, "topic_dict"), "Model has no topic_dict."
 
         # Extract all unique words and sort them
-        all_words = set(word for topic in self.topic_dict.values()
-                        for word, _ in topic)
+        all_words = set(word for topic in self.topic_dict.values() for word, _ in topic)
         sorted_words = sorted(all_words)
 
         # Create an empty DataFrame with sorted words as rows and topics as columns
@@ -371,30 +372,34 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
     def suggest_hyperparameters(self, trial):
         # Suggest UMAP parameters
-        self.hparams["umap_n_neighbors"] = trial.suggest_int(
-            "umap_n_neighbors", 10, 50)
-        self.hparams["umap_n_components"] = trial.suggest_int(
-            "umap_n_components", 5, 50
+        self.hparams["umap_args"]["n_neighbors"] = trial.suggest_int(
+            "n_neighbors", 10, 50
         )
-        self.hparams["umap_metric"] = trial.suggest_categorical(
-            "umap_metric", ["cosine", "euclidean"]
+        self.hparams["umap_args"]["n_components"] = trial.suggest_int(
+            "n_components", 5, 50
+        )
+        self.hparams["umap_args"]["metric"] = trial.suggest_categorical(
+            "metric", ["cosine", "euclidean"]
         )
 
         # Suggest GMM parameters
-        self.hparams["gmm_covariance_type"] = trial.suggest_categorical(
-            "gmm_covariance_type", ["full", "tied", "diag", "spherical"]
+        self.hparams["gmm_args"]["covariance_type"] = trial.suggest_categorical(
+            "covariance_type", ["full", "tied", "diag", "spherical"]
         )
-        self.hparams["gmm_tol"] = trial.suggest_float(
-            "gmm_tol", 1e-4, 1e-1, log=True)
-        self.hparams["gmm_reg_covar"] = trial.suggest_float(
-            "gmm_reg_covar", 1e-6, 1e-3, log=True
+        self.hparams["gmm_args"]["tol"] = trial.suggest_float(
+            "tol", 1e-4, 1e-1, log=True
         )
-        self.hparams["gmm_max_iter"] = trial.suggest_int(
-            "gmm_max_iter", 100, 1000)
-        self.hparams["gmm_n_init"] = trial.suggest_int("gmm_n_init", 1, 10)
-        self.hparams["gmm_init_params"] = trial.suggest_categorical(
-            "gmm_init_params", ["kmeans", "random"]
+        self.hparams["gmm_args"]["reg_covar"] = trial.suggest_float(
+            "reg_covar", 1e-6, 1e-3, log=True
         )
+        self.hparams["gmm_args"]["max_iter"] = trial.suggest_int("max_iter", 100, 1000)
+        self.hparams["gmm_args"]["n_init"] = trial.suggest_int("n_init", 1, 10)
+        self.hparams["gmm_args"]["init_params"] = trial.suggest_categorical(
+            "init_params", ["kmeans", "random"]
+        )
+
+        self.umap_args = self.hparams.get("umap_args")
+        self.gmmargs = self.hparams.get("gmm_args")
 
     def optimize_and_fit(
         self,

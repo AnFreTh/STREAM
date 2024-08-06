@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-#from ..utils.check_dataset_steps import check_dataset_steps
+# from ..utils.check_dataset_steps import check_dataset_steps
 import umap
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 from loguru import logger
@@ -24,7 +24,9 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "TNTM"
 # logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 SENTENCE_EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-WORD_EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2" # use this model for word embeddings for now
+WORD_EMBEDDING_MODEL_NAME = (
+    "paraphrase-MiniLM-L3-v2"  # use this model for word embeddings for now
+)
 
 
 class TNTM(BaseModel):
@@ -34,10 +36,10 @@ class TNTM(BaseModel):
         word_embeddings_folder_path: str = None,
         word_embeddings_file_path: str = None,
         save_word_embeddings: bool = False,
-        sentence_embedding_model_name: str = SENTENCE_EMBEDDING_MODEL_NAME,
-        sentence_embeddings_folder_path: str = None,
-        sentence_embeddings_file_path: str = None,
-        save_sentence_embeddings: bool = False,
+        embedding_model_name: str = SENTENCE_EMBEDDING_MODEL_NAME,
+        embeddings_folder_path: str = None,
+        embeddings_file_path: str = None,
+        save_embeddings: bool = False,
         encoder_dim=128,
         dropout=0.1,
         inference_type="combined",
@@ -69,10 +71,7 @@ class TNTM(BaseModel):
                 "word_embeddings_folder_path",
                 "word_embeddings_file_path",
                 "save_word_embeddings",
-                "sentence_embedding_model_name",
-                "sentence_embeddings_folder_path",
-                "sentence_embeddings_file_path",
-                "save_sentence_embeddings",
+                "save_embeddings",
                 "random_state",
             ]
         )
@@ -81,16 +80,16 @@ class TNTM(BaseModel):
             "word_embedding_model_name", word_embedding_model_name
         )
 
-        self.sentence_embedding_model_name = self.hparams.get(
-            "sentence_embedding_model_name", sentence_embedding_model_name
+        self.embedding_model_name = self.hparams.get(
+            "embedding_model_name", embedding_model_name
         )
         self.word_embeddings_path = word_embeddings_folder_path
         self.word_embeddings_file_path = word_embeddings_file_path
         self.save_word_embeddings = save_word_embeddings
 
-        self.sentence_embeddings_path = sentence_embeddings_folder_path
-        self.sentence_embeddings_file_path = sentence_embeddings_file_path
-        self.save_sentence_embeddings = save_sentence_embeddings
+        self.embeddings_path = embeddings_folder_path
+        self.embeddings_file_path = embeddings_file_path
+        self.save_embeddings = save_embeddings
 
         self.n_topics = None
 
@@ -130,12 +129,12 @@ class TNTM(BaseModel):
         return info
 
     def _reduce_dimensionality_and_cluster_for_initialization(
-            self,
-            word_embeddings: torch.Tensor,
-            n_topics: int,
-            umap_n_neighbors: int = 15,
-            umap_min_dist: float = 0.01,
-            umap_n_dims: int = 11
+        self,
+        word_embeddings: torch.Tensor,
+        n_topics: int,
+        umap_n_neighbors: int = 15,
+        umap_min_dist: float = 0.01,
+        umap_n_dims: int = 11,
     ):
         """
         Reduce the dimensionality of the word embeddings and cluster them to initialize the model.
@@ -167,24 +166,30 @@ class TNTM(BaseModel):
         word_embedding_list = [value for key, value in word_embeddings.items()]
         word_embeding_array = torch.stack(word_embedding_list)
 
-        umap_model = umap.UMAP(n_components=umap_n_dims, metric = 'cosine', n_neighbors=umap_n_neighbors, min_dist=umap_min_dist)
+        umap_model = umap.UMAP(
+            n_components=umap_n_dims,
+            metric="cosine",
+            n_neighbors=umap_n_neighbors,
+            min_dist=umap_min_dist,
+        )
         proj_embeddings = umap_model.fit_transform(word_embeding_array)
         proj_embeddings = proj_embeddings
 
-        gmm_model = GaussianMixture(n_components=n_topics,covariance_type='full')
+        gmm_model = GaussianMixture(n_components=n_topics, covariance_type="full")
         gmm_model.fit(proj_embeddings)
 
         mus_init = torch.tensor(gmm_model.means_)
         sigmas_init = torch.tensor(gmm_model.covariances_)
 
         L_lower_init = torch.linalg.cholesky(sigmas_init)
-        log_diag_init = torch.log(torch.ones(n_topics, umap_n_dims)*1e-4)  # initialize diag = (1,...,1)*eps, such that only a small value is added to the diagonal
+        log_diag_init = torch.log(
+            torch.ones(n_topics, umap_n_dims) * 1e-4
+        )  # initialize diag = (1,...,1)*eps, such that only a small value is added to the diagonal
 
         return proj_embeddings, mus_init, L_lower_init, log_diag_init
 
-
     def _initialize_model(
-        self,**model_kwargs  # all arguments for tntm_base go into model_kwargs
+        self, **model_kwargs  # all arguments for tntm_base go into model_kwargs
     ):
         """
         Initialize the neural base model.
@@ -205,37 +210,38 @@ class TNTM(BaseModel):
             Additional keyword arguments for the model.
         """
         n_topics = self.hparams["n_topics"]
-        umap_kwargs = {name: value for name, value in model_kwargs.items() if name in ["umap_n_neighbors", "umap_min_dist", "umap_n_dims"]}
+        umap_kwargs = {
+            name: value
+            for name, value in model_kwargs.items()
+            if name in ["umap_n_neighbors", "umap_min_dist", "umap_n_dims"]
+        }
 
-        proj_embeddings, mus_init, L_lower_init, log_diag_init = self._reduce_dimensionality_and_cluster_for_initialization(
-            self.word_embeddings,
-            n_topics,
-            **umap_kwargs
+        proj_embeddings, mus_init, L_lower_init, log_diag_init = (
+            self._reduce_dimensionality_and_cluster_for_initialization(
+                self.word_embeddings, n_topics, **umap_kwargs
+            )
         )
 
-        #model_kwargs["mus_init"] = mus_init
-        #model_kwargs["L_lower_init"] = L_lower_init
-        #model_kwargs["log_diag_init"] = log_diag_init
-        #model_kwargs["word_embeddings_projected"] = proj_embeddings
+        # model_kwargs["mus_init"] = mus_init
+        # model_kwargs["L_lower_init"] = L_lower_init
+        # model_kwargs["log_diag_init"] = log_diag_init
+        # model_kwargs["word_embeddings_projected"] = proj_embeddings
 
-
-        #model_kwargs = {key: value for key, value in model_kwargs.items() if key != "dataset"}
+        # model_kwargs = {key: value for key, value in model_kwargs.items() if key != "dataset"}
 
         self.model = NeuralBaseModel(
             model_class=TNTMBase,
             dataset=self.dataset,
-            mus_init = mus_init,
-            L_lower_init = L_lower_init,
-            log_diag_init = log_diag_init,
-            word_embeddings_projected = proj_embeddings,
-
-           **{
+            mus_init=mus_init,
+            L_lower_init=L_lower_init,
+            log_diag_init=log_diag_init,
+            word_embeddings_projected=proj_embeddings,
+            **{
                 k: v
                 for k, v in self.hparams.items()
                 if k not in ["datamodule_args", "max_epochs", "factor", "model_type"]
             },
         )
-
 
     def _initialize_trainer(
         self,
@@ -297,69 +303,10 @@ class TNTM(BaseModel):
             **trainer_kwargs,
         )
 
-    def encode_documents(self, documents, encoder_model, use_average=True):
-        """
-        Encode a list of documents into sentence embeddings.
-
-        Parameters
-        ----------
-        documents : list of str
-            List of documents to encode.
-        encoder_model : str
-            Name of the sentence encoder model.
-        use_average : bool, optional
-            Whether to use the average of the embeddings, by default True.
-        """
-
-        model = SentenceTransformer(encoder_model)
-        embeddings = model.encode(documents, convert_to_tensor=True, show_progress_bar=True)
-
-        return embeddings
-
-
-    def _prepare_embeddings(self, dataset, logger):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.sentence_embedding_model_name):
-            logger.info(
-                f"--- Loading precomputed {self.sentence_embedding_model_name} sentence embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.sentence_embedding_model_name,
-                self.sentence_embeddings_path,
-                self.sentence_embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-        else:
-            logger.info(f"--- Creating {self.sentence_embedding_model_name} sentence embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.sentence_embedding_model_name, use_average=True
-            )
-            if self.sentence_embeddings_path is not None and os.path.exists(self.sentence_embeddings_path):
-                os.makedirs(self.sentence_embeddings_path)
-            if self.save_sentence_embeddings:
-                print("Saving sentence embeddings")
-                dataset.save_embeddings(
-                    embeddings = self.embeddings,
-                    embedding_model_name = self.sentence_embedding_model_name,
-                    path = self.sentence_embeddings_path,
-                    file_name = self.sentence_embeddings_file_path,
-                )
-        dataset.embeddings = self.embeddings
-
-        self.embeddings_prepared = True
-
     def _prepare_word_embeddings(self, data_module, dataset, logger):
         """
         Prepare the word embeddings for the dataset.
-        
+
         Parameters
         ----------
         data_module : TMDataModule
@@ -381,25 +328,32 @@ class TNTM(BaseModel):
             )
 
         else:
-            logger.info(f"--- Creating {self.word_embedding_model_name} word embeddings ---")
-            self.word_embeddings = dataset.get_word_embeddings(
-                model_name =  self.word_embedding_model_name,
-                vocab = data_module.vocab  # use the vocabulary from the data module
+            logger.info(
+                f"--- Creating {self.word_embedding_model_name} word embeddings ---"
             )
-            if self.save_word_embeddings and self.word_embeddings_path is not None and not os.path.exists(self.word_embeddings_path):
+            self.word_embeddings = dataset.get_word_embeddings(
+                model_name=self.word_embedding_model_name,
+                vocab=data_module.vocab,  # use the vocabulary from the data module
+            )
+            if (
+                self.save_word_embeddings
+                and self.word_embeddings_path is not None
+                and not os.path.exists(self.word_embeddings_path)
+            ):
                 os.makedirs(self.word_embeddings_path)
             if self.save_word_embeddings:
                 dataset.save_word_embeddings(
-                    word_embeddings = self.word_embeddings,
-                    model_name = self.word_embedding_model_name,
-                    path= self.word_embeddings_path,
-                    file_name= self.word_embeddings_file_path,
+                    word_embeddings=self.word_embeddings,
+                    model_name=self.word_embedding_model_name,
+                    path=self.word_embeddings_path,
+                    file_name=self.word_embeddings_file_path,
                 )
 
         self.word_embeddings_prepared = True
 
     def _initialize_datamodule(
-        self, dataset,
+        self,
+        dataset,
     ):
         """
         Initialize the data module.
@@ -507,7 +461,8 @@ class TNTM(BaseModel):
         try:
             self._status = TrainingStatus.RUNNING
             if not self.embeddings_prepared:
-                self._prepare_embeddings(dataset, logger)
+                sdataset, embeddings = self.prepare_embeddings(dataset, logger)
+                self.embeddings_prepared = True
 
             self._status = TrainingStatus.INITIALIZED
             self._initialize_datamodule(dataset=dataset)
@@ -574,7 +529,7 @@ class TNTM(BaseModel):
         self.beta = self.beta.transpose(1, 0)
         self.labels = np.array(np.argmax(self.theta, axis=1))
 
-        #self.beta = self.beta.transpose(0, 1)
+        # self.beta = self.beta.transpose(0, 1)
 
         self.topic_dict = self.get_topic_word_dict(self.data_module.vocab)
 
@@ -618,7 +573,7 @@ class TNTM(BaseModel):
         return self.model.model.get_beta().transpose(0, 1)
 
     def suggest_hyperparameters(self, trial, max_topics=100):
-        #self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)  # is already suggested in the parent class
+        # self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)  # is already suggested in the parent class
         self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
         self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
         self.hparams["inference_type"] = trial.suggest_categorical(
@@ -641,7 +596,6 @@ class TNTM(BaseModel):
         self.hparams["datamodule_args"]["batch_size"] = trial.suggest_int(
             "batch_size", 12, 512
         )
-
 
     def optimize_and_fit(
         self,

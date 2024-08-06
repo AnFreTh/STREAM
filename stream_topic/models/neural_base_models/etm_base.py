@@ -28,12 +28,13 @@ class ETMBase(nn.Module):
     def __init__(
         self,
         dataset,
-        embed_size=128,
-        n_topics=10,
-        en_units=256,
-        dropout=0.0,
+        embed_size: int = 128,
+        n_topics: int = 10,
+        encoder_dim: int = 256,
+        dropout: float = 0.1,
         pretrained_WE=None,
-        train_WE=True,
+        train_WE: bool = True,
+        encoder_activation: callable = nn.ReLU(),
     ):
         super().__init__()
 
@@ -51,15 +52,15 @@ class ETMBase(nn.Module):
         )
 
         self.encoder1 = nn.Sequential(
-            nn.Linear(vocab_size, en_units),
-            nn.ReLU(),
-            nn.Linear(en_units, en_units),
-            nn.ReLU(),
+            nn.Linear(vocab_size, encoder_dim),
+            encoder_activation,
+            nn.Linear(encoder_dim, encoder_dim),
+            encoder_activation,
             nn.Dropout(dropout),
         )
 
-        self.fc21 = nn.Linear(en_units, n_topics)
-        self.fc22 = nn.Linear(en_units, n_topics)
+        self.fc21 = nn.Linear(encoder_dim, n_topics)
+        self.fc22 = nn.Linear(encoder_dim, n_topics)
 
     def reparameterize(self, mu, logvar):
         """
