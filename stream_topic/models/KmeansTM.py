@@ -251,7 +251,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
             self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
-            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
