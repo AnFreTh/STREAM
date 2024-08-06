@@ -5,7 +5,8 @@ import pyarrow as pa
 from datasets import Dataset
 from loguru import logger
 from sentence_transformers.losses import CosineSimilarityLoss
-from setfit import SetFitModel, Trainer, TrainingArguments
+from setfit import SetFitModel,TrainingArguments
+from setfit import Trainer as SetfitTrainer
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
@@ -40,6 +41,7 @@ class DCTE(BaseModel):
     def __init__(
         self,
         model: str = EMBEDDING_MODEL_NAME,
+        **kwargs,
     ):
         """
         Initializes the DCTE model with specified number of topics, embedding model,
@@ -50,12 +52,41 @@ class DCTE(BaseModel):
                 Defaults to "all-MiniLM-L6-v2".
 
         """
+        super().__init__(use_pretrained_embeddings=True, **kwargs)
+        self.save_hyperparameters(
+            ignore=[
+                "embeddings_file_path",
+                "embeddings_folder_path",
+                "random_state",
+                "save_embeddings",
+            ]
+        )
         self.n_topics = None
 
-        self.model = SetFitModel.from_pretrained(
-            f"sentence-transformers/{model}")
-
+        self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
         self._status = TrainingStatus.NOT_STARTED
+        self.n_topics = None
+        self.embedding_model_name = self.hparams.get("embedding_model_name", model)
+
+    def get_info(self):
+        """
+        Get information about the model.
+
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including model name,
+            number of topics, embedding model name, UMAP arguments,
+            K-Means arguments, and training status.
+        """
+        info = {
+            "model_name": MODEL_NAME,
+            "num_topics": self.n_topics,
+            "embedding_model": self.embedding_model_name,
+            "trained": self._status.name,
+        }
+        return info
 
     def _prepare_data(self, val_split: float):
         """
@@ -67,84 +98,45 @@ class DCTE(BaseModel):
             self.train_dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        self.train_dataset.get_dataframe()
         self.dataframe = self.train_dataset.dataframe
 
-        self.dataframe["label"] = preprocessing.LabelEncoder().fit_transform(
-            self.dataframe["label_text"]
-        )
+        self.dataframe.rename(columns={"labels": "label"}, inplace=True)
 
         print(
             "--- a train-validation split of 0.8 to 0.2 is performed --- \n---change 'val_split' if needed"
         )
-        train_df, val_df = train_test_split(
-            self.dataframe, test_size=val_split)
+        train_df, val_df = train_test_split(self.dataframe, test_size=val_split)
 
         # convert to Huggingface dataset
         self.train_ds = Dataset(pa.Table.from_pandas(train_df))
         self.val_ds = Dataset(pa.Table.from_pandas(val_df))
 
-    def _get_topic_document_matrix(self):
-        assert (
-            self.trained
-        ), "Model must be trained before accessing the topic-document matrix."
-        # Safely get the topic-document matrix with a default value of None if not found
-        return self.output.get("topic-document-matrix", None)
-
-    def _get_topics(self, predict_df: pd.DataFrame, top_words: int):
+    def _get_topic_representation(self, predict_df: pd.DataFrame, top_words: int):
         docs_per_topic = predict_df.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
-        tfidf, count = c_tf_idf(
-            docs_per_topic["text"].values, m=len(predict_df))
-        topics = extract_tfidf_topics(
+        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
+        topic_dict = extract_tfidf_topics(
             tfidf,
             count,
             docs_per_topic,
             n=top_words,
         )
 
-        new_topics = {}
-        words_list = []
-        for k in predict_df["predictions"].unique():
-            words = [
-                word
-                for t in topics[k][0:top_words]
-                for word in t
-                if isinstance(word, str)
-            ]
-            weights = [
-                weight
-                for t in topics[k][0:top_words]
-                for weight in t
-                if isinstance(weight, float)
-            ]
-            weights = [weight / sum(weights) for weight in weights]
-            new_topics[k] = list(zip(words, weights))
-            words_list.append(words)
-
-        res_dic = {}
-        res_dic["topics"] = words_list
-        res_dic["topic-word-matrix"] = tfidf.T
-        res_dic["topic_dict"] = topics
-        one_hot_encoder = OneHotEncoder(
-            sparse=False
-        )  # Use sparse=False to get a dense array
+        one_hot_encoder = OneHotEncoder(sparse=False)
         predictions_one_hot = one_hot_encoder.fit_transform(
-            predict_df[["predictions"]])
+            predict_df[["predictions"]]
+        )
 
-        # Transpose the one-hot encoded matrix to get shape (k, n)
-        topic_document_matrix = predictions_one_hot.T
-        res_dic["topic-document-matrix"] = topic_document_matrix
+        beta = tfidf
+        theta = predictions_one_hot
 
-        return res_dic
+        return topic_dict, beta, theta
 
-    def train_model(
+    def fit(
         self,
-        train_dataset,
-        predict_dataset,
+        dataset,
         val_split: float = 0.2,
-        n_top_words: int = 10,
         **training_args,
     ):
         """
@@ -155,8 +147,7 @@ class DCTE(BaseModel):
         It then applies the trained model for prediction and extracts topics using TF-IDF.
 
         Parameters:
-            train_dataset: The dataset used for training the model.
-            predict_dataset: The dataset on which to perform prediction and topic extraction.
+            dataset: The dataset used for training the model.
             val_split (float, optional): The fraction of the training data to use as
                 validation data. Defaults to 0.2.
             top_words (int, optional): The number of top words to extract for each topic.
@@ -166,13 +157,19 @@ class DCTE(BaseModel):
             dict: A dictionary containing the extracted topics and the topic-word matrix.
         """
 
+        assert isinstance(
+            dataset, TMDataset
+        ), "The dataset must be an instance of TMDataset."
+
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+
         # Set default training arguments
         default_args = {
-            "batch_size": self.batch_size,
-            "num_epochs": self.num_epochs,
+            "batch_size": 6,
+            "num_epochs": 10,
             "evaluation_strategy": "epoch",
             "save_strategy": "epoch",
-            "num_iterations": self.num_iterations,
+            "num_iterations": 10,
             "load_best_model_at_end": True,
             "loss": CosineSimilarityLoss,
         }
@@ -183,36 +180,100 @@ class DCTE(BaseModel):
         # Use the updated arguments
         args = TrainingArguments(**default_args)
 
-        self.train_dataset = train_dataset
-        self._prepare_data(val_split=val_split)
+        self.train_dataset = dataset
+        self._status = TrainingStatus.INITIALIZED
 
-        assert hasattr(self, "train_ds") and hasattr(
-            self, "val_ds"
-        ), "The training and Validation datasets have to be processed before training"
+        try:
+            logger.info(f"--- Preparing {EMBEDDING_MODEL_NAME} Dataset ---")
+            self._prepare_data(val_split=val_split)
 
-        self.trainer = Trainer(
-            model=self.model,
-            args=args,
-            train_dataset=self.train_ds,
-            eval_dataset=self.val_ds,
-        )
+            assert hasattr(self, "train_ds") and hasattr(
+                self, "val_ds"
+            ), "The training and Validation datasets have to be processed before training"
 
-        # train
-        self.trainer.train()
-        # evaluate accuracy
-        metrics = self.trainer.evaluate()
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
+            self.trainer = SetfitTrainer(
+                model=self.model,
+                args=args,
+                train_dataset=self.train_ds,
+                eval_dataset=self.val_ds,
+            )
 
-        print("--- finished training ---")
-        print(metrics)
+            # train
+            self.trainer.train()
+            # evaluate accuracy
+            metrics = self.trainer.evaluate()
 
-        predict_df = pd.DataFrame({"tokens": predict_dataset.get_corpus()})
-        predict_df["text"] = [" ".join(words)
-                              for words in predict_df["tokens"]]
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
 
-        self.labels = self.model(predict_df["text"])
-        predict_df["predictions"] = self.labels
+        logger.info("--- Training completed successfully. ---")
+        self._status = TrainingStatus.SUCCEEDED
+        
+        return self
+    
 
-        self.output = self._get_topics(predict_df, n_top_words)
-        self.trained = True
+    def predict(self, dataset):
+        """
+        Predict topics for new documents.
 
-        return self.output
+        Parameters
+        ----------
+        dataset : TMDataset
+
+        Returns
+        -------
+        list of int
+            List of predicted topic labels.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        predict_df = pd.DataFrame({"tokens": dataset.get_corpus()})
+        predict_df["text"] = [" ".join(words) for words in predict_df["tokens"]]
+
+        labels = self.model(predict_df["text"])
+        predict_df["predictions"] = labels
+        
+        return labels
+    
+    def get_topics(self, dataset, n_words=10):
+        """
+        Retrieve the top words for each topic.
+
+        Parameters
+        ----------
+        n_words : int
+            Number of top words to retrieve for each topic.
+
+        Returns
+        -------
+        list of list of str
+            List of topics with each topic represented as a list of top words.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been trained yet.
+        """
+        predict_df = pd.DataFrame({"tokens": dataset.get_corpus()})
+        predict_df["text"] = [" ".join(words) for words in predict_df["tokens"]]
+
+        labels = self.model(predict_df["text"])
+        predict_df["predictions"] = labels
+        
+        topic_dict, beta, theta = self._get_topic_representation(predict_df, n_words)
+        if self._status != TrainingStatus.SUCCEEDED:
+            raise RuntimeError("Model has not been trained yet or failed.")
+        return [
+            [word for word, _ in topic_dict[key][:n_words]]
+            for key in topic_dict
+        ]
