@@ -12,6 +12,8 @@
    :hidden:
 
    installation
+   Datasets <notebooks/datasets>
+   
    
 
 .. toctree::
@@ -20,12 +22,12 @@
    :maxdepth: 2
    :hidden:
    
-   api/stream.models/index
-   api/stream.NAM/index
-   api/stream.metrics/index
-   api/stream.preprocessor/index
-   api/stream.visuals/index
-   api/stream.utils/index
+   api/models/index
+   api/NAM/index
+   api/metrics/index
+   api/preprocessor/index
+   api/visuals/index
+   api/utils/index
 
 
 .. toctree::
