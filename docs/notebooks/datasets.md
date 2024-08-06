@@ -11,8 +11,8 @@ kernelspec:
   name: python3
 ---
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AnFreTh/STREAM/tree/bugfixes/docs/notebooks/datasets.ipynb)
-[![Open On GitHub](https://img.shields.io/badge/Open-on%20GitHub-blue?logo=GitHub)](https://github.com/AnFreTh/STREAM/tree/bugfixes/docs/notebooks/datasets.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AnFreTh/STREAM/blob/bugfixes/docs/notebooks/datasets.ipynb)
+[![Open On GitHub](https://img.shields.io/badge/Open-on%20GitHub-blue?logo=GitHub)](https://github.com/AnFreTh/STREAM/blob/bugfixes/docs/notebooks/datasets.ipynb)
 
 # Datasets
 
@@ -62,7 +62,7 @@ dataset.get_tfidf()
 ```
 
 ```{code-cell} ipython3
-dataset.get_word_embeddings()
+# dataset.get_word_embeddings()
 ```
 
 ```{code-cell} ipython3
@@ -74,7 +74,7 @@ dataset.dataframe.head()
 ```
 
 ```{code-cell} ipython3
-dataset.texts
+dataset.texts[:2]
 ```
 
 ```{code-cell} ipython3
@@ -82,7 +82,7 @@ dataset.tokens
 ```
 
 ```{code-cell} ipython3
-dataset.labels
+dataset.labels[:5]
 ```
 
 ## Loading own dataset
