@@ -2,5 +2,5 @@ NAM
 ========
 
 
-.. autoclass:: stream.NAM.DownstreamModel
+.. autoclass:: stream_topic.NAM.DownstreamModel
     :members:

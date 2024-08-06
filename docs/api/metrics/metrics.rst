@@ -2,23 +2,23 @@ Metrics
 ========
 
 
-.. autoclass:: stream.metrics.NPMI
+.. autoclass:: stream_topic.metrics.NPMI
     :members:
 
-.. autoclass:: stream.metrics.Embedding_Coherence
+.. autoclass:: stream_topic.metrics.Embedding_Coherence
     :members:
 
-.. autoclass:: stream.metrics.Embedding_Topic_Diversity
+.. autoclass:: stream_topic.metrics.Embedding_Topic_Diversity
     :members:
 
-.. autoclass:: stream.metrics.Expressivity
+.. autoclass:: stream_topic.metrics.Expressivity
     :members:
 
-.. autoclass:: stream.metrics.INT
+.. autoclass:: stream_topic.metrics.INT
     :members:
 
-.. autoclass:: stream.metrics.ISH
+.. autoclass:: stream_topic.metrics.ISH
     :members:
 
-.. autoclass:: stream.metrics.ISIM
+.. autoclass:: stream_topic.metrics.ISIM
     :members:
