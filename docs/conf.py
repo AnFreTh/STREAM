@@ -73,7 +73,9 @@ autodoc_mock_imports = [
     "datasets",
     "setfit",
     "umap_learn",
-    "dash"
+    "dash",
+    "optuna",
+    "optuna-integration"
     ""
 
 ]
@@ -156,3 +158,16 @@ autosummary_generate = True
 # see https://github.com/numpy/numpydoc/issues/69
 
 numpydoc_show_class_members = False
+
+# -- Options for myst ----------------------------------------------
+# uncomment line below to avoid running notebooks during development
+nb_execution_mode = 'off'
+# Notebook cell execution timeout; defaults to 30.
+nb_execution_timeout = 100
+# List of patterns, relative to source directory, that match notebook
+# files that will not be executed.
+myst_enable_extensions = ['dollarmath']
+
+# raise exceptions on execution so CI can catch errors
+nb_execution_allow_errors = False
+nb_execution_raise_on_error = True
