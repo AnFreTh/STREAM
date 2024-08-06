@@ -112,8 +112,7 @@ class BaseModel(ABC):
         Parameters:
             ignore (list, optional): List of keys to ignore while saving hyperparameters. Defaults to [].
         """
-        self.hparams = {k: v for k, v in self.hparams.items()
-                        if k not in ignore}
+        self.hparams = {k: v for k, v in self.hparams.items() if k not in ignore}
         for key, value in self.hparams.items():
             setattr(self, key, value)
 
@@ -129,8 +128,7 @@ class BaseModel(ABC):
                 self.hparams = json.load(file)
         else:
             logger.error(f"Hyperparameters file not found at: {path}")
-            raise FileNotFoundError(
-                f"Hyperparameters file not found at: {path}")
+            raise FileNotFoundError(f"Hyperparameters file not found at: {path}")
 
     def get_hyperparameters(self):
         """
@@ -193,15 +191,13 @@ class BaseModel(ABC):
         assert hasattr(
             self, "embeddings"
         ), "Model has no embeddings to reduce dimensions."
-        assert hasattr(
-            self, "umap_args"), "Model has no UMAP arguments specified."
+        assert hasattr(self, "umap_args"), "Model has no UMAP arguments specified."
         try:
             logger.info("--- Reducing dimensions ---")
             self.reducer = umap.UMAP(**self.umap_args)
             reduced_embeddings = self.reducer.fit_transform(self.embeddings)
         except Exception as e:
-            raise RuntimeError(
-                f"Error in dimensionality reduction: {e}") from e
+            raise RuntimeError(f"Error in dimensionality reduction: {e}") from e
 
         return reduced_embeddings
 
@@ -239,7 +235,9 @@ class BaseModel(ABC):
                     self.embeddings_path,
                     self.embeddings_file_path,
                 )
-        return dataset.dataframe, embeddings
+
+        dataset.embeddings = embeddings
+        return dataset, embeddings
 
     def get_topics(self, n_words=10):
         """
@@ -303,8 +301,7 @@ class BaseModel(ABC):
         """
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
-        assert hasattr(
-            self, "theta"), "Model has no topic-document distribution."
+        assert hasattr(self, "theta"), "Model has no topic-document distribution."
         return self.theta
 
     @abstractmethod
@@ -369,11 +366,9 @@ class BaseModel(ABC):
             if criterion in ["aic", "bic"]:
 
                 if criterion == "aic":
-                    score = self.calculate_aic(
-                        n_topics=self.hparams["n_topics"])
+                    score = self.calculate_aic(n_topics=self.hparams["n_topics"])
                 else:
-                    score = self.calculate_bic(
-                        n_topics=self.hparams["n_topics"])
+                    score = self.calculate_bic(n_topics=self.hparams["n_topics"])
             else:
                 # Compute the custom metric score
                 topics = self.get_topics()
@@ -395,8 +390,30 @@ class BaseModel(ABC):
             f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
         )
 
-        # Update self.hparams with the best parameters
-        self.hparams.update(best_params)
+        def update_hparams(hparams, best_params):
+            activation_mapping = {
+                "Softplus": nn.Softplus(),
+                "ReLU": nn.ReLU(),
+                "LeakyReLU": nn.LeakyReLU(),
+                "Tanh": nn.Tanh(),
+            }
+            # First, update the nested dictionary parameters
+            for k, v in best_params.items():
+                if isinstance(hparams.get(k), dict) and isinstance(v, dict):
+                    update_hparams(hparams[k], v)
+
+            # Next, update the top-level parameters, skipping keys that belong to nested dictionaries
+            for k, v in best_params.items():
+                if k in hparams and isinstance(hparams[k], dict):
+                    continue
+                if not any(
+                    k in hparams.get(sub_key, {})
+                    for sub_key in hparams
+                    if isinstance(hparams[sub_key], dict)
+                ):
+                    hparams[k] = v
+
+        update_hparams(self.hparams, best_params)
         self.hparams["n_topics"] = best_n_topics
 
         self.fit(dataset, n_topics=best_n_topics)
@@ -509,7 +526,7 @@ class BaseModel(ABC):
                     for sub_key in hparams
                     if isinstance(hparams[sub_key], dict)
                 ):
-                    if k == "inference_activation" and isinstance(v, str):
+                    if "activation" in k and isinstance(v, str):
                         hparams[k] = activation_mapping[v]
                     else:
                         hparams[k] = v
