@@ -25,3 +25,18 @@ Models
 
 .. autoclass:: stream.models.LDA
     :members:
+
+.. autoclass:: stream.models.ETM
+    :members:
+
+.. autoclass:: stream.models.ProdLDA
+    :members:
+
+.. autoclass:: stream.models.CTM
+    :members:
+
+.. autoclass:: stream.models.NeuralLDA
+    :members:
+
+.. autoclass:: stream.models.CTMNeg
+    :members:
