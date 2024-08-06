@@ -11,6 +11,7 @@ from .prodlda import ProdLDA
 from .ctm import CTM
 from .neurallda import NeuralLDA
 from .ctmneg import CTMNeg
+from .tntm import TNTM
 
 __all__ = [
     "BERTopicTM",
@@ -26,4 +27,5 @@ __all__ = [
     "CTM",
     "NeuralLDA",
     "CTMNeg",
+    "TNTM",
 ]
