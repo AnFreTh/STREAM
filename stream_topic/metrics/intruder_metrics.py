@@ -5,8 +5,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from ._helper_funcs import embed_corpus, embed_topic, update_corpus_dic_list
 from .base import BaseMetric
-from .constants import (EMBEDDING_PATH, PARAPHRASE_TRANSFORMER_MODEL,
-                        SENTENCE_TRANSFORMER_MODEL)
+from .constants import (
+    EMBEDDING_PATH,
+    PARAPHRASE_TRANSFORMER_MODEL,
+    SENTENCE_TRANSFORMER_MODEL,
+)
 from .TopwordEmbeddings import TopwordEmbeddings
 
 
@@ -183,8 +186,7 @@ class ISIM(BaseMetric):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(
-                np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
@@ -207,8 +209,6 @@ class ISIM(BaseMetric):
         """
         if new_embeddings:
             self.embeddings = None
-
-        topics = topics["topics"]
 
         return float(np.mean(list(self.score_per_topic(topics).values())))
 
@@ -257,7 +257,7 @@ class INT(AbstractMetric):
         self.n_words = n_words
         self.n_intruders = n_intruders
 
-    def score_one_intr_per_topic(self, model_output, new_embeddings=True):
+    def score_one_intr_per_topic(self, topics, new_embeddings=True):
         """
         Calculates the INT score for each topic individually using only one intruder word.
 
@@ -276,7 +276,7 @@ class INT(AbstractMetric):
         """
         if new_embeddings:
             self.embeddings = None
-        topics_tw = model_output["topics"]
+        topics_tw = topics
 
         emb_tw = self.topword_embeddings.embed_topwords(
             topics_tw, n_topwords_to_use=self.n_words
@@ -322,7 +322,7 @@ class INT(AbstractMetric):
 
         return np.array(avg_sim_topic_list)
 
-    def score_one_intr(self, model_output, new_embeddings=True):
+    def score_one_intr(self, topics, new_embeddings=True):
         """
         Calculates the overall INT score for all topics combined using only one intruder word.
 
@@ -343,9 +343,9 @@ class INT(AbstractMetric):
             self.embeddings = None
         self.embeddings = None
 
-        return np.mean(self.score_one_intr_per_topic(model_output))
+        return np.mean(self.score_one_intr_per_topic(topics))
 
-    def score_per_topic(self, model_output, new_embeddings=True):
+    def score_per_topic(self, topics, new_embeddings=True):
         """
         Calculates the INT scores for each topic individually using several intruder words.
 
@@ -375,19 +375,18 @@ class INT(AbstractMetric):
         res = np.vstack(score_lis).T
 
         mean_scores = np.mean(res, axis=1)
-        ntopics = len(model_output["topics"])
-        topic_words = model_output["topics"]
+        ntopics = len(topics)
+        topic_words = topics
         results = {}
         for k in range(ntopics):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = float(
-                np.around(mean_scores[k], 5))
+            results[", ".join(half_topic_words)] = float(np.around(mean_scores[k], 5))
 
         return results  # return the mean score for each topic
 
-    def score(self, model_output, new_embeddings=True):
+    def score(self, topics, new_embeddings=True):
         """
         Calculates the overall INT score for all topics combined using several intruder words.
 
@@ -407,7 +406,7 @@ class INT(AbstractMetric):
         if new_embeddings:
             self.embeddings = None
 
-        return float(np.mean(list(self.score_per_topic(model_output).values())))
+        return float(np.mean(list(self.score_per_topic(topics).values())))
 
 
 class ISH(AbstractMetric):
@@ -455,20 +454,20 @@ class ISH(AbstractMetric):
         self.embeddings = None
         self.n_intruders = n_intruders
 
-    def score(self, model_output, new_embeddings=True):
+    def score(self, topics, new_embeddings=True):
         """
         Calculate the score for all topics combined
         """
         if new_embeddings:
             self.embeddings = None
 
-        return float(np.mean(list(self.score_per_topic(model_output).values())))
+        return float(np.mean(list(self.score_per_topic(topics).values())))
 
-    def score_per_topic(self, model_output, new_embeddings=None):
+    def score_per_topic(self, topics, new_embeddings=None):
         if new_embeddings:  # for this function, reuse embeddings per default
             self.embeddings = None
 
-        topics_tw = model_output["topics"]
+        topics_tw = topics
 
         emb_tw = self.topword_embeddings.embed_topwords(
             topics_tw, n_topwords_to_use=self.n_words
@@ -487,8 +486,7 @@ class ISH(AbstractMetric):
             intruder_words_idx_word = np.random.choice(
                 np.arange(intruder_words.shape[1]), size=1
             )  # select one intruder word from each topic
-            intruder_words = intruder_words[:,
-                                            intruder_words_idx_word, :].squeeze()
+            intruder_words = intruder_words[:, intruder_words_idx_word, :].squeeze()
 
             topic_mean = np.mean(topic, axis=0)
 
@@ -498,8 +496,8 @@ class ISH(AbstractMetric):
             score_topic_list.append(np.mean(topic_sims))
 
         results = {}
-        ntopics = len(model_output["topics"])
-        topic_words = model_output["topics"]
+        ntopics = len(topics)
+        topic_words = topics
         for k in range(ntopics):
             half_topic_words = topic_words[k][
                 : len(topic_words[k]) // 2
