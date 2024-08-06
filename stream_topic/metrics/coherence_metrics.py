@@ -303,7 +303,7 @@ class Embedding_Coherence(AbstractMetric):
 
         self.n_words = n_words
 
-    def score_per_topic(self, model_output):
+    def score_per_topic(self, topics):
         """
         Calculates coherence scores for each topic individually based on embedding similarities.
 
@@ -318,7 +318,7 @@ class Embedding_Coherence(AbstractMetric):
         -------
             numpy.ndarray: An array of coherence scores for each topic.
         """
-        topics = model_output["topics"]
+        topics = topics
         n_topics = len(topics)
         topwords_embedded = self.topword_embeddings.embed_topwords(
             topics, n_topwords_to_use=self.n_words
@@ -341,7 +341,7 @@ class Embedding_Coherence(AbstractMetric):
 
         return results
 
-    def score(self, model_output):
+    def score(self, topics):
         """
         Calculates the overall average coherence score for the given model output.
 
@@ -356,7 +356,7 @@ class Embedding_Coherence(AbstractMetric):
         -------
             float: The average coherence score for all topics.
         """
-        res = self.score_per_topic(model_output).values()
+        res = self.score_per_topic(topics).values()
         return sum(res) / len(res)
 
 

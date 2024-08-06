@@ -7,18 +7,26 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
 
-from ._helper_funcs import (cos_sim_pw, embed_corpus, embed_stopwords,
-                            embed_topic, update_corpus_dic_list)
-from .constants import (EMBEDDING_PATH, NLTK_STOPWORD_LANGUAGE,
-                        PARAPHRASE_TRANSFORMER_MODEL,
-                        SENTENCE_TRANSFORMER_MODEL)
+from ._helper_funcs import (
+    cos_sim_pw,
+    embed_corpus,
+    embed_stopwords,
+    embed_topic,
+    update_corpus_dic_list,
+)
+from .constants import (
+    EMBEDDING_PATH,
+    NLTK_STOPWORD_LANGUAGE,
+    PARAPHRASE_TRANSFORMER_MODEL,
+    SENTENCE_TRANSFORMER_MODEL,
+)
 from .TopwordEmbeddings import TopwordEmbeddings
 
 GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
 NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-STOPWORDS = list(set(list(NLTK_STOPWORDS) +
-                     list(GENSIM_STOPWORDS) +
-                     list(ENGLISH_STOP_WORDS)))
+STOPWORDS = list(
+    set(list(NLTK_STOPWORDS) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS))
+)
 
 
 class Embedding_Topic_Diversity(AbstractMetric):
@@ -60,7 +68,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         self.n_words = n_words
 
-    def score(self, model_output):
+    def score(self, topics, beta):
         """
         Calculates the overall diversity score for the given model output.
 
@@ -76,18 +84,15 @@ class Embedding_Topic_Diversity(AbstractMetric):
         -------
             float: The overall diversity score for all topics.
         """
-        topics_tw = model_output["topics"]  # size: (n_topics, voc_size)
-        topic_weights = model_output["topic-word-matrix"][
-            :, : self.n_words
-        ]  # select the weights of the top words
+        topics_tw = topics  # size: (n_topics, voc_size)
+        topic_weights = beta[:, : self.n_words]  # select the weights of the top words
 
         topic_weights = topic_weights / np.sum(topic_weights, axis=1).reshape(
             -1, 1
         )  # normalize the weights such that they sum up to one
 
         topwords_embedded = self.topword_embeddings.embed_topwords(
-            topics_tw,
-            n_topwords_to_use=self.n_words
+            topics_tw, n_topwords_to_use=self.n_words
         )
 
         weighted_vecs = (
@@ -99,7 +104,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         return float(cos_sim_pw(topic_means))
 
-    def score_per_topic(self, model_output):
+    def score_per_topic(self, topics, beta):
         """
         Calculates diversity scores for each topic individually based on embedding similarities.
 
@@ -115,8 +120,8 @@ class Embedding_Topic_Diversity(AbstractMetric):
         -------
             numpy.ndarray: An array of diversity scores for each topic.
         """
-        topics_tw = model_output["topics"]  # size: (n_topics, voc_size)
-        topic_weights = model_output["topic-word-matrix"][
+        topics_tw = topics  # size: (n_topics, voc_size)
+        topic_weights = beta[
             :, : self.n_words
         ]  # select the weights of the top words size: (n_topics, n_topwords)
 
@@ -127,8 +132,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
         )  # normalize the weights such that they sum up to one
 
         topwords_embedded = self.topword_embeddings.embed_topwords(
-            topics_tw,
-            n_topwords_to_use=self.n_words
+            topics_tw, n_topwords_to_use=self.n_words
         )
 
         weighted_vecs = (
@@ -146,12 +150,11 @@ class Embedding_Topic_Diversity(AbstractMetric):
         )  # average the similarity of each topic's mean to the mean of every other topic
 
         results = {}
-        for k in range(len(model_output["topics"])):
+        for k in range(len(topics)):
             half_topic_words = topics_tw[k][
                 : len(topics_tw[k]) // 2
             ]  # Take only the first half of the words
-            results[", ".join(half_topic_words)] = np.around(
-                np.array(sim_mean)[k], 5)
+            results[", ".join(half_topic_words)] = np.around(np.array(sim_mean)[k], 5)
 
         return results
 
@@ -208,7 +211,7 @@ class Expressivity(AbstractMetric):
             np.array(self.stopword_emb), axis=0
         )  # mean of stopword embeddings
 
-    def score(self, model_output, new_embeddings=True):
+    def score(self, topics, beta, new_embeddings=True):
         """
         Calculates the overall expressivity score for the given model output.
 
@@ -229,11 +232,10 @@ class Expressivity(AbstractMetric):
         if new_embeddings:
             self.embeddings = None
         return float(
-            np.mean(list(self.score_per_topic(
-                model_output, new_embeddings).values()))
+            np.mean(list(self.score_per_topic(topics, beta, new_embeddings).values()))
         )
 
-    def score_per_topic(self, model_output, new_embeddings=True):
+    def score_per_topic(self, topics, beta, new_embeddings=True):
         """
         Calculates expressivity scores for each topic individually based on embedding distances.
 
@@ -256,10 +258,8 @@ class Expressivity(AbstractMetric):
         # not used for now, but could be useful in the future
         # ntopics = len(model_output["topics"])
 
-        topics_tw = model_output["topics"]  # size: (n_topics, voc_size)
-        topic_weights = model_output["topic-word-matrix"][
-            :, : self.n_words
-        ]  # select the weights of the top words
+        topics_tw = topics  # size: (n_topics, voc_size)
+        topic_weights = beta[:, : self.n_words]  # select the weights of the top words
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True
@@ -268,8 +268,7 @@ class Expressivity(AbstractMetric):
         )  # normalize the weights such that they sum up to one
 
         emb_tw = self.topword_embeddings.embed_topwords(
-            topics_tw,
-            n_topwords_to_use=self.n_words
+            topics_tw, n_topwords_to_use=self.n_words
         )
 
         weighted_vecs = (
