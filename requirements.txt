@@ -29,3 +29,4 @@ loguru
 pre-commit
 optuna==3.6.1
 optuna-integration==3.6.0
+transformers==4.40.2
