@@ -403,8 +403,14 @@ class TMDataset(Dataset):
         self.dataframe = pd.DataFrame(additional_columns)
 
         # Save the dataset to Parquet format
+        if not os.path.exists(save_dir):
+            logger.info(f'Dataset save directory does not exist: {save_dir}')
+            logger.info(f"Creating directory: {save_dir}")
+            os.makedirs(save_dir)
+
         parquet_path = os.path.join(save_dir, f"{dataset_name}.parquet")
         self.dataframe.to_parquet(parquet_path)
+        logger.info(f"Dataset saved to {parquet_path}")
 
         # Save dataset information
         dataset_info = {
@@ -419,8 +425,12 @@ class TMDataset(Dataset):
         info_path = os.path.join(save_dir, f"{dataset_name}_info.pkl")
         with open(info_path, "wb") as info_file:
             pickle.dump(dataset_info, info_file)
+        logger.info(f"Dataset info saved to {info_path}")
 
-        return preprocessor
+        self.available_datasets.append(dataset_name)
+        logger.info(
+            f'Dataset name appended to avaliable datasets list: {self.available_datasets}')
+        # return preprocessor
 
     def preprocess(self, model_type=None, custom_stopwords=None, **preprocessing_steps):
         """
