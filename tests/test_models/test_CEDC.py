@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 
-from stream.models.CEDC import CEDC
-from stream.utils.dataset import TMDataset
+from stream_topic.models.CEDC import CEDC
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestCEDC(unittest.TestCase):
