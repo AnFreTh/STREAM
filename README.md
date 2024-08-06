@@ -392,6 +392,18 @@ Scores for each topic are available via:
 metric.score_per_topic(topics)
 ```
 
+To leverage one of the metrics available in [octis](https://github.com/MIND-Lab/OCTIS), simply create a model output that fits within the octis' framework
+
+```python
+model_output = {"topics": model.get_topics(), "topic-word-matrix": model.get_beta(), "topic-document-matrix": model.get_theta()}
+
+from octis.evaluation_metrics.diversity_metrics import TopicDiversity
+
+metric = TopicDiversity(topk=10) # Initialize metric
+topic_diversity_score = metric.score(model_output)
+
+```
+
 ## Hyperparameter optimization
 If you want to optimize the hyperparameters, simply run:
 ```python
