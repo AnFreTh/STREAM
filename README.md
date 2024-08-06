@@ -4,7 +4,7 @@
 
 [![PyPI](tbd)](tbd)
 ![PyPI - Downloads](tbd)
-[![docs build](https://readthedocs.org/projects/mambular/badge/?version=latest)](tbd)
+[![docs build](https://readthedocs.org/projects/stream/badge/?version=latest)](tbd)
 [![docs](https://img.shields.io/badge/docs-latest-blue)](tbd)
 [![open issues](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/AnFreTh/STREAM/issues)
 
@@ -22,7 +22,7 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
 # Table of Contents
 - [STREAM](#stream)
 - [Table of Contents](#table-of-contents)
-      - [Speed](#speed)
+    - [Speed](#speed)
 - [Installation](#installation)
 - [Available Models](#available-models)
 - [Available Metrics](#available-metrics)
@@ -406,8 +406,9 @@ model.optimize_and_fit(
 ## Visualization
 You can also specify to optimize with respect to any evaluation metric from stream_topic.
 Visualize the results:
+
 ```python
-from stream.visuals import visualize_topic_model,visualize_topics
+from stream_topic.visuals import visualize_topic_model,visualize_topics
 visualize_topic_model(
     model, 
     reduce_first=True, 
@@ -444,7 +445,7 @@ Fitting a downstream model with a pre-trained topic model is straightforward usi
 ### How to use
 
 ```python
-from pytorch_lightning import Trainer
+from lightning import Trainer
 from stream_topic.NAM import DownstreamModel
 
 # Instantiate the DownstreamModel
