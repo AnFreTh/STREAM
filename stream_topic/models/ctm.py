@@ -11,6 +11,8 @@ from ..utils.datamodule import TMDataModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 import torch.nn as nn
 from optuna.integration import PyTorchLightningPruningCallback
+from ..commons.check_steps import check_dataset_steps
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "CTM"
@@ -18,7 +20,76 @@ MODEL_NAME = "CTM"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 
 
-class CTM(BaseModel):
+class CTM(BaseModel, SentenceEncodingMixin):
+    """
+    CTM (Combined Topic Model) class.
+
+    This class initializes and configures the CTM model with the specified
+    hyperparameters and dataset. It inherits from the `BaseModel` class.
+
+    Parameters
+    ----------
+    embedding_model_name : str, optional
+        Name of the embedding model, by default EMBEDDING_MODEL_NAME.
+    embeddings_folder_path : str, optional
+        Path to the folder containing embeddings, by default None.
+    embeddings_file_path : str, optional
+        Path to the file containing embeddings, by default None.
+    save_embeddings : bool, optional
+        Whether to save embeddings after training, by default False.
+    encoder_dim : int, optional
+        Dimensionality of the encoder layer, by default 128.
+    dropout : float, optional
+        Dropout rate for the layers, by default 0.1.
+    inference_type : str, optional
+        Type of inference to use, by default "combined".
+    inference_activation : callable, optional
+        Activation function for the inference, by default `nn.Softplus()`.
+    model_type : str, optional
+        Type of the model, by default "ProdLDA".
+    rescale_loss : bool, optional
+        Whether to rescale the loss, by default False.
+    rescale_factor : float, optional
+        Factor to rescale the loss, by default 1e-2.
+    batch_size : int, optional
+        Batch size for training, by default 64.
+    val_size : float, optional
+        Proportion of the dataset to use for validation, by default 0.2.
+    shuffle : bool, optional
+        Whether to shuffle the dataset before splitting, by default True.
+    random_state : int, optional
+        Random seed for shuffling and splitting the dataset, by default 42.
+
+    Attributes
+    ----------
+    embedding_model_name : str
+        Name of the embedding model used.
+    embeddings_path : str or None
+        Path to the folder containing embeddings.
+    embeddings_file_path : str or None
+        Path to the file containing embeddings.
+    save_embeddings : bool
+        Flag indicating whether to save embeddings after training.
+    n_topics : int or None
+        Number of topics in the model, by default None.
+    _status : TrainingStatus
+        Current training status of the model, by default `TrainingStatus.NOT_STARTED`.
+    hparams : dict
+        Hyperparameters for the data module, including batch size, validation size,
+        shuffling, and random state.
+    embeddings_prepared : bool
+        Flag indicating whether embeddings have been prepared, by default False.
+    optimize : bool
+        Flag indicating whether to optimize the model, by default False.
+
+    Examples
+    --------
+    >>> ctm = CTM(embedding_model_name='bert', encoder_dim=200, dropout=0.2, batch_size=32)
+    >>> print(ctm.hparams)
+    {'datamodule_args': {'batch_size': 32, 'val_size': 0.2, 'shuffle': True, 'random_state': 42,
+                         'embeddings': True, 'bow': True, 'tf_idf': False, 'word_embeddings': False}}
+    """
+
     def __init__(
         self,
         embedding_model_name: str = EMBEDDING_MODEL_NAME,
@@ -38,14 +109,41 @@ class CTM(BaseModel):
         random_state=42,
     ):
         """
-        Initialize the ETM model.
+        Initialize the CTM model.
 
         Parameters
         ----------
-        **kwargs : dict
-            Additional keyword arguments to pass to the parent class constructor.
+        embedding_model_name : str, optional
+            Name of the embedding model, by default EMBEDDING_MODEL_NAME.
+        embeddings_folder_path : str, optional
+            Path to the folder containing embeddings, by default None.
+        embeddings_file_path : str, optional
+            Path to the file containing embeddings, by default None.
+        save_embeddings : bool, optional
+            Whether to save embeddings after training, by default False.
+        encoder_dim : int, optional
+            Dimensionality of the encoder layer, by default 128.
+        dropout : float, optional
+            Dropout rate for the layers, by default 0.1.
+        inference_type : str, optional
+            Type of inference to use, by default "combined".
+        inference_activation : callable, optional
+            Activation function for the inference, by default `nn.Softplus()`.
+        model_type : str, optional
+            Type of the model, by default "ProdLDA".
+        rescale_loss : bool, optional
+            Whether to rescale the loss, by default False.
+        rescale_factor : float, optional
+            Factor to rescale the loss, by default 1e-2.
+        batch_size : int, optional
+            Batch size for training, by default 64.
+        val_size : float, optional
+            Proportion of the dataset to use for validation, by default 0.2.
+        shuffle : bool, optional
+            Whether to shuffle the dataset before splitting, by default True.
+        random_state : int, optional
+            Random seed for shuffling and splitting the dataset, by default 42.
         """
-
         super().__init__(
             use_pretrained_embeddings=False,
             dropout=dropout,
@@ -85,6 +183,7 @@ class CTM(BaseModel):
             "bow": True,
             "tf_idf": False,
             "word_embeddings": False,
+            "embedding_model_name": self.embedding_model_name,
         }
 
         self.embeddings_prepared = False
@@ -108,26 +207,24 @@ class CTM(BaseModel):
         }
         return info
 
-    def _initialize_model(
-        self,
-    ):
+    def _initialize_model(self):
         """
         Initialize the neural base model.
 
+        This method initializes the neural base model (`NeuralBaseModel`) with the given
+        hyperparameters and dataset. It filters out certain hyperparameters that are
+        not required by the model.
+
         Parameters
         ----------
-        n_topics : int
-            Number of topics.
-        lr : float
-            Learning rate.
-        lr_patience : int
-            Patience for learning rate scheduler.
-        factor : float
-            Factor for learning rate scheduler.
-        weight_decay : float
-            Weight decay for the optimizer.
-        **model_kwargs : dict
-            Additional keyword arguments for the model.
+        self : object
+            The instance of the class that this method is a part of. This object should have
+            attributes `dataset` and `hparams`.
+
+        Attributes
+        ----------
+        model : NeuralBaseModel
+            The initialized neural base model.
         """
 
         self.model = NeuralBaseModel(
@@ -165,6 +262,8 @@ class CTM(BaseModel):
             Mode for the monitored metric (min or max).
         checkpoint_path : str
             Path to save model checkpoints.
+        trial : int, optional
+            Optuna trial for hyperparameter optimization, by default None.
         **trainer_kwargs : dict
             Additional keyword arguments for the trainer.
         """
@@ -200,10 +299,7 @@ class CTM(BaseModel):
             **trainer_kwargs,
         )
 
-    def _initialize_datamodule(
-        self,
-        dataset,
-    ):
+    def _initialize_datamodule(self, dataset):
         """
         Initialize the data module.
 
@@ -211,16 +307,6 @@ class CTM(BaseModel):
         ----------
         dataset : TMDataset
             The dataset to be used for training.
-        batch_size : int
-            Batch size for training.
-        shuffle : bool
-            Whether to shuffle the data.
-        val_size : float
-            Proportion of the dataset to use for validation.
-        random_state : int
-            Random seed for reproducibility.
-        **kwargs : dict
-            Additional keyword arguments for data preprocessing.
         """
 
         logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
@@ -241,41 +327,6 @@ class CTM(BaseModel):
         )
 
         self.dataset = dataset
-
-    def _prepare_embeddings(self, dataset):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.embedding_model_name):
-            logger.info(
-                f"--- Loading precomputed {EMBEDDING_MODEL_NAME} embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.embedding_model_name,
-                self.embeddings_path,
-                self.embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-        else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
-            )
-            if self.save_embeddings:
-                dataset.save_embeddings(
-                    self.embeddings,
-                    self.embedding_model_name,
-                    self.embeddings_path,
-                    self.embeddings_file_path,
-                )
-
-        self.embeddings_prepared = True
 
     def fit(
         self,
@@ -299,35 +350,68 @@ class CTM(BaseModel):
         **kwargs,
     ):
         """
-        Fits the CTM topic model to the given dataset.
+        Fits the CTM (Combined TM) topic model to the given dataset.
 
-        Args:
-            dataset (TMDataset, optional): The dataset to train the topic model on. Defaults to None.
-            n_topics (int, optional): The number of topics to extract. Defaults to 20.
-            val_size (float, optional): The proportion of the dataset to use for validation. Defaults to 0.2.
-            lr (float, optional): The learning rate for the optimizer. Defaults to 1e-04.
-            lr_patience (int, optional): The number of epochs with no improvement after which the learning rate will be reduced. Defaults to 15.
-            patience (int, optional): The number of epochs with no improvement after which training will be stopped. Defaults to 15.
-            factor (float, optional): The factor by which the learning rate will be reduced. Defaults to 0.5.
-            weight_decay (float, optional): The weight decay (L2 penalty) for the optimizer. Defaults to 1e-07.
-            max_epochs (int, optional): The maximum number of epochs to train for. Defaults to 100.
-            batch_size (int, optional): The batch size for training. Defaults to 32.
-            shuffle (bool, optional): Whether to shuffle the training data. Defaults to True.
-            random_state (int, optional): The random seed for reproducibility. Defaults to 101.
-            checkpoint_path (str, optional): The path to save model checkpoints. Defaults to "checkpoints".
-            monitor (str, optional): The metric to monitor for early stopping. Defaults to "val_loss".
-            mode (str, optional): The mode for early stopping. Defaults to "min".
-            **kwargs: Additional keyword arguments to be passed to the trainer.
+        Parameters
+        ----------
+        dataset : TMDataset, optional
+            The dataset to train the topic model on. Defaults to None.
+        n_topics : int, optional
+            The number of topics to extract. Defaults to 20.
+        val_size : float, optional
+            The proportion of the dataset to use for validation. Defaults to 0.2.
+        lr : float, optional
+            The learning rate for the optimizer. Defaults to 1e-04.
+        lr_patience : int, optional
+            The number of epochs with no improvement after which the learning rate will be reduced. Defaults to 15.
+        patience : int, optional
+            The number of epochs with no improvement after which training will be stopped. Defaults to 15.
+        factor : float, optional
+            The factor by which the learning rate will be reduced. Defaults to 0.5.
+        weight_decay : float, optional
+            The weight decay (L2 penalty) for the optimizer. Defaults to 1e-07.
+        max_epochs : int, optional
+            The maximum number of epochs to train for. Defaults to 100.
+        batch_size : int, optional
+            The batch size for training. Defaults to 32.
+        shuffle : bool, optional
+            Whether to shuffle the training data. Defaults to True.
+        random_state : int, optional
+            The random seed for reproducibility. Defaults to 101.
+        checkpoint_path : str, optional
+            The path to save model checkpoints. Defaults to "checkpoints".
+        monitor : str, optional
+            The metric to monitor for early stopping. Defaults to "val_loss".
+        mode : str, optional
+            The mode for early stopping. Defaults to "min".
+        trial : optuna.Trial, optional
+            The Optuna trial for hyperparameter optimization. Defaults to None.
+        optimize : bool, optional
+            Whether to optimize hyperparameters. Defaults to False.
+        **kwargs
+            Additional keyword arguments to be passed to the trainer.
 
-        Raises:
-            ValueError: If the dataset is not an instance of TMDataset.
+        Raises
+        ------
+        ValueError
+            If the dataset is not an instance of TMDataset or if the number of topics is less than or equal to 0.
+
+        Examples
+        --------
+        >>> model = CTM()
+        >>> dataset = TMDataset(...)
+        >>> model.fit(dataset, n_topics=20, val_size=0.2, lr=1e-04)
         """
+
         self.optimize = optimize
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+
         self.n_topics = n_topics
+        self.dataset = dataset
 
         self.hparams.update(
             {
@@ -351,11 +435,12 @@ class CTM(BaseModel):
         )
 
         try:
-            self._status = TrainingStatus.RUNNING
-            if not self.embeddings_prepared:
-                self.prepare_embeddings(dataset, logger)
-
             self._status = TrainingStatus.INITIALIZED
+
+            if not self.embeddings_prepared:
+                dataset, embeddings = self.prepare_embeddings(dataset, logger)
+                self.embeddings_prepared = True
+
             self._initialize_datamodule(dataset=dataset)
 
             self._initialize_model()
@@ -385,19 +470,6 @@ class CTM(BaseModel):
 
         if self.n_topics <= 0:
             raise ValueError("Number of topics must be greater than 0.")
-
-        self._status = TrainingStatus.INITIALIZED
-        try:
-            pass
-
-        except Exception as e:
-            logger.error(f"Error in training: {e}")
-            self._status = TrainingStatus.FAILED
-            raise
-        except KeyboardInterrupt:
-            logger.error("Training interrupted.")
-            self._status = TrainingStatus.INTERRUPTED
-            raise
 
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
@@ -446,6 +518,32 @@ class CTM(BaseModel):
         pass
 
     def suggest_hyperparameters(self, trial, max_topics=100):
+        """
+        Suggests hyperparameters for the model using an Optuna trial.
+
+        This method uses an Optuna trial object to suggest a set of hyperparameters for the model.
+        The suggested hyperparameters are stored in the `hparams` dictionary of the model.
+
+        Parameters
+        ----------
+        trial : optuna.trial.Trial
+            The Optuna trial object used for suggesting hyperparameters.
+        max_topics : int, optional
+            The maximum number of topics to consider for the `n_topics` hyperparameter. Defaults to 100.
+
+        Attributes
+        ----------
+        hparams : dict
+            A dictionary to store the suggested hyperparameters, including:
+            - `n_topics`: Number of topics.
+            - `encoder_dim`: Dimensionality of the encoder.
+            - `dropout`: Dropout rate.
+            - `inference_type`: Type of inference to use.
+            - `inference_activation`: Activation function for inference.
+            - `model_type`: Type of the model.
+            - `datamodule_args.batch_size`: Batch size for training.
+        """
+
         self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)
         self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
         self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
