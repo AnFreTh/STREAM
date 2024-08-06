@@ -156,7 +156,7 @@ def visualize_topics(
         Visualize topics in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
         Args:
-    model (AbstractModel): The trained topic model instance.
+            model (AbstractModel): The trained topic model instance.
             model_output (dict, optional): The output of the topic model, typically including topic-word distributions and document-topic distributions. Required if the model does not have an 'output' attribute.
             dataset (TMDataset, optional): The dataset used for training the topic model. Required if the model does not have an 'output' attribute.
             three_dim (bool, optional): Flag to visualize in 3D if True, otherwise in 2D. Defaults to False.
