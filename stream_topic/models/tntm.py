@@ -1,19 +1,24 @@
-from .neural_base_models.tntm_base import TNTMBase
-import numpy as np
-from loguru import logger
+import os
 from datetime import datetime
+
+import lightning as pl
+import numpy as np
+import torch
+import torch.nn as nn
+
+#from ..utils.check_dataset_steps import check_dataset_steps
+import umap
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
+from loguru import logger
+from optuna.integration import PyTorchLightningPruningCallback
+from sentence_transformers import SentenceTransformer
+from sklearn.mixture import GaussianMixture
+
+from ..utils.datamodule import TMDataModule
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.neural_basemodel import NeuralBaseModel
-import lightning as pl
-import torch
-from ..utils.datamodule import TMDataModule
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
-from ..utils.check_dataset_steps import check_dataset_steps
-import umap
-from sklearn.mixture import GaussianMixture
-from sentence_transformers import SentenceTransformer
-import os
+from .neural_base_models.tntm_base import TNTMBase
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "TNTM"
@@ -33,7 +38,14 @@ class TNTM(BaseModel):
         sentence_embeddings_folder_path: str = None,
         sentence_embeddings_file_path: str = None,
         save_sentence_embeddings: bool = False,
-        **kwargs,
+        encoder_dim=128,
+        dropout=0.1,
+        inference_type="combined",
+        inference_activation=nn.Softplus(),
+        batch_size=64,
+        val_size=0.2,
+        shuffle=True,
+        random_state=42,
     ):
         """
         Initialize the TNTM model.
@@ -44,7 +56,13 @@ class TNTM(BaseModel):
             Additional keyword arguments to pass to the parent class constructor.
         """
 
-        super().__init__(use_pretrained_embeddings=True, **kwargs)
+        super().__init__(
+            use_pretrained_embeddings=True,
+            dropout=dropout,
+            inference_type=inference_type,
+            encoder_dim=encoder_dim,
+            inference_activation=inference_activation,
+        )
         self.save_hyperparameters(
             ignore=[
                 "word_embedding_model_name",
@@ -77,6 +95,21 @@ class TNTM(BaseModel):
         self.n_topics = None
 
         self._status = TrainingStatus.NOT_STARTED
+
+        self.hparams["datamodule_args"] = {
+            "batch_size": batch_size,
+            "val_size": val_size,
+            "shuffle": shuffle,
+            "random_state": random_state,
+            "embeddings": True,
+            "bow": True,
+            "tf_idf": False,
+            "word_embeddings": False,
+        }
+
+        self.embeddings_prepared = False
+        self.word_embeddings_prepared = False
+        self.optimize = False
 
     def get_info(self):
         """
@@ -151,7 +184,7 @@ class TNTM(BaseModel):
 
 
     def _initialize_model(
-        self, n_topics, lr, lr_patience, factor, weight_decay, **model_kwargs  # all arguments for tntm_base go into model_kwargs
+        self,**model_kwargs  # all arguments for tntm_base go into model_kwargs
     ):
         """
         Initialize the neural base model.
@@ -171,7 +204,7 @@ class TNTM(BaseModel):
         **model_kwargs : dict
             Additional keyword arguments for the model.
         """
-
+        n_topics = self.hparams["n_topics"]
         umap_kwargs = {name: value for name, value in model_kwargs.items() if name in ["umap_n_neighbors", "umap_min_dist", "umap_n_dims"]}
 
         proj_embeddings, mus_init, L_lower_init, log_diag_init = self._reduce_dimensionality_and_cluster_for_initialization(
@@ -180,25 +213,29 @@ class TNTM(BaseModel):
             **umap_kwargs
         )
 
-        model_kwargs["mus_init"] = mus_init
-        model_kwargs["L_lower_init"] = L_lower_init
-        model_kwargs["log_diag_init"] = log_diag_init
-        model_kwargs["word_embeddings_projected"] = proj_embeddings
+        #model_kwargs["mus_init"] = mus_init
+        #model_kwargs["L_lower_init"] = L_lower_init
+        #model_kwargs["log_diag_init"] = log_diag_init
+        #model_kwargs["word_embeddings_projected"] = proj_embeddings
 
 
-        model_kwargs = {key: value for key, value in model_kwargs.items() if key != "dataset"}
+        #model_kwargs = {key: value for key, value in model_kwargs.items() if key != "dataset"}
 
         self.model = NeuralBaseModel(
             model_class=TNTMBase,
             dataset=self.dataset,
-            n_topics=n_topics,
-            lr=lr,
-            lr_patience=lr_patience,
-            lr_factor=factor,
-            weight_decay=weight_decay,
-            **model_kwargs,
+            mus_init = mus_init,
+            L_lower_init = L_lower_init,
+            log_diag_init = log_diag_init,
+            word_embeddings_projected = proj_embeddings,
+
+           **{
+                k: v
+                for k, v in self.hparams.items()
+                if k not in ["datamodule_args", "max_epochs", "factor", "model_type"]
+            },
         )
-    
+
 
     def _initialize_trainer(
         self,
@@ -207,6 +244,7 @@ class TNTM(BaseModel):
         patience,
         mode,
         checkpoint_path,
+        trial=None,
         **trainer_kwargs,
     ):
         """
@@ -241,15 +279,21 @@ class TNTM(BaseModel):
             filename="best_model",
         )
 
+        model_callbacks = [
+            early_stop_callback,
+            checkpoint_callback,
+            ModelSummary(max_depth=2),
+        ]
+
+        if self.optimize:
+            model_callbacks.append(
+                PyTorchLightningPruningCallback(trial, monitor="val_loss")
+            )
+
         # Initialize the trainer
         self.trainer = pl.Trainer(
             max_epochs=max_epochs,
-            callbacks=[
-                early_stop_callback,
-                checkpoint_callback,
-                ModelSummary(max_depth=2),
-            ],
-            gradient_clip_val=10.0,   #use gradient clipping to avoid exploding gradients
+            callbacks=model_callbacks,
             **trainer_kwargs,
         )
 
@@ -309,56 +353,8 @@ class TNTM(BaseModel):
                     file_name = self.sentence_embeddings_file_path,
                 )
         dataset.embeddings = self.embeddings
-    
-    '''
-    def _get_word_embeddings(self, logger, model_name = "paraphrase-MiniLM-L3-v2"):
-        """
-        Get the word embeddings for the vocabulary using a pre-trained model.
 
-        Parameters
-        ----------
-        model_name : str, optional
-            Name of the pre-trained model to use, by default 'paraphrase-MiniLM-L3-v2'
-
-        Returns
-        -------
-        dict
-            Dictionary mapping words to their embeddings.
-        """
-
-        assert model_name in [
-            "paraphrase-MiniLM-L3-v2",
-        ], f"model name {model_name} not supported. Can be 'paraphrase-MiniLM-L3-v2'"
-
-        logger.info(f"--- Getting word embeddings using {model_name} ---")
-
-        if model_name == "paraphrase-MiniLM-L3-v2":
-            # try to load the embeddings from the file
-            if self.word_embeddings_path is not None:
-                if os.path.exists(f"{self.word_embeddings_path}/{model_name}_embeddings.pt"):
-                    embeddings = torch.load(f"{self.word_embeddings_path}/{model_name}_embeddings.pt")
-
-                    logger.info(f"--- Loaded {model_name} word embeddings from file ---")
-                    return embeddings
-            logger.info(f"--- Creating {model_name} word embeddings ---")
-            model = SentenceTransformer(model_name)
-            vocabulary = self.data_module.vocab
-            vocabulary = list(vocabulary)
-            embeddings = model.encode(vocabulary, convert_to_tensor=True, show_progress_bar=True)
-
-            embeddings = {word: embeddings[i] for i, word in enumerate(vocabulary)}
-
-            assert len(embeddings) == len(vocabulary), "Embeddings and vocabulary length mismatch"
-
-        if self.word_embeddings_path is not None:
-            if not os.path.exists(self.word_embeddings_path):
-                os.makedirs(self.word_embeddings_path)
-            torch.save(embeddings, f"{self.word_embeddings_path}/{model_name}_embeddings.pt")
-
-
-
-        return embeddings
-    '''
+        self.embeddings_prepared = True
 
     def _prepare_word_embeddings(self, data_module, dataset, logger):
         """
@@ -400,10 +396,10 @@ class TNTM(BaseModel):
                     file_name= self.word_embeddings_file_path,
                 )
 
+        self.word_embeddings_prepared = True
 
-        
     def _initialize_datamodule(
-        self, dataset, batch_size, shuffle, val_size, random_state, **kwargs
+        self, dataset,
     ):
         """
         Initialize the data module.
@@ -412,35 +408,23 @@ class TNTM(BaseModel):
         ----------
         dataset : TMDataset
             The dataset to be used for training.
-        batch_size : int
-            Batch size for training.
-        shuffle : bool
-            Whether to shuffle the data.
-        val_size : float
-            Proportion of the dataset to use for validation.
-        random_state : int
-            Random seed for reproducibility.
-        **kwargs : dict
-            Additional keyword arguments for data preprocessing.
         """
 
         logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
         self.data_module = TMDataModule(
-            batch_size=batch_size,
-            shuffle=shuffle,
-            val_size=val_size,
-            random_state=random_state,
+            batch_size=self.hparams["datamodule_args"]["batch_size"],
+            shuffle=self.hparams["datamodule_args"]["shuffle"],
+            val_size=self.hparams["datamodule_args"]["val_size"],
+            random_state=self.hparams["datamodule_args"]["random_state"],
         )
 
         self.data_module.preprocess_data(
             dataset=dataset,
-            val=val_size,
-            embeddings=True,
-            bow=True,
-            tf_idf=False,
-            word_embeddings=False,
-            random_state=random_state,
-            **kwargs,
+            **{
+                k: v
+                for k, v in self.hparams["datamodule_args"].items()
+                if k not in ["batch_size", "shuffle", "val_size"]
+            },
         )
 
         self.dataset = dataset
@@ -460,12 +444,11 @@ class TNTM(BaseModel):
         shuffle: bool = True,
         random_state: int = 101,
         inferece_type="zeroshot",
-        #model_type="ProdLDA",
-        #rescale_loss=False,
-        #rescale_factor=1e-2,
         checkpoint_path: str = "checkpoints",
         monitor: str = "val_loss",
         mode: str = "min",
+        trial=None,
+        optimize=False,
         **kwargs,
     ):
         """
@@ -493,51 +476,56 @@ class TNTM(BaseModel):
             ValueError: If the dataset is not an instance of TMDataset.
         """
 
+        self.optimize = optimize
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
-        assert isinstance(
-            dataset, TMDataset
-        ), "The dataset must be an instance of TMDataset."
-
-        check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self.n_topics = n_topics
 
-        try:
-            self._prepare_embeddings(dataset, logger)
+        self.hparams.update(
+            {
+                "n_topics": n_topics,
+                "lr": lr,
+                "lr_patience": lr_patience,
+                "patience": patience,
+                "factor": factor,
+                "weight_decay": weight_decay,
+                "max_epochs": max_epochs,
+            }
+        )
 
-            self._initialize_datamodule(
-                dataset=dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                val_size=val_size,
-                random_state=random_state,
-            )
-            self._prepare_word_embeddings(self.data_module, dataset, logger)
-            self._initialize_model(
-                lr=lr,
-                n_topics=n_topics,
-                lr_patience=lr_patience,
-                factor=factor,
-                weight_decay=weight_decay,
-                inference_type=inferece_type,
-                dataset = dataset,
-                #model_type=model_type,
-                #rescale_loss=rescale_loss,
-                #rescale_factor=rescale_factor,
-            )
+        self.hparams["datamodule_args"].update(
+            {
+                "batch_size": batch_size,
+                "val_size": val_size,
+                "shuffle": shuffle,
+                "random_state": random_state,
+            }
+        )
+
+        try:
+            self._status = TrainingStatus.RUNNING
+            if not self.embeddings_prepared:
+                self._prepare_embeddings(dataset, logger)
+
+            self._status = TrainingStatus.INITIALIZED
+            self._initialize_datamodule(dataset=dataset)
+
+            if not self.word_embeddings_prepared:
+                self._prepare_word_embeddings(self.data_module, dataset, logger)
+
+            self._initialize_model()
 
             self._initialize_trainer(
-                max_epochs=max_epochs,
+                max_epochs=self.hparams["max_epochs"],
                 monitor=monitor,
                 patience=patience,
                 mode=mode,
                 checkpoint_path=checkpoint_path,
+                trial=trial,
                 **kwargs,
             )
-
-            self._status = TrainingStatus.INITIALIZED
 
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
@@ -555,6 +543,7 @@ class TNTM(BaseModel):
         if self.n_topics <= 0:
             raise ValueError("Number of topics must be greater than 0.")
 
+        self._status = TrainingStatus.INITIALIZED
         try:
             pass
 
@@ -627,3 +616,72 @@ class TNTM(BaseModel):
         """
 
         return self.model.model.get_beta().transpose(0, 1)
+
+    def suggest_hyperparameters(self, trial, max_topics=100):
+        #self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)  # is already suggested in the parent class
+        self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
+        self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
+        self.hparams["inference_type"] = trial.suggest_categorical(
+            "inference_type", ["combined", "zeroshot"]
+        )
+        self.hparams["inference_activation"] = trial.suggest_categorical(
+            "inference_activation", ["Softplus", "ReLU", "LeakyReLU", "Tanh"]
+        )
+        # Map string to actual PyTorch activation function
+        activation_mapping = {
+            "Softplus": nn.Softplus(),
+            "ReLU": nn.ReLU(),
+            "LeakyReLU": nn.LeakyReLU(),
+            "Tanh": nn.Tanh(),
+        }
+        self.hparams["inference_activation"] = activation_mapping[
+            self.hparams["inference_activation"]
+        ]
+
+        self.hparams["datamodule_args"]["batch_size"] = trial.suggest_int(
+            "batch_size", 12, 512
+        )
+
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="val_loss",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        A new method in the child class that calls the parent class's optimize_hyperparameters method.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        best_params = super().optimize_hyperparameters_neural(
+            dataset=dataset,
+            min_topics=min_topics,
+            max_topics=max_topics,
+            criterion=criterion,
+            n_trials=n_trials,
+            custom_metric=custom_metric,
+        )
+
+        return best_params
