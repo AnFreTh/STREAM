@@ -6,6 +6,7 @@ import re
 import gensim.downloader as api
 import numpy as np
 import pandas as pd
+from loguru import logger
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import DataLoader, Dataset, random_split
 
@@ -14,28 +15,76 @@ from ..preprocessor import TextPreprocessor
 
 
 class TMDataset(Dataset):
-    def __init__(self, name=None, language="en"):
-        """
-        Initialize the TMDataset.
+    """
+    Topic Modeling Dataset containing methods to fetch and preprocess text data. 
 
-        Parameters
-        ----------
-        name : str, optional
-            Name of the dataset.
-        """
+    Parameters
+    ----------
+    name : str, optional
+        Name of the dataset.
+
+    Attributes
+    ----------
+    available_datasets : list of str
+        List of available datasets.
+    name : str
+        Name of the dataset.
+    dataframe : pd.DataFrame
+        DataFrame containing the dataset.
+    embeddings : np.ndarray
+        Embeddings for the dataset.
+    bow : np.ndarray
+        Bag of Words representation of the dataset.
+    tfidf : np.ndarray
+        TF-IDF representation of the dataset.
+    tokens : list of list of str
+        Tokenized documents.
+    texts : list of str
+        Preprocessed text data.
+    labels : list of str
+        Labels for the dataset.
+    language : str
+        Language of the dataset.
+    preprocessing_steps : dict
+        Preprocessing steps to apply to the dataset.
+
+    Notes
+    -----
+    Available datasets:
+
+    - 20NewsGroup
+    - BBC_News
+    - Stocktwits_GME
+    - Reddit_GME'
+    - Reuters'
+    - Spotify
+    - Spotify_most_popular
+    - Poliblogs
+    - Spotify_least_popular
+
+    Examples
+    --------
+    >>> from stream_topic.utils.dataset import TMDataset
+    >>> dataset = TMDataset()
+    >>> dataset.fetch_dataset("20NewsGroup")
+    >>> dataset.preprocess(remove_stopwords=True, lowercase=True)
+    >>> dataset.get_bow()
+    >>> dataset.get_tfidf()
+    >>> dataset.get_word_embeddings()
+    >>> dataset.dataframe.head()
+
+    """
+
+    def __init__(self, name=None, language="en"):
         super().__init__()
-        self.dataset_registry = [
-            "20NewsGroup",
-            "M10",
-            "Spotify",
-            "Spotify_most_popular",
-            "Poliblogs",
-            "Reuters",
-            "BBC_News",
-            "DBLP",
-            "DBPedia_IT",
-            "Europarl_IT",
-        ]
+
+        self.available_datasets = self.get_dataset_list()
+        if name is not None and name not in self.available_datasets:
+            logger.error(
+                f"Dataset {name} not found. Available datasets: {self.available_datasets}")
+            raise ValueError(
+                f"Dataset {name} not found. Available datasets: {self.available_datasets}"
+            )
         self.name = name
         self.dataframe = None
         self.embeddings = None
@@ -46,6 +95,21 @@ class TMDataset(Dataset):
         self.labels = None
         self.language = language
         self.preprocessing_steps = self.default_preprocessing_steps()
+
+    def get_dataset_list(self):
+        """
+        Get the list of available datasets.
+
+        Returns
+        -------
+        list of str
+            List of available datasets.
+        """
+        package_path = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))
+        dataset_path = os.path.join(package_path, "preprocessed_datasets")
+        datasets = os.listdir(dataset_path)
+        return datasets
 
     def default_preprocessing_steps(self):
         return {
@@ -63,7 +127,7 @@ class TMDataset(Dataset):
             "detokenize": True,
         }
 
-    def fetch_dataset(self, name, dataset_path=None):
+    def fetch_dataset(self, name: str, dataset_path=None):
         """
         Fetch a dataset by name.
 
@@ -74,12 +138,31 @@ class TMDataset(Dataset):
         dataset_path : str, optional
             Path to the dataset directory.
         """
-        self.name = name
+        if name not in self.available_datasets:
+            logger.error(
+                f"Dataset {name} not found. Available datasets: {self.available_datasets}")
+            raise ValueError(
+                f"Dataset {name} not found. Available datasets: {self.available_datasets}"
+            )
+
+        if self.name is not None:
+            logger.info(
+                f'Dataset name already provided while instantiating the class: {self.name}')
+            logger.info(
+                f'Overwriting the dataset name with the provided name in fetch_dataset: {name}')
+            self.name = name
+            logger.info(f"Fetching dataset: {name}")
+        else:
+            self.name = name
+            logger.info(f"Fetching dataset: {name}")
+
         if dataset_path is None:
             dataset_path = self.get_package_dataset_path(name)
         if os.path.exists(dataset_path):
             self.load_custom_dataset_from_folder(dataset_path)
+            logger.info(f"Dataset loaded successfully from {dataset_path}")
         else:
+            logger.error(f"Dataset path {dataset_path} does not exist.")
             raise ValueError(f"Dataset path {dataset_path} does not exist.")
         # self._load_data_to_dataframe()
 
@@ -170,11 +253,11 @@ class TMDataset(Dataset):
             if path is None:
                 path = self.get_package_embeddings_path(self.name)
 
-            print(f"Saving embeddings to path: {path}")
+            logger.info(f"Saving embeddings to path: {path}")
 
             if not os.path.exists(path):
                 os.makedirs(path)
-                print(f"Created directory: {path}")
+                logger.info(f"Created directory: {path}")
 
             embeddings_file = (
                 os.path.join(path, file_name)
@@ -184,17 +267,17 @@ class TMDataset(Dataset):
                 )
             )
 
-            print(f"Embeddings file path: {embeddings_file}")
+            logger.info(f"Embeddings file path: {embeddings_file}")
 
             with open(embeddings_file, "wb") as file:
                 pickle.dump(embeddings, file)
 
-            print("Embeddings saved successfully.")
+            logger.info("Embeddings saved successfully.")
 
         except PermissionError as e:
-            print(f"PermissionError: {e}")
+            logger.error(f"PermissionError: {e}")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
 
     def get_embeddings(self, embedding_model_name, path=None, file_name=None):
         """
@@ -219,7 +302,7 @@ class TMDataset(Dataset):
                 "Embeddings are not available. Run the encoding process first or load embeddings."
             )
 
-        # print("--- Loading pre-computed document embeddings ---")
+        # logger.info("--- Loading pre-computed document embeddings ---")
 
         if self.embeddings is None:
             if path is None:
