@@ -12,9 +12,9 @@
    :hidden:
 
    installation
+   Quickstart <notebooks/quickstart>
    Datasets <notebooks/datasets>
-   
-   
+
 
 .. toctree::
    :name: API Reference
