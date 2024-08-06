@@ -73,12 +73,13 @@ class TMDataModule(pl.LightningDataModule):
         tf_idf=False,
         word_embeddings=False,
         random_state=101,
+        embedding_model_name=None,
         **kwargs,
     ):
 
         if embeddings:
             if dataset.embeddings is None:
-                embs = dataset.get_embeddings(**kwargs)
+                embs = dataset.get_embeddings(embedding_model_name)
             else:
                 embs = dataset.embeddings
 

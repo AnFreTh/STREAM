@@ -83,6 +83,10 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             self.umap_args["random_state"] = random_state
         self.min_cluster_size = min_cluster_size
         self.hdbscan_args = self.hparams.get("hdscan_args", hdbscan_args or {})
+
+        self.hparams["umap_args"] = self.umap_args
+        self.hparams["hdbscan_args"] = self.hdbscan_args
+
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
 
@@ -118,8 +122,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         """
 
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         try:
@@ -149,7 +152,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             # Store the mean embedding in the dictionary
             self.topic_centroids.append(mean_embedding)
 
-    def fit(self, dataset):
+    def fit(self, dataset, n_topics=None):
         """
         Trains the BERTOPIC topic model on the provided dataset.
 
@@ -172,8 +175,8 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+            self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe = self.dataset.dataframe
             self.reduced_embeddings = self.dim_reduction(logger)
 
             self._clustering()
@@ -187,8 +190,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
                 docs_per_topic["text"].values, m=len(self.dataframe)
             )
 
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
+            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
             one_hot_encoder = OneHotEncoder(sparse=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
@@ -237,3 +239,131 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         reduced_embeddings = self.reducer.transform(embeddings)
         labels = self.clustering_model.approximate_predict(reduced_embeddings)
         return labels
+
+    def suggest_hyperparameters(self, trial):
+        """
+        Suggests hyperparameters for the model using an Optuna trial.
+
+        This method uses an Optuna trial object to suggest a set of hyperparameters for the model.
+        The suggested hyperparameters are stored in the `hparams` dictionary of the model.
+
+        Parameters
+        ----------
+        trial : optuna.trial.Trial
+            The Optuna trial object used for suggesting hyperparameters.
+        """
+        # Suggest UMAP parameters
+        self.hparams["umap_args"]["n_neighbors"] = trial.suggest_int(
+            "n_neighbors", 10, 50
+        )
+        self.hparams["umap_args"]["n_components"] = trial.suggest_int(
+            "n_components", 5, 50
+        )
+        self.hparams["umap_args"]["metric"] = trial.suggest_categorical(
+            "metric", ["cosine", "euclidean"]
+        )
+
+        # Suggest HDBSCAN parameters
+        self.hparams["hdbscan_args"]["min_cluster_size"] = trial.suggest_int(
+            "min_cluster_size", 5, 100
+        )
+        self.hparams["hdbscan_args"]["min_samples"] = trial.suggest_int(
+            "min_samples", 1, 100
+        )
+        self.hparams["hdbscan_args"]["cluster_selection_epsilon"] = trial.suggest_float(
+            "cluster_selection_epsilon", 0.0, 1.0
+        )
+
+        self.umap_args = self.hparams.get("umap_args")
+        self.hdbscan_args = self.hparams.get("hdbscan_args")
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="aic",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        A new method in the child class that calls the parent class's optimize_hyperparameters method.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        best_params = super().optimize_hyperparameters(
+            dataset=dataset,
+            min_topics=min_topics,
+            max_topics=max_topics,
+            criterion=criterion,
+            n_trials=n_trials,
+            custom_metric=custom_metric,
+        )
+
+        return best_params
+
+    def _compute_wcss(self):
+        """
+        Compute the within-cluster sum of squares (WCSS) for HDBSCAN clusters.
+
+        Returns
+        -------
+        float
+            The WCSS value.
+        """
+        wcss = 0.0
+        labels = self.clustering_model.labels_
+        unique_labels = np.unique(labels)
+        for label in unique_labels:
+            if label == -1:
+                continue  # Skip noise
+            cluster_points = self.reduced_embeddings[labels == label]
+            centroid = cluster_points.mean(axis=0)
+            wcss += ((cluster_points - centroid) ** 2).sum()
+        return wcss
+
+    def calculate_aic(self, n_topics=None):
+        """
+        Calculate the AIC for the HDBSCAN model.
+
+        Returns
+        -------
+        float
+            AIC score.
+        """
+        wcss = self._compute_wcss()
+        n = self.reduced_embeddings.shape[0]
+        k = len(np.unique(self.clustering_model.labels_))
+        return n * np.log(wcss / n) + 2 * k
+
+    def calculate_bic(self, n_topics=None):
+        """
+        Calculate the BIC for the HDBSCAN model.
+
+        Returns
+        -------
+        float
+            BIC score.
+        """
+        wcss = self._compute_wcss()
+        n = self.reduced_embeddings.shape[0]
+        k = len(np.unique(self.clustering_model.labels_))
+        return n * np.log(wcss / n) + k * np.log(n)
