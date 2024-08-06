@@ -2,41 +2,41 @@ Models
 ========
 
 
-.. autoclass:: stream.models.BERTopicTM
+.. autoclass:: stream_topic.models.BERTopicTM
     :members:
 
-.. autoclass:: stream.models.CBC
+.. autoclass:: stream_topic.models.CBC
     :members:
 
-.. autoclass:: stream.models.CEDC
+.. autoclass:: stream_topic.models.CEDC
     :members:
 
-.. autoclass:: stream.models.DCTE
+.. autoclass:: stream_topic.models.DCTE
     :members:
 
-.. autoclass:: stream.models.KmeansTM
+.. autoclass:: stream_topic.models.KmeansTM
     :members:
 
-.. autoclass:: stream.models.SOMTM
+.. autoclass:: stream_topic.models.SOMTM
     :members:
 
-.. autoclass:: stream.models.WordCluTM
+.. autoclass:: stream_topic.models.WordCluTM
     :members:
 
-.. autoclass:: stream.models.LDA
+.. autoclass:: stream_topic.models.LDA
     :members:
 
-.. autoclass:: stream.models.ETM
+.. autoclass:: stream_topic.models.ETM
     :members:
 
-.. autoclass:: stream.models.ProdLDA
+.. autoclass:: stream_topic.models.ProdLDA
     :members:
 
-.. autoclass:: stream.models.CTM
+.. autoclass:: stream_topic.models.CTM
     :members:
 
-.. autoclass:: stream.models.NeuralLDA
+.. autoclass:: stream_topic.models.NeuralLDA
     :members:
 
-.. autoclass:: stream.models.CTMNeg
+.. autoclass:: stream_topic.models.CTMNeg
     :members:

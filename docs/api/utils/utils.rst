@@ -2,13 +2,13 @@ Utils
 ========
 
 
-.. autoclass:: stream.utils.DocumentCoherence
+.. autoclass:: stream_topic.utils.DocumentCoherence
     :members:
 
-.. autoclass:: stream.utils.TMDataset
+.. autoclass:: stream_topic.utils.TMDataset
     :members:
 
-.. autofunction:: stream.utils.benchmarking
+.. autofunction:: stream_topic.utils.benchmarking
 
-.. autofunction:: stream.utils.get_top_tfidf_words_per_document
+.. autofunction:: stream_topic.utils.get_top_tfidf_words_per_document
 
