@@ -103,8 +103,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         )
         self.kmeans_args = self.hparams.get("kmeans_args", kmeans_args or {})
 
-        self.hparams.update(self.umap_args)
-        self.hparams.update(self.kmeans_args)
+        self.hparams["umap_args"] = self.umap_args
+        self.hparams["kmeans_args"] = self.kmeans_args
 
         if random_state is not None:
             self.umap_args["random_state"] = random_state
@@ -137,40 +137,6 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         }
         return info
 
-    def _prepare_embeddings(self, dataset):
-        """
-        Prepares the dataset for clustering.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            The dataset to be used for clustering.
-        """
-
-        if dataset.has_embeddings(self.embedding_model_name):
-            logger.info(
-                f"--- Loading precomputed {EMBEDDING_MODEL_NAME} embeddings ---"
-            )
-            self.embeddings = dataset.get_embeddings(
-                self.embedding_model_name,
-                self.embeddings_path,
-                self.embeddings_file_path,
-            )
-            self.dataframe = dataset.dataframe
-        else:
-            logger.info(f"--- Creating {EMBEDDING_MODEL_NAME} document embeddings ---")
-            self.embeddings = self.encode_documents(
-                dataset.texts, encoder_model=self.embedding_model_name, use_average=True
-            )
-            if self.save_embeddings:
-                dataset.save_embeddings(
-                    self.embeddings,
-                    self.embedding_model_name,
-                    self.embeddings_path,
-                    self.embeddings_file_path,
-                )
-        self.dataframe = dataset.dataframe
-
     def _clustering(self):
         """
         Applies K-Means clustering to the reduced embeddings.
@@ -184,6 +150,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
+        self.kmeans_args = self.hparams.get("kmeans_args", self.kmeans_args)
         try:
             logger.info("--- Creating document cluster ---")
             self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
@@ -238,7 +205,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+            self.dataframe = self.dataset.dataframe
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
 
@@ -346,22 +314,27 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
 
     def suggest_hyperparameters(self, trial):
         # Suggest UMAP parameters
-        self.hparams["umap_n_neighbors"] = trial.suggest_int("umap_n_neighbors", 10, 50)
-        self.hparams["umap_n_components"] = trial.suggest_int(
-            "umap_n_components", 5, 50
+        self.hparams["umap_args"]["n_neighbors"] = trial.suggest_int(
+            "n_neighbors", 10, 50
         )
-        self.hparams["umap_metric"] = trial.suggest_categorical(
-            "umap_metric", ["cosine", "euclidean"]
+        self.hparams["umap_args"]["n_components"] = trial.suggest_int(
+            "n_components", 5, 50
+        )
+        self.hparams["umap_args"]["metric"] = trial.suggest_categorical(
+            "metric", ["cosine", "euclidean"]
         )
 
         # Suggest K-Means parameters
-        self.hparams["kmeans_init"] = trial.suggest_categorical(
-            "kmeans_init", ["k-means++", "random"]
+        self.hparams["kmeans_args"]["init"] = trial.suggest_categorical(
+            "init", ["k-means++", "random"]
         )
-        self.hparams["kmeans_n_init"] = trial.suggest_int("kmeans_n_init", 10, 30)
-        self.hparams["kmeans_max_iter"] = trial.suggest_int(
-            "kmeans_max_iter", 100, 1000
+        self.hparams["kmeans_args"]["n_init"] = trial.suggest_int("n_init", 10, 30)
+        self.hparams["kmeans_args"]["max_iter"] = trial.suggest_int(
+            "max_iter", 100, 1000
         )
+
+        self.umap_args = self.hparams.get("umap_args")
+        self.kmeans_args = self.hparams.get("kmeans_args")
 
     def optimize_and_fit(
         self,
