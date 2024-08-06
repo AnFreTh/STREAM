@@ -54,8 +54,6 @@ setup(
     package_data={
         # Use '**' to include all files within subdirectories recursively
         "stream_topic": [
-            "datasets/preprocessed_datasets/**/*",
-            "datasets/pre_embedded_datasets/**/*",
             "preprocessed_datasets/**/*",
             "preprocessor/config/default_preprocessing_steps.json"
         ],
