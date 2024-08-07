@@ -5,9 +5,8 @@ import pyarrow as pa
 from datasets import Dataset
 from loguru import logger
 from sentence_transformers.losses import CosineSimilarityLoss
-from setfit import SetFitModel,TrainingArguments
+from setfit import SetFitModel, TrainingArguments
 from setfit import Trainer as SetfitTrainer
-from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 
@@ -124,9 +123,7 @@ class DCTE(BaseModel):
         )
 
         one_hot_encoder = OneHotEncoder(sparse=False)
-        predictions_one_hot = one_hot_encoder.fit_transform(
-            predict_df[["predictions"]]
-        )
+        predictions_one_hot = one_hot_encoder.fit_transform(predict_df[["predictions"]])
 
         beta = tfidf
         theta = predictions_one_hot
@@ -215,9 +212,8 @@ class DCTE(BaseModel):
 
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
-        
+
         return self
-    
 
     def predict(self, dataset):
         """
@@ -242,9 +238,9 @@ class DCTE(BaseModel):
 
         labels = self.model(predict_df["text"])
         predict_df["predictions"] = labels
-        
+
         return labels
-    
+
     def get_topics(self, dataset, n_words=10):
         """
         Retrieve the top words for each topic.
@@ -269,11 +265,8 @@ class DCTE(BaseModel):
 
         labels = self.model(predict_df["text"])
         predict_df["predictions"] = labels
-        
+
         topic_dict, beta, theta = self._get_topic_representation(predict_df, n_words)
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
-        return [
-            [word for word, _ in topic_dict[key][:n_words]]
-            for key in topic_dict
-        ]
+        return [[word for word, _ in topic_dict[key][:n_words]] for key in topic_dict]
