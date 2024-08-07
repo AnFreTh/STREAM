@@ -177,3 +177,5 @@ myst_enable_extensions = [
     "dollarmath",
     # other MyST extensions
 ]
+
+mathjax_path = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
