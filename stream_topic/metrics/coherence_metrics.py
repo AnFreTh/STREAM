@@ -45,7 +45,7 @@ class NPMI(AbstractMetric):
 
     Examples
     --------
-    >>> from stream_topic import NPMI
+    >>> from stream_topic.metrics import NPMI
     >>> npmi = NPMI(dataset)
     >>> avg_npmi_score = npmi.score(topic_words)
     >>> print("Average NPMI score:", avg_npmi_score)
