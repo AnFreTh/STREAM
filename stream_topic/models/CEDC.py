@@ -186,7 +186,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
     def fit(
         self,
-        dataset: TMDataset = None,
+        dataset: TMDataset,
         n_topics: int = 20,
         only_nouns: bool = False,
         clean: bool = False,
