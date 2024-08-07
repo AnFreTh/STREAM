@@ -471,6 +471,8 @@ class ETM(BaseModel):
         self.hparams["encoder_activation"] = trial.suggest_categorical(
             "encoder_activation", ["Softplus", "ReLU", "LeakyReLU", "Tanh"]
         )
+        self.hparams["lr"] = trial.suggest_float("lr", 1e-5, 1e-2)
+        self.hparams["weight_decay"] = trial.suggest_float("weight_decay", 1e-7, 1e-3)
 
         # Map string to actual PyTorch activation function
         activation_mapping = {
