@@ -1,6 +1,7 @@
 import unittest
-from stream.models import WordCluTM
-from stream.data_utils import TMDataset
+
+from stream_topic.models import WordCluTM
+from stream_topic.utils import TMDataset
 
 
 class TestWordCluTM(unittest.TestCase):

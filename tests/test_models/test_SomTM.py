@@ -1,11 +1,13 @@
-import unittest
-from unittest.mock import patch, MagicMock
-import pandas as pd
-import numpy as np
-from stream.models import SOMTM
-from stream.data_utils import TMDataset
 import random
 import string
+import unittest
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
+
+from stream_topic.data_utils import TMDataset
+from stream_topic.models import SOMTM
 
 
 class TestSomTM(unittest.TestCase):
@@ -17,8 +19,10 @@ class TestSomTM(unittest.TestCase):
         self.mock_dataset = MagicMock(spec=TMDataset)
         text_data = [
             " ".join(
-                "".join(random.choices(string.ascii_lowercase, k=random.randint(1, 15)))
-                for _ in range(random.randint(5, 10))  # Each document has 5-10 words
+                "".join(random.choices(
+                    string.ascii_lowercase, k=random.randint(1, 15)))
+                # Each document has 5-10 words
+                for _ in range(random.randint(5, 10))
             )
             for _ in range(self.n_documents)  # 50 documents
         ]
@@ -32,7 +36,8 @@ class TestSomTM(unittest.TestCase):
             self.n_documents, 384
         )
 
-        self.mock_dataset.get_corpus = lambda: [text.split() for text in text_data]
+        self.mock_dataset.get_corpus = lambda: [
+            text.split() for text in text_data]
         self.mock_dataset.dataframe = pd.DataFrame({"text": text_data})
 
         # Initialize the KmeansTM model
