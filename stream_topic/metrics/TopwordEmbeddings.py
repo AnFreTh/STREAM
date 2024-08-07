@@ -1,12 +1,14 @@
-
 import os
 import pickle
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from .constants import (EMBEDDING_PATH, PARAPHRASE_TRANSFORMER_MODEL,
-                        SENTENCE_TRANSFORMER_MODEL)
+from .constants import (
+    EMBEDDING_PATH,
+    PARAPHRASE_TRANSFORMER_MODEL,
+    SENTENCE_TRANSFORMER_MODEL,
+)
 
 
 class TopwordEmbeddings:
@@ -28,13 +30,14 @@ class TopwordEmbeddings:
     """
 
     def __init__(
-            self,
-            word_embedding_model: SentenceTransformer = SentenceTransformer(
-                PARAPHRASE_TRANSFORMER_MODEL),
-            cache_to_file: bool = False,
-            emb_filename: str = None,
-            emb_path: str = EMBEDDING_PATH,
-            create_new_file: bool = True
+        self,
+        word_embedding_model: SentenceTransformer = SentenceTransformer(
+            PARAPHRASE_TRANSFORMER_MODEL
+        ),
+        cache_to_file: bool = False,
+        emb_filename: str = None,
+        emb_path: str = EMBEDDING_PATH,
+        create_new_file: bool = True,
     ):
         """
         Initialize the TopwordEmbeddings object.
@@ -70,7 +73,8 @@ class TopwordEmbeddings:
         """
         try:
             self.embedding_dict = pickle.load(
-                open(f"{self.emb_path}{self.emb_filename}.pickle", "rb"))
+                open(f"{self.emb_path}{self.emb_filename}.pickle", "rb")
+            )
         except FileNotFoundError:
             self.embedding_dict = {}
 
@@ -79,13 +83,12 @@ class TopwordEmbeddings:
         Save the embedding dictionary to the disk.
         """
         with open(f"{self.emb_path}{self.emb_filename}.pickle", "wb") as handle:
-            pickle.dump(self.embedding_dict, handle,
-                        protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self.embedding_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def embed_topwords(
-            self,
-            topwords: np.ndarray,
-            n_topwords_to_use: int = 10,
+        self,
+        topwords: np.ndarray,
+        n_topwords_to_use: int = 10,
     ) -> np.ndarray:
         """
         Get the embeddings of the n_topwords topwords.
@@ -111,8 +114,11 @@ class TopwordEmbeddings:
             topwords = topwords.reshape(-1, 1)
 
         assert np.issubdtype(
-            topwords.dtype, np.str_), "topwords should only contain strings."
-        assert topwords.shape[1] >= n_topwords_to_use, "n_topwords_to_use should be less than or equal to the number of words in each topic."
+            topwords.dtype, np.str_
+        ), "topwords should only contain strings."
+        assert (
+            topwords.shape[1] >= n_topwords_to_use
+        ), "n_topwords_to_use should be less than or equal to the number of words in each topic."
 
         # Get the top n_topwords words
         topwords = topwords[:, :n_topwords_to_use]
