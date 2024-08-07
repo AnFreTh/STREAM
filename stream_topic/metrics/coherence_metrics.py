@@ -1,15 +1,11 @@
 import re
-
 import gensim
-import nltk
 import numpy as np
 from nltk.corpus import stopwords
-from octis.dataset.dataset import Dataset
-from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-
-from ._helper_funcs import cos_sim_pw, embed_corpus, embed_topic, update_corpus_dic_list
+from .base import BaseMetric
+from ._helper_funcs import cos_sim_pw
 from .constants import (
     EMBEDDING_PATH,
     NLTK_STOPWORD_LANGUAGE,
@@ -24,7 +20,7 @@ STOPWORDS = list(
 )
 
 
-class NPMI(AbstractMetric):
+class NPMI(BaseMetric):
     """
     A class for calculating Normalized Pointwise Mutual Information (NPMI) for topics.
 
@@ -75,6 +71,26 @@ class NPMI(AbstractMetric):
 
         files = self.dataset.get_corpus()
         self.files = [" ".join(words) for words in files]
+
+    def get_info(self):
+        """
+        Get information about the metric.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including metric name,
+            number of top words, number of intruders, embedding model name,
+            metric range and metric description.
+        """
+
+        info = {
+            "metric_name": "NPMI",
+            "n_words": self.n_words,
+            "description": "NPMI coherence",
+        }
+
+        return info
 
     def _create_vocab_preprocess(self, data, preprocess=5, process_data=False):
         """
@@ -287,7 +303,7 @@ class NPMI(AbstractMetric):
         return results
 
 
-class Embedding_Coherence(AbstractMetric):
+class Embedding_Coherence(BaseMetric):
     """
     A metric class to calculate the coherence of topics based on word embeddings. It computes
     the average cosine similarity between all top words in each topic.

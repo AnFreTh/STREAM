@@ -1,9 +1,6 @@
 import numpy as np
-from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-
-from ._helper_funcs import embed_corpus, embed_topic, update_corpus_dic_list
 from .base import BaseMetric
 from .constants import (
     EMBEDDING_PATH,
@@ -245,7 +242,7 @@ class ISIM(BaseMetric):
         return float(np.mean(list(self.score_per_topic(topics).values())))
 
 
-class INT(AbstractMetric):
+class INT(BaseMetric):
     """
     A metric class to calculate the Intruder Topic Metric (INT) for topics. This metric assesses the distinctiveness
     of topics by calculating the embedding intruder cosine similarity accuracy. It involves selecting intruder words
@@ -490,7 +487,7 @@ class INT(AbstractMetric):
         return float(np.mean(list(self.score_per_topic(topics).values())))
 
 
-class ISH(AbstractMetric):
+class ISH(BaseMetric):
     """
     A metric class to calculate the Intruder Similarity to Mean (ISH) for topics. This metric evaluates
     the distinctiveness of topics by measuring the average cosine similarity between the mean of the
