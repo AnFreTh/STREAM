@@ -383,7 +383,7 @@ To evaluate your model simply use one of the metrics.
 ```python
 from stream_topic.metrics import ISIM, INT, ISH,Expressivity, NPMI
 
-metric = ISIM(dataset)
+metric = ISIM()
 metric.score(topics)
 ```
 
@@ -395,14 +395,16 @@ metric.score_per_topic(topics)
 To leverage one of the metrics available in [octis](https://github.com/MIND-Lab/OCTIS), simply create a model output that fits within the octis' framework
 
 ```python
-model_output = {"topics": model.get_topics(), "topic-word-matrix": model.get_beta(), "topic-document-matrix": model.get_theta()}
-
 from octis.evaluation_metrics.diversity_metrics import TopicDiversity
+
+model_output = {"topics": model.get_topics(), "topic-word-matrix": model.get_beta(), "topic-document-matrix": model.get_theta()}
 
 metric = TopicDiversity(topk=10) # Initialize metric
 topic_diversity_score = metric.score(model_output)
 
 ```
+
+Similarly to use one of STREAMS metrics for any model, use the topics and occasionally the $\beta$ (topic-word-matrix) of the model to calculate the score.
 
 ## Hyperparameter optimization
 If you want to optimize the hyperparameters, simply run:
