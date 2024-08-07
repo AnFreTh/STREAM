@@ -4,6 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import pathlib
@@ -11,8 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("../"))
-sys.path.insert(1, os.path.dirname(
-    os.path.abspath("../")) + os.sep + "stream")
+sys.path.insert(1, os.path.dirname(os.path.abspath("../")) + os.sep + "stream")
 
 project = "stream_topic"
 author = "Anton Frederik Thielmann"
@@ -37,7 +37,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_togglebutton",
     "nbsphinx",
-    'myst_nb',
+    "myst_nb",
     "IPython.sphinxext.ipython_console_highlighting",
     "IPython.sphinxext.ipython_directive",
     # "myst_parser",
@@ -64,7 +64,6 @@ autodoc_mock_imports = [
     "gensim",
     "nltk",
     "langdetect",
-    "octis",
     "loguru",
     "scipy",
     "community",
@@ -75,9 +74,7 @@ autodoc_mock_imports = [
     "umap_learn",
     "dash",
     "optuna",
-    "optuna-integration"
-    ""
-
+    "optuna-integration" "",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -123,8 +120,8 @@ pygments_style = "sphinx"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_book_theme"
-html_static_path = ['_static']
-html_css_files = ['css/stream_theme.css']
+html_static_path = ["_static"]
+html_css_files = ["css/stream_theme.css"]
 # html_css_files = ['custom.css']
 # html_js_files = ['custom.js']
 
@@ -161,12 +158,12 @@ numpydoc_show_class_members = False
 
 # -- Options for myst ----------------------------------------------
 # uncomment line below to avoid running notebooks during development
-nb_execution_mode = 'off'
+nb_execution_mode = "off"
 # Notebook cell execution timeout; defaults to 30.
 nb_execution_timeout = 100
 # List of patterns, relative to source directory, that match notebook
 # files that will not be executed.
-myst_enable_extensions = ['dollarmath']
+myst_enable_extensions = ["dollarmath"]
 
 # raise exceptions on execution so CI can catch errors
 nb_execution_allow_errors = False
@@ -178,4 +175,6 @@ myst_enable_extensions = [
     # other MyST extensions
 ]
 
-mathjax_path = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+mathjax_path = (
+    "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+)
