@@ -2,17 +2,13 @@ import gensim
 import nltk
 import numpy as np
 from nltk.corpus import stopwords
-from octis.evaluation_metrics.metrics import AbstractMetric
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
-
+from .base import BaseMetric
 from ._helper_funcs import (
     cos_sim_pw,
-    embed_corpus,
     embed_stopwords,
-    embed_topic,
-    update_corpus_dic_list,
 )
 from .constants import (
     EMBEDDING_PATH,
@@ -29,7 +25,7 @@ STOPWORDS = list(
 )
 
 
-class Embedding_Topic_Diversity(AbstractMetric):
+class Embedding_Topic_Diversity(BaseMetric):
     """
     A metric class to calculate the diversity of topics based on word embeddings. It computes
     the mean cosine similarity of the mean vectors of the top words of all topics, providing
@@ -204,7 +200,7 @@ class Embedding_Topic_Diversity(AbstractMetric):
         return results
 
 
-class Expressivity(AbstractMetric):
+class Expressivity(BaseMetric):
     """
     A metric class to calculate the expressivity of topics by measuring the distance between
     the mean vector of the top words in a topic and the mean vector of the embeddings of
