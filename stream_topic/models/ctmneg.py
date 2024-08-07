@@ -549,6 +549,8 @@ class CTMNeg(BaseModel, SentenceEncodingMixin):
         self.hparams["inference_type"] = trial.suggest_categorical(
             "inference_type", ["combined", "zeroshot"]
         )
+        self.hparams["lr"] = trial.suggest_float("lr", 1e-5, 1e-2)
+        self.hparams["weight_decay"] = trial.suggest_float("weight_decay", 1e-7, 1e-3)
         self.hparams["inference_activation"] = trial.suggest_categorical(
             "inference_activation", ["Softplus", "ReLU", "LeakyReLU", "Tanh"]
         )
