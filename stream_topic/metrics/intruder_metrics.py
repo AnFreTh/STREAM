@@ -31,7 +31,7 @@ class ISIM(BaseMetric):
 
     Examples
     --------
-    >>> from stream_topic import SentenceTransformer
+    >>> from stream_topic.metrics import SentenceTransformer
     >>> topics = [
     ...     ["apple", "banana", "cherry", "date", "fig"],
     ...     ["dog", "cat", "rabbit", "hamster", "gerbil"]
