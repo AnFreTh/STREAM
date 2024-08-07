@@ -2,16 +2,16 @@
   <img src="./docs/images/logos/STREAM_2.jpg" width="400"/>
 
 
-[![PyPI](tbd)](tbd)
-![PyPI - Downloads](tbd)
-[![docs build](https://readthedocs.org/projects/stream/badge/?version=latest)](tbd)
-[![docs](https://img.shields.io/badge/docs-latest-blue)](tbd)
+[![PyPI](https://img.shields.io/pypi/v/stream_topic)](https://pypi.org/project/stream_topic)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/stream_topic)
+[![docs build](https://readthedocs.org/projects/stream_topic/badge/?version=latest)](https://stream_topic.readthedocs.io/en/latest/?badge=latest)
+[![docs](https://img.shields.io/badge/docs-latest-blue)](https://stream-topic.readthedocs.io/en/latest/index.html)
 [![open issues](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/AnFreTh/STREAM/issues)
 
 
-[📘Documentation](tbd) |
-[🛠️Installation](#installation) |
-[Models](#available-models) |
+[📘Documentation](https://stream-topic.readthedocs.io/en/latest/index.html) |
+[🛠️Installation](https://stream-topic.readthedocs.io/en/latest/installation.html) |
+[Models](https://stream-topic.readthedocs.io/en/latest/api/models/index.html) |
 [🤔Report Issues](https://github.com/AnFreTh/STREAM/issues)
 </div>
 
