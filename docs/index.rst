@@ -14,6 +14,7 @@
    installation
    Quickstart <notebooks/quickstart>
    Datasets <notebooks/datasets>
+   Examples <notebooks/examples>
 
 
 .. toctree::
