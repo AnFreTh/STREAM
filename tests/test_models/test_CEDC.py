@@ -1,11 +1,13 @@
-import unittest
-from unittest.mock import patch, MagicMock
-import pandas as pd
-import numpy as np
 import random
 import string
-from stream.models.CEDC import CEDC
-from stream.data_utils.dataset import TMDataset
+import unittest
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
+
+from stream_topic.models.CEDC import CEDC
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestCEDC(unittest.TestCase):
@@ -17,7 +19,8 @@ class TestCEDC(unittest.TestCase):
 
         # Generate random words and create a dataframe
         random_texts = [
-            "sample text " + "".join(random.choices(string.ascii_lowercase, k=250))
+            "sample text " +
+            "".join(random.choices(string.ascii_lowercase, k=250))
             for _ in range(50)
         ]
         self.mock_dataset.dataframe = pd.DataFrame({"text": random_texts})

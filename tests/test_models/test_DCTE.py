@@ -1,10 +1,12 @@
-import unittest
-from unittest.mock import patch, MagicMock
-import pandas as pd
 import random
 import string
-from stream.models.DCTE import DCTE
-from stream.data_utils.dataset import TMDataset
+import unittest
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
+
+from stream_topic.models.DCTE import DCTE
+from stream_topic.utils.dataset import TMDataset
 
 
 class TestDCTE(unittest.TestCase):
@@ -14,8 +16,10 @@ class TestDCTE(unittest.TestCase):
         labels = ["A", "B", "C", "D", "E"]
         text_data = [
             " ".join(
-                "".join(random.choices(string.ascii_lowercase, k=random.randint(1, 15)))
-                for _ in range(random.randint(5, 10))  # Each document has 5-10 words
+                "".join(random.choices(
+                    string.ascii_lowercase, k=random.randint(1, 15)))
+                # Each document has 5-10 words
+                for _ in range(random.randint(5, 10))
             )
             for _ in range(50)  # 50 documents
         ]
@@ -29,7 +33,8 @@ class TestDCTE(unittest.TestCase):
         self.mock_dataset.get_vocabulary = lambda: list(
             set(word for text in text_data for word in text.split())
         )
-        self.mock_dataset.get_corpus = lambda: [text.split() for text in text_data]
+        self.mock_dataset.get_corpus = lambda: [
+            text.split() for text in text_data]
 
         self.model = DCTE(num_topics=3, num_iterations=1, num_epochs=1)
 

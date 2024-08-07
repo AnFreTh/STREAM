@@ -1,25 +1,42 @@
-dash
-datasets
-gensim
-matplotlib
-nltk
-numpy
-octis==1.13.1
+# basics
+numpy<=1.26.4
 pandas
-plotly
 pyarrow
-scikit_learn
+scikit-learn==1.1.0
 scipy==1.10.1
-seaborn
-sentence_transformers
-setfit
-setuptools
-tqdm
-umap_learn
-wordcloud
+
+# dl
+lightning==2.3.3
+torch==2.4.0
+
+# nlp
+transformers==4.40.2
+setfit==1.0.3
+gensim==4.2.0
+umap-learn==0.5.6
+wordcloud==1.9.3
+
 community
-networkx
+networkx==3.3
 python_louvain
-pytorch_lightning
-torch
-hdbscan
+langdetect
+hdbscan==0.8.37
+huggingface_hub==0.23.5
+# nltk
+# datasets==2.20.0
+# sentence-transformers==3.0.1
+
+
+# plotting
+dash
+plotly
+matplotlib
+
+# misc
+loguru
+ipywidgets
+ipykernel<6.22.0
+# tqdm
+# pre-commit
+optuna==3.6.1
+optuna-integration==3.6.0
