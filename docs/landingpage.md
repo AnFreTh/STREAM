@@ -8,9 +8,7 @@ Since most of STREAMs models are centered around Document embeddings, STREAM com
 Additionally, once a user fits a model that leverages document embeddings, the embeddings are saved and automatically loaded the next time the user wants to fit any model with the same set of embeddings.
 
 
-<p align="center">
-    <img src="https://github.com/AnFreTh/STREAM/blob/develop/assets/model_plot.png" alt="Figure Description" width="400"/>
-</p>
+![Model plot](./images/model_plot.png)
 
 Installation
 =============
@@ -149,101 +147,6 @@ Since evaluating topic models, especially automatically, STREAM implements numer
 </div>
 
 
-
-
-
-# Available Datasets
-
-To integrate custom datasets for modeling with STREAM, please follow the example notebook in the examples folder. For benchmarking new models, STREAM already includes the following datasets:
-<div align="center" style="width: 100%;">
-  <table style="margin: 0 auto;">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th># Docs</th>
-      <th># Words</th>
-      <th># Features</th>
-      <th>Description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Spotify_most_popular</td>
-      <td>4,538</td>
-      <td>53,181</td>
-      <td>14</td>
-      <td>Spotify dataset comprised of popular song lyrics and various tabular features.</td>
-    </tr>
-    <tr>
-      <td>Spotify_least_popular</td>
-      <td>4,374</td>
-      <td>111,738</td>
-      <td>14</td>
-      <td>Spotify dataset comprised of less popular song lyrics and various tabular features.</td>
-    </tr>
-    <tr>
-      <td>Spotify</td>
-      <td>4,185</td>
-      <td>80,619</td>
-      <td>14</td>
-      <td>General Spotify dataset with song lyrics and various tabular features.</td>
-    </tr>
-    <tr>
-      <td>Reddit_GME</td>
-      <td>21,549</td>
-      <td>21,309</td>
-      <td>6</td>
-      <td>Reddit dataset filtered for "Gamestop" (GME) from the Subreddit "r/wallstreetbets".</td>
-    </tr>
-    <tr>
-      <td>Stocktwits_GME</td>
-      <td>11,114</td>
-      <td>19,383</td>
-      <td>3</td>
-      <td>Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.</td>
-    </tr>
-    <tr>
-      <td>Stocktwits_GME_large</td>
-      <td>136,138</td>
-      <td>80,435</td>
-      <td>3</td>
-      <td>Larger Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.</td>
-    </tr>
-    <tr>
-      <td>Reuters</td>
-      <td>8,929</td>
-      <td>24,803</td>
-      <td>-</td>
-      <td>Preprocessed Reuters dataset well suited for comparing topic model outputs.</td>
-    </tr>
-    <tr>
-      <td>Poliblogs</td>
-      <td>13,246</td>
-      <td>70,726</td>
-      <td>4</td>
-      <td>Preprocessed Poliblogs dataset well suited for comparing topic model outputs.</td>
-    </tr>
-    <tr>
-      <td>20NewsGroup</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
-    </tr>
-    <tr>
-      <td>BBCNews</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-If you wish yo include and publish one of your datasets directly into the package, feel free to contact us.
-
-
-
 # Usage
 
 To use one of the available models, follow the simple steps below:
@@ -256,6 +159,7 @@ To use one of the available models, follow the simple steps below:
 ## Preprocessing
 
 2. Get your dataset and preprocess for your model:
+
     ```python
     dataset = TMDataset()
     dataset.fetch_dataset("20NewsGroup")
@@ -279,6 +183,7 @@ Fitting a model from STREAM follows a simple, sklearn-like logic and every model
 Depending on the model, check the documentation for hyperparameter settings. To get the topics, simply run:
 
 1. Get the topics:
+
     ```python
     topics = model.get_topics()
     ```
@@ -286,6 +191,7 @@ Depending on the model, check the documentation for hyperparameter settings. To 
 ## Evaluation
 
 In this section, we describe the three metrics used to evaluate topic models' performance: **Intruder Shift (ISH)**, **Intruder Accuracy (INT)**, and **Average Intruder Similarity (ISIM)**.
+
 
 ### Expressivity
 
@@ -378,9 +284,9 @@ visualize_topic_model(
     )
 ```
 
-<p align="center">
-    <img src="https://github.com/AnFreTh/STREAM/blob/develop/assets/topical_distances.png" alt="Figure Description" width="600"/>
-</p>
+
+![Topical distance plot](./images/topical_distances.png)
+
 
 ## Downstream Tasks
 
@@ -436,22 +342,28 @@ We welcome contributions to enhance the functionality of our topic modeling pack
 
 ### Steps for Contributing
 
+
 1. **Fork the Repository**:
+
    - Fork the repository to your GitHub account.
    - Clone the forked repository to your local machine.
+
    ```bash
    git clone https://github.com/your-username/your-repository.git
    cd your-repository
    ```
 
 2. **Create a New Branch**:
+
    - Ensure you are on the develop branch and create a new branch for your model development.
+
    ```bash
    git checkout develop
    git checkout -b new-model-branch
    ```
 
 3. **Develop Your Model**:
+
    - Navigate to the `mypackage/models/` directory.
    - Create your model class file, ensuring it follows the expected structure and naming conventions.
    - Implement the required methods (`get_info`, `fit`, `predict`) and attributes (`topic_dict`). Optionally, implement `beta`, `theta`, or corresponding methods (`get_beta`, `get_theta`).
@@ -495,18 +407,23 @@ class ExampleModel(BaseModel):
 #### Testing Your Model
 
 1. **Install Dependencies**:
+
    - Ensure all dependencies are installed.
+
    ```bash
    pip install -r requirements.txt
    ```
 
 2. **Validate Your Model**:
+
    - To validate your model, use `tests/validate_new_model.py` to include your new model class.
+
    ```python
    from tests.model_validation import validate_model
 
    validate_model(NewModel)
    ```
+
 If this validation fails, it will tell you 
 
 #### Validation Criteria
@@ -524,19 +441,24 @@ Refer to the `tests/model_validation.py` script for detailed validation logic.
 #### Submitting Your Contribution
 
 1. **Commit Your Changes**:
+
    - Commit your changes to your branch.
+
    ```bash
    git add .
    git commit -m "Add new model: YourModelName"
    ```
 
 2. **Push to GitHub**:
+
    - Push your branch to your GitHub repository.
+
    ```bash
    git push origin new-model-branch
    ```
 
 3. **Create a Pull Request**:
+
    - Go to the original repository on GitHub.
    - Create a pull request from your forked repository and branch.
    - Provide a clear description of your changes and request a review.
