@@ -183,3 +183,4 @@ post-checkout
 post-commit
 post-merge
 pre-push
+docs/notebooks/lightning_logs/*
