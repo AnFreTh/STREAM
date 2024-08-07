@@ -1,8 +1,7 @@
-import json
 import os
 import pickle
 import re
-
+import importlib.util
 import gensim.downloader as api
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ from loguru import logger
 from sentence_transformers import SentenceTransformer
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import Dataset, random_split
 
 from ..commons.load_steps import load_model_preprocessing_steps
 from ..preprocessor import TextPreprocessor
@@ -201,9 +200,17 @@ class TMDataset(Dataset):
         str
             Path to the dataset.
         """
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(my_package_dir, "preprocessed_datasets", name)
+        # Get the location of the installed package
+        package_name = "stream_topic"
+        spec = importlib.util.find_spec(package_name)
+        if spec is None:
+            raise ImportError(f"Cannot find the package '{package_name}'")
+
+        package_root_dir = os.path.dirname(spec.origin)
+
+        # Construct the full path to the dataset
+        dataset_path = os.path.join(package_root_dir, "preprocessed_datasets", name)
+
         return dataset_path
 
     def has_embeddings(self, embedding_model_name, path=None, file_name=None):
@@ -336,10 +343,18 @@ class TMDataset(Dataset):
         str
             Path to the embeddings.
         """
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        my_package_dir = os.path.dirname(script_dir)
-        dataset_path = os.path.join(my_package_dir, "pre_embedded_datasets", name)
-        return dataset_path
+        # Get the location of the installed package
+        package_name = "stream_topic"
+        spec = importlib.util.find_spec(package_name)
+        if spec is None:
+            raise ImportError(f"Cannot find the package '{package_name}'")
+
+        package_root_dir = os.path.dirname(spec.origin)
+
+        # Construct the full path to the dataset
+        embedding_path = os.path.join(package_root_dir, "pre_embedded_datasets", name)
+
+        return embedding_path
 
     def create_load_save_dataset(
         self,
