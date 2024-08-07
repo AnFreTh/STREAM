@@ -171,3 +171,9 @@ myst_enable_extensions = ['dollarmath']
 # raise exceptions on execution so CI can catch errors
 nb_execution_allow_errors = False
 nb_execution_raise_on_error = True
+
+myst_enable_extensions = [
+    "amsmath",
+    "dollarmath",
+    # other MyST extensions
+]
