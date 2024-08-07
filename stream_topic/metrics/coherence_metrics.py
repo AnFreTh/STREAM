@@ -34,10 +34,23 @@ class NPMI(AbstractMetric):
 
     Attributes
     ----------
-        stopwords (list): A list of stopwords to exclude from analysis.
-        ntopics (int): The number of topics to evaluate.
-        dataset: The dataset used for calculating NPMI.
-        files (list): Processed text data from the dataset.
+    stopwords : list
+        A list of stopwords to exclude from analysis.
+    ntopics : int
+        The number of topics to evaluate.
+    dataset
+        The dataset used for calculating NPMI.
+    files : list
+        Processed text data from the dataset.
+
+    Examples
+    --------
+    >>> from stream_topic.metrics import NPMI
+    >>> npmi = NPMI(dataset)
+    >>> avg_npmi_score = npmi.score(topic_words)
+    >>> print("Average NPMI score:", avg_npmi_score)
+    >>> per_topic_scores = npmi.score_per_topic(topic_words)
+    >>> print("NPMI scores per topic:", per_topic_scores)
     """
 
     def __init__(
@@ -50,9 +63,10 @@ class NPMI(AbstractMetric):
 
         Parameters
         ----------
-            dataset: The dataset to be used for NPMI calculation.
-            stopwords (list, optional): A list of stopwords to exclude from analysis. Default includes GenSim, NLTK, and Scikit-learn stopwords.
-            n_topics (int, optional): The number of topics to evaluate. Defaults to 20.
+        dataset
+            The dataset to be used for NPMI calculation.
+        stopwords : list, optional
+            A list of stopwords to exclude from analysis. Default includes GenSim, NLTK, and Scikit-learn stopwords.
         """
         self.stopwords = stopwords
         if stopwords is None:
@@ -71,13 +85,17 @@ class NPMI(AbstractMetric):
 
         Parameters
         ----------
-            data (list): The text data to process.
-            preprocess (int): The minimum number of documents a word must appear in.
-            process_data (bool, optional): Whether to return the processed data. Defaults to False.
+        data : list
+            The text data to process.
+        preprocess : int
+            The minimum number of documents a word must appear in.
+        process_data : bool, optional
+            Whether to return the processed data. Defaults to False.
 
         Returns
         -------
-            tuple: A tuple containing word-to-document mappings, multiple word-to-document mappings,
+        tuple
+            A tuple containing word-to-document mappings, multiple word-to-document mappings,
             and optionally processed data.
         """
         word_to_file = {}
@@ -134,12 +152,13 @@ class NPMI(AbstractMetric):
 
         Parameters
         ----------
-            preprocess (int, optional): The minimum number of documents a word must appear in.
-                Defaults to 5.
+        preprocess : int, optional
+            The minimum number of documents a word must appear in. Defaults to 5.
 
         Returns
         -------
-            tuple: A tuple containing word-to-document mappings and other relevant data for NPMI calculation.
+        tuple
+            A tuple containing word-to-document mappings and other relevant data for NPMI calculation.
         """
         return self._create_vocab_preprocess(self.files, preprocess)
 
@@ -152,11 +171,13 @@ class NPMI(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics.
+        topic_words : list of list of str
+            The output of a topic model, containing a list of topics.
 
         Returns
         -------
-            float: The average NPMI score for the topics.
+        float
+            The average NPMI score for the topics.
         """
         self.ntopics = len(topic_words)
         (
@@ -207,14 +228,15 @@ class NPMI(AbstractMetric):
 
         Parameters
         ----------
-            topic_words (list): A list of lists containing words in each topic.
-            ntopics (int): The number of topics.
-            preprocess (int, optional): The minimum number of documents a word must appear in.
-                Defaults to 5.
+        topic_words : list of list of str
+            A list of lists containing words in each topic.
+        preprocess : int, optional
+            The minimum number of documents a word must appear in. Defaults to 5.
 
         Returns
         -------
-            dict: A dictionary with topics as keys and their corresponding NPMI scores as values.
+        dict
+            A dictionary with topics as keys and their corresponding NPMI scores as values.
         """
 
         ntopics = len(topic_words)
@@ -272,8 +294,18 @@ class Embedding_Coherence(AbstractMetric):
 
     Attributes
     ----------
-        n_words (int): The number of top words to consider for each topic.
-        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
+    n_words : int
+        The number of top words to consider for each topic.
+    metric_embedder : SentenceTransformer
+        The SentenceTransformer model to use for embedding.
+
+    Examples
+    --------
+    >>> metric = Embedding_Coherence()
+    >>> topic_scores = metric.score_per_topic(topics)
+    >>> print("Coherence scores per topic:", topic_scores)
+    >>> overall_score = metric.score(topics)
+    >>> print("Overall coherence score:", overall_score)
     """
 
     def __init__(
@@ -289,10 +321,14 @@ class Embedding_Coherence(AbstractMetric):
 
         Parameters
         ----------
-        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
-        emb_filename (str, optional): The filename for the embedding model. Defaults to None.
-        emb_path (str, optional): The path to the embedding model. Defaults to EMBEDDING_PATH.
+        n_words : int, optional
+            The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder : SentenceTransformer, optional
+            The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
+        emb_filename : str, optional
+            The filename for the embedding model. Defaults to None.
+        emb_path : str, optional
+            The path to the embedding model. Defaults to EMBEDDING_PATH.
         """
 
         self.topword_embeddings = TopwordEmbeddings(
@@ -312,11 +348,13 @@ class Embedding_Coherence(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics.
+        topics : list of list of str
+            The output of a topic model, containing a list of topics.
 
         Returns
         -------
-            numpy.ndarray: An array of coherence scores for each topic.
+        dict
+            A dictionary where the keys are comma-separated top words of each topic and the values are the coherence scores.
         """
         topics = topics
         n_topics = len(topics)
@@ -350,11 +388,13 @@ class Embedding_Coherence(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics.
+        topics : list of list of str
+            The output of a topic model, containing a list of topics.
 
         Returns
         -------
-            float: The average coherence score for all topics.
+        float
+            The average coherence score for all topics.
         """
         res = self.score_per_topic(topics).values()
         return sum(res) / len(res)
