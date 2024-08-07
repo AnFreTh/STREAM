@@ -37,8 +37,23 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
     Attributes
     ----------
-        n_words (int): The number of top words to consider for each topic.
-        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
+        n_words : int
+            The number of top words to consider for each topic.
+        metric_embedder : SentenceTransformer
+            The SentenceTransformer model to use for embedding.
+
+    Examples
+    --------
+    >>> topics = [
+    ...     ["apple", "banana", "cherry", "date", "fig"],
+    ...     ["dog", "cat", "rabbit", "hamster", "gerbil"]
+    ... ]
+    >>> beta = np.random.rand(2, 5)
+    >>> diversity_metric = Embedding_Topic_Diversity()
+    >>> info = diversity_metric.get_info()
+    >>> print("Metric Info:", info)
+    >>> scores = diversity_metric.score(topics, beta)
+    >>> print("Diversity score:", scores)
     """
 
     def __init__(
@@ -49,15 +64,19 @@ class Embedding_Topic_Diversity(AbstractMetric):
         emb_path: str = EMBEDDING_PATH,
     ):
         """
-        Initializes the Embedding_Coherence object with the number of top words to consider
+        Initializes the Embedding_Topic_Diversity object with the number of top words to consider
         and the embedding model to use.
 
         Parameters
         ----------
-        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
-        emb_filename (str, optional): The filename of the embeddings to load. Defaults to None.
-        emb_path (str, optional): The path to the embeddings file. Defaults to "/embeddings".
+        n_words : int, optional
+            The number of top words to consider for each topic. Defaults to 10.
+        metric_embedder : SentenceTransformer, optional
+            The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
+        emb_filename : str, optional
+            The filename of the embeddings to load. Defaults to None.
+        emb_path : str, optional
+            The path to the embeddings file. Defaults to "/embeddings".
         """
 
         self.topword_embeddings = TopwordEmbeddings(
@@ -68,6 +87,26 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         self.n_words = n_words
 
+    def get_info(self):
+        """
+        Get information about the metric.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including metric name,
+            number of top words, embedding model name,
+            metric range, and metric description.
+        """
+        info = {
+            "metric_name": "Embedding Topic Diversity",
+            "n_words": self.n_words,
+            "embedding_model_name": self.topword_embeddings.word_embedding_model,
+            "metric_range": "0 to 1, smaller is better",
+            "description": "The diversity metric measures the mean cosine similarity of the mean vectors of the top words of all topics.",
+        }
+        return info
+
     def score(self, topics, beta):
         """
         Calculates the overall diversity score for the given model output.
@@ -77,12 +116,15 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics
-                                 and a topic-word matrix.
+        topics : list of list of str
+            The output of a topic model, containing a list of topics and a topic-word matrix.
+        beta : numpy.ndarray
+            The topic-word distribution matrix.
 
         Returns
         -------
-            float: The overall diversity score for all topics.
+        float
+            The overall diversity score for all topics.
         """
         topics_tw = topics  # size: (n_topics, voc_size)
         topic_weights = beta[:, : self.n_words]  # select the weights of the top words
@@ -113,12 +155,15 @@ class Embedding_Topic_Diversity(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics
-                                 and a topic-word matrix.
+        topics : list of list of str
+            The output of a topic model, containing a list of topics and a topic-word matrix.
+        beta : numpy.ndarray
+            The topic-word distribution matrix.
 
         Returns
         -------
-            numpy.ndarray: An array of diversity scores for each topic.
+        numpy.ndarray
+            An array of diversity scores for each topic.
         """
         topics_tw = topics  # size: (n_topics, voc_size)
         topic_weights = beta[
@@ -168,8 +213,29 @@ class Expressivity(AbstractMetric):
 
     Attributes
     ----------
-        n_words (int): The number of top words to consider for each topic.
-        metric_embedder (SentenceTransformer): The SentenceTransformer model to use for embedding.
+    n_words : int
+        The number of top words to consider for each topic.
+    metric_embedder : SentenceTransformer
+        The SentenceTransformer model to use for embedding.
+    stopwords : list
+        A list of stopwords to use for the expressivity calculation.
+
+    Examples
+    --------
+    >>> from sentence_transformers import SentenceTransformer
+    >>> topics = [
+    ...     ["apple", "banana", "cherry", "date", "fig"],
+    ...     ["dog", "cat", "rabbit", "hamster", "gerbil"]
+    ... ]
+    >>> expressivity_metric = Expressivity(
+    ...     n_words=5,
+    ...     stopwords=["the", "is", "at", "which", "on"],
+    ...     metric_embedder=SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    ... )
+    >>> info = expressivity_metric.get_info()
+    >>> print("Metric Info:", info)
+    >>> scores = expressivity_metric.score(topics, beta)
+    >>> print("Expressivity scores:", scores)
     """
 
     def __init__(
@@ -181,16 +247,21 @@ class Expressivity(AbstractMetric):
         emb_path: str = EMBEDDING_PATH,
     ):
         """
-        Initializes the Embedding_Coherence object with the number of top words to consider
+        Initializes the Expressivity object with the number of top words to consider
         and the embedding model to use.
 
         Parameters
         ----------
-        n_words (int, optional): The number of top words to consider for each topic. Defaults to 10.
-        stopwords (list, optional): A list of stopwords to use for the expressivity calculation. Defaults includes list of NLTK, Gensim, and Scikit-learn stopwords.
-        metric_embedder (SentenceTransformer, optional): The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
-        emb_filename (str, optional): The filename of the embeddings to load. Defaults to None.
-        emb_path (str, optional): The path to the embeddings file. Defaults to "/embeddings".
+        n_words : int, optional
+            The number of top words to consider for each topic. Defaults to 10.
+        stopwords : list, optional
+            A list of stopwords to use for the expressivity calculation. Defaults includes list of NLTK, Gensim, and Scikit-learn stopwords.
+        metric_embedder : SentenceTransformer, optional
+            The SentenceTransformer model to use for embedding. Defaults to "paraphrase-MiniLM-L6-v2".
+        emb_filename : str, optional
+            The filename of the embeddings to load. Defaults to None.
+        emb_path : str, optional
+            The path to the embeddings file. Defaults to "/embeddings".
         """
         self.stopwords = stopwords
         if stopwords is None:
@@ -211,6 +282,26 @@ class Expressivity(AbstractMetric):
             np.array(self.stopword_emb), axis=0
         )  # mean of stopword embeddings
 
+    def get_info(self):
+        """
+        Get information about the metric.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including metric name,
+            number of top words, embedding model name,
+            metric range, and metric description.
+        """
+        info = {
+            "metric_name": "Expressivity",
+            "n_words": self.n_words,
+            "embedding_model_name": self.topword_embeddings.word_embedding_model,
+            "metric_range": "0 to 1, smaller is better",
+            "description": "The expressivity metric measures the distance between the mean vector of the top words in a topic and the mean vector of the embeddings of the stop words.",
+        }
+        return info
+
     def score(self, topics, beta, new_embeddings=True):
         """
         Calculates the overall expressivity score for the given model output.
@@ -221,13 +312,17 @@ class Expressivity(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics
-                                 and a topic-word matrix.
-            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+        topics : list of list of str
+            The output of a topic model, containing a list of topics and a topic-word matrix.
+        beta : numpy.ndarray
+            The topic-word distribution matrix.
+        new_embeddings : bool, optional
+            Whether to recalculate embeddings. Defaults to True.
 
         Returns
         -------
-            float: The overall expressivity score for all topics.
+        float
+            The overall expressivity score for all topics.
         """
         if new_embeddings:
             self.embeddings = None
@@ -244,13 +339,17 @@ class Expressivity(AbstractMetric):
 
         Parameters
         ----------
-            model_output (dict): The output of a topic model, containing a list of topics
-                                 and a topic-word matrix.
-            new_embeddings (bool, optional): Whether to recalculate embeddings. Defaults to True.
+        topics : list of list of str
+            The output of a topic model, containing a list of topics and a topic-word matrix.
+        beta : numpy.ndarray
+            The topic-word distribution matrix.
+        new_embeddings : bool, optional
+            Whether to recalculate embeddings. Defaults to True.
 
         Returns
         -------
-            numpy.ndarray: An array of expressivity scores for each topic.
+        numpy.ndarray
+            An array of expressivity scores for each topic.
         """
         if new_embeddings:
             self.embeddings = None

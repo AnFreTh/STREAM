@@ -22,7 +22,7 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
 # Table of Contents
 - [STREAM](#stream)
 - [Table of Contents](#table-of-contents)
-    - [Speed](#speed)
+      - [Speed](#speed)
 - [Installation](#installation)
 - [Available Models](#available-models)
 - [Available Metrics](#available-metrics)
@@ -215,73 +215,73 @@ To integrate custom datasets for modeling with STREAM, please follow the example
   <tbody>
     <tr>
       <td>Spotify_most_popular</td>
-      <td>4,538</td>
-      <td>53,181</td>
-      <td>14</td>
+      <td>5,860</td>
+      <td>18,193</td>
+      <td>17</td>
       <td>Spotify dataset comprised of popular song lyrics and various tabular features.</td>
     </tr>
     <tr>
       <td>Spotify_least_popular</td>
-      <td>4,374</td>
-      <td>111,738</td>
+      <td>5,124</td>
+      <td>20,168</td>
       <td>14</td>
       <td>Spotify dataset comprised of less popular song lyrics and various tabular features.</td>
     </tr>
     <tr>
       <td>Spotify</td>
-      <td>4,185</td>
-      <td>80,619</td>
+      <td>11,012</td>
+      <td>25,835</td>
       <td>14</td>
       <td>General Spotify dataset with song lyrics and various tabular features.</td>
     </tr>
     <tr>
       <td>Reddit_GME</td>
-      <td>21,549</td>
-      <td>21,309</td>
+      <td>21,559</td>
+      <td>11,724</td>
       <td>6</td>
       <td>Reddit dataset filtered for "Gamestop" (GME) from the Subreddit "r/wallstreetbets".</td>
     </tr>
     <tr>
       <td>Stocktwits_GME</td>
-      <td>11,114</td>
-      <td>19,383</td>
+      <td>300,000</td>
+      <td>14,707</td>
       <td>3</td>
       <td>Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.</td>
     </tr>
     <tr>
       <td>Stocktwits_GME_large</td>
-      <td>136,138</td>
-      <td>80,435</td>
-      <td>3</td>
+      <td>600,000</td>
+      <td>94,925</td>
+      <td>0</td>
       <td>Larger Stocktwits dataset filtered for "Gamestop" (GME), covering the GME short squeeze of 2021.</td>
     </tr>
     <tr>
       <td>Reuters</td>
-      <td>8,929</td>
-      <td>24,803</td>
+      <td>10,788</td>
+      <td>19,696</td>
       <td>-</td>
-      <td>Preprocessed Reuters dataset well suited for comparing topic model outputs.</td>
+      <td>Preprocessed Reuters dataset.</td>
     </tr>
     <tr>
       <td>Poliblogs</td>
       <td>13,246</td>
-      <td>70,726</td>
-      <td>4</td>
-      <td>Preprocessed Poliblogs dataset well suited for comparing topic model outputs.</td>
+      <td>47,106</td>
+      <td>2</td>
+      <td>Preprocessed Poliblogs dataset suitable for STMs.</td>
     </tr>
     <tr>
-      <td>20NewsGroup</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
+      <td>20NewsGroups</td>
+      <td>18,846</td>
+      <td>70,461</td>
+      <td>-</td>
+      <td>preprocessed 20NewsGroups dataset</td>
     </tr>
     <tr>
-      <td>BBCNews</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
-      <td>tbd</td>
+      <td>BBC_News</td>
+      <td>2,225</td>
+      <td>19,116</td>
+      <td>-</td>
+      <td>preprocessed BBC News dataset</td>
     </tr>
   </tbody>
 </table>
@@ -383,7 +383,7 @@ To evaluate your model simply use one of the metrics.
 ```python
 from stream_topic.metrics import ISIM, INT, ISH,Expressivity, NPMI
 
-metric = ISIM(dataset)
+metric = ISIM()
 metric.score(topics)
 ```
 
@@ -395,14 +395,16 @@ metric.score_per_topic(topics)
 To leverage one of the metrics available in [octis](https://github.com/MIND-Lab/OCTIS), simply create a model output that fits within the octis' framework
 
 ```python
-model_output = {"topics": model.get_topics(), "topic-word-matrix": model.get_beta(), "topic-document-matrix": model.get_theta()}
-
 from octis.evaluation_metrics.diversity_metrics import TopicDiversity
+
+model_output = {"topics": model.get_topics(), "topic-word-matrix": model.get_beta(), "topic-document-matrix": model.get_theta()}
 
 metric = TopicDiversity(topk=10) # Initialize metric
 topic_diversity_score = metric.score(model_output)
 
 ```
+
+Similarly to use one of STREAMS metrics for any model, use the topics and occasionally the $\beta$ (topic-word-matrix) of the model to calculate the score.
 
 ## Hyperparameter optimization
 If you want to optimize the hyperparameters, simply run:
