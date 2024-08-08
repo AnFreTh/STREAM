@@ -141,7 +141,7 @@ class TMDataset(Dataset):
         dataset_path : str, optional
             Path to the dataset directory.
         source : str, optional
-            Source of the dataset, by default 'github'. Use 'local' if dataset is available in locally. Then provide the dataset_path.
+            Source of the dataset, by default 'github'. Use 'local' if dataset is available in locally. Then, provide the dataset_path.
         """
         if name not in self.available_datasets:
             logger.error(
@@ -156,7 +156,7 @@ class TMDataset(Dataset):
                 f"Dataset name already provided while instantiating the class: {self.name}"
             )
             logger.info(
-                f"Overwriting the dataset name with the provided name in fetch_dataset: {name}"
+                f"Overwriting the dataset name with the name provided in fetch_dataset: {name}"
             )
             self.name = name
             logger.info(f"Fetching dataset: {name}")
@@ -165,8 +165,12 @@ class TMDataset(Dataset):
             logger.info(f"Fetching dataset: {name}")
 
         if source == 'github' and dataset_path is None:
-            logger.info(f"Fetching dataset from github")
+            # logger.info(f"Fetching dataset from github")
             self.load_custom_dataset_from_url(name)
+            data_home = get_data_home()
+            dataset_path = os.path.join(
+                data_home, "preprocessed_datasets", name)
+            self.info = self.get_info(dataset_path)
         elif source == 'local' and dataset_path is not None:
             logger.info(f"Fetching dataset from local path")
             self.load_custom_dataset_from_folder(dataset_path)
@@ -183,6 +187,11 @@ class TMDataset(Dataset):
                     f"Dataset path {dataset_path} does not exist.")
             # self._load_data_to_dataframe()
             self.info = self.get_info(dataset_path)
+        else:
+            logger.error(
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset.")
+            raise ValueError(
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset.")
 
     def _load_data_to_dataframe(self):
         """
@@ -580,14 +589,13 @@ class TMDataset(Dataset):
             raise ValueError(f"Dataset path {dataset_path} does not exist.")
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
-        if not os.path.exists(info_path):
+        if os.path.exists(info_path):
+            with open(info_path, "rb") as info_file:
+                dataset_info = pickle.load(info_file)
+            return dataset_info
+        else:
             raise FileNotFoundError(
                 f"Dataset info file {info_path} does not exist.")
-
-        with open(info_path, "rb") as info_file:
-            dataset_info = pickle.load(info_file)
-
-        return dataset_info
 
     @staticmethod
     def clean_text(text):
@@ -681,7 +689,7 @@ class TMDataset(Dataset):
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
-    def load_custom_dataset_from_url(self, dataset_path):
+    def load_custom_dataset_from_url(self, dataset_path=None):
         """
         Load a custom dataset from a folder.
 
@@ -693,11 +701,15 @@ class TMDataset(Dataset):
         BASE_URL = "https://raw.githubusercontent.com/mkumar73/stream_topic_data/main/datasets/preprocessed_datasets/"
         git_parquet_path = os.path.join(
             BASE_URL, self.name, f"{self.name}.parquet")
+        git_pkl_path = os.path.join(
+            BASE_URL, self.name, f"{self.name}_info.pkl")
         data_home = get_data_home()
         save_dir = os.path.join(data_home, "preprocessed_datasets", self.name)
+
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         local_parquet_path = os.path.join(save_dir, f"{self.name}.parquet")
+        local_pkl_path = os.path.join(save_dir, f"{self.name}_info.pkl")
 
         if url_exists(git_parquet_path):
             logger.info(f"Downloading dataset from github")
@@ -706,6 +718,7 @@ class TMDataset(Dataset):
                 f"Dataset downloaded successfully at ~/stream_topic_data/ folder")
             self.load_dataset_from_parquet(local_parquet_path)
         else:
+            # TODO: need to be refactored to include githb url for corpus and labels
             documents_path = os.path.join(dataset_path, "corpus.txt")
             labels_path = os.path.join(dataset_path, "labels.txt")
 
@@ -726,6 +739,12 @@ class TMDataset(Dataset):
                 lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
+
+        if url_exists(git_pkl_path):
+            logger.info(f"Downloading dataset info from github")
+            download_file_from_github(git_pkl_path, local_pkl_path)
+            logger.info(
+                f"Dataset info downloaded successfully at ~/stream_topic_data/ folder")
 
     def get_corpus(self):
         """
@@ -982,7 +1001,6 @@ def get_data_home(data_home=None):
     -------
     str
         Path to the data home directory.
-
 
     """
     if data_home is None:
