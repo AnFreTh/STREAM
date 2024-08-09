@@ -9,9 +9,10 @@ from loguru import logger
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import Dataset, random_split
-from .data_downloader import DataDownloader, get_data_home
+
 from ..commons.load_steps import load_model_preprocessing_steps
 from ..preprocessor import TextPreprocessor
+from .data_downloader import DataDownloader, get_data_home
 
 
 class TMDataset(Dataset, DataDownloader):
@@ -120,7 +121,8 @@ class TMDataset(Dataset, DataDownloader):
             # logger.info(f"Fetching dataset from github")
             self.load_custom_dataset_from_url(name)
             data_home = get_data_home()
-            dataset_path = os.path.join(data_home, "preprocessed_datasets", name)
+            dataset_path = os.path.join(
+                data_home, "preprocessed_datasets", name)
             self.info = self.get_info(dataset_path)
         elif source == "local" and dataset_path is not None:
             logger.info(f"Fetching dataset from local path")
@@ -134,7 +136,8 @@ class TMDataset(Dataset, DataDownloader):
                 logger.info(f"Dataset loaded successfully from {dataset_path}")
             else:
                 logger.error(f"Dataset path {dataset_path} does not exist.")
-                raise ValueError(f"Dataset path {dataset_path} does not exist.")
+                raise ValueError(
+                    f"Dataset path {dataset_path} does not exist.")
             # self._load_data_to_dataframe()
             self.info = self.get_info(dataset_path)
         else:
@@ -155,7 +158,8 @@ class TMDataset(Dataset, DataDownloader):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words)
+                                  for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -193,18 +197,21 @@ class TMDataset(Dataset, DataDownloader):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError("doc_column must be specified for DataFrame input")
+                raise ValueError(
+                    "doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [None] * len(documents)
+                data[label_column].tolist() if label_column else [
+                    None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError("data must be a pandas DataFrame or a list of documents")
+            raise TypeError(
+                "data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -243,11 +250,6 @@ class TMDataset(Dataset, DataDownloader):
         with open(info_path, "wb") as info_file:
             pickle.dump(dataset_info, info_file)
         logger.info(f"Dataset info saved to {info_path}")
-
-        self.available_datasets.append(dataset_name)
-        logger.info(
-            f"Dataset name appended to avaliable datasets list: {self.available_datasets}"
-        )
         # return preprocessor
 
     def preprocess(self, model_type=None, custom_stopwords=None, **preprocessing_steps):
@@ -318,7 +320,8 @@ class TMDataset(Dataset, DataDownloader):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(
+                    f"Error in dataset preprocessing: {e}") from e
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
@@ -369,7 +372,8 @@ class TMDataset(Dataset, DataDownloader):
                 dataset_info = pickle.load(info_file)
             return dataset_info
         else:
-            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
+            raise FileNotFoundError(
+                f"Dataset info file {info_path} does not exist.")
 
     @staticmethod
     def clean_text(text):
@@ -521,7 +525,8 @@ class TMDataset(Dataset, DataDownloader):
         """
         corpus = [" ".join(tokens) for tokens in self.get_corpus()]
         vectorizer = CountVectorizer(**kwargs)
-        self.bow = vectorizer.fit_transform(corpus).toarray().astype(np.float32)
+        self.bow = vectorizer.fit_transform(
+            corpus).toarray().astype(np.float32)
         return self.bow, vectorizer.get_feature_names_out()
 
     def get_tfidf(self, **kwargs):
@@ -594,7 +599,8 @@ class TMDataset(Dataset, DataDownloader):
             # Load pre-trained model
             model = api.load(model_name)
 
-            embeddings = {word: model[word] for word in vocabulary if word in model}
+            embeddings = {word: model[word]
+                          for word in vocabulary if word in model}
 
         if model_name == "paraphrase-MiniLM-L3-v2":
             model = SentenceTransformer(model_name)
@@ -603,7 +609,8 @@ class TMDataset(Dataset, DataDownloader):
                 vocabulary, convert_to_tensor=True, show_progress_bar=True
             )
 
-            embeddings = {word: embeddings[i] for i, word in enumerate(vocabulary)}
+            embeddings = {word: embeddings[i]
+                          for i, word in enumerate(vocabulary)}
 
             assert len(embeddings) == len(
                 vocabulary
