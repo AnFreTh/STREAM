@@ -184,3 +184,10 @@ post-commit
 post-merge
 pre-push
 docs/notebooks/lightning_logs/*
+docs/notebooks/lightning_logs
+docs/notebooks/data
+docs/notebooks/data/*
+docs/notebooks/embeddings
+docs/notebooks/embeddings/*
+docs/notebooks/checkpoints
+docs/notebooks/checkpoints/*
