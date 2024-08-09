@@ -47,15 +47,15 @@ setup(
     install_requires=install_reqs,
     # extras_require=extras_reqs,
     license="MIT",  # adapt based on your needs
-    packages=find_packages(
-        exclude=["examples", "examples.*", "tests", "tests.*"]),
+    packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
     include_package_data=True,
     # package_dir={"stream": "stream"},
     package_data={
         # Use '**' to include all files within subdirectories recursively
         "stream_topic": [
             "preprocessed_datasets/**/*",
-            "preprocessor/config/default_preprocessing_steps.json"
+            "pre_embedded_datasets/**/*",
+            "preprocessor/config/default_preprocessing_steps.json",
         ],
     },
     classifiers=[
@@ -63,6 +63,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    project_urls={'Documentation': DOCS},
-    url=HOMEPAGE
+    project_urls={"Documentation": DOCS},
+    url=HOMEPAGE,
 )
