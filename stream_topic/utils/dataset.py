@@ -1,21 +1,21 @@
 import os
 import pickle
 import re
-import importlib.util
+
 import gensim.downloader as api
 import numpy as np
 import pandas as pd
 from loguru import logger
 from sentence_transformers import SentenceTransformer
-
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import Dataset, random_split
 
 from ..commons.load_steps import load_model_preprocessing_steps
 from ..preprocessor import TextPreprocessor
+from .data_downloader import DataDownloader, get_data_home
 
 
-class TMDataset(Dataset):
+class TMDataset(Dataset, DataDownloader):
     """
     Topic Modeling Dataset containing methods to fetch and preprocess text data.
 
@@ -79,14 +79,6 @@ class TMDataset(Dataset):
     def __init__(self, name=None, language="en"):
         super().__init__()
 
-        self.available_datasets = self.get_dataset_list()
-        if name is not None and name not in self.available_datasets:
-            logger.error(
-                f"Dataset {name} not found. Available datasets: {self.available_datasets}"
-            )
-            raise ValueError(
-                f"Dataset {name} not found. Available datasets: {self.available_datasets}"
-            )
         self.name = name
         self.dataframe = None
         self.embeddings = None
@@ -98,37 +90,7 @@ class TMDataset(Dataset):
         self.language = language
         self.preprocessing_steps = self.default_preprocessing_steps()
 
-    def get_dataset_list(self):
-        """
-        Get the list of available datasets.
-
-        Returns
-        -------
-        list of str
-            List of available datasets.
-        """
-        package_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        dataset_path = os.path.join(package_path, "preprocessed_datasets")
-        datasets = os.listdir(dataset_path)
-        return datasets
-
-    def default_preprocessing_steps(self):
-        return {
-            "remove_stopwords": False,
-            "lowercase": True,
-            "remove_punctuation": False,
-            "remove_numbers": False,
-            "lemmatize": False,
-            "stem": False,
-            "expand_contractions": True,
-            "remove_html_tags": True,
-            "remove_special_chars": True,
-            "remove_accents": False,
-            "custom_stopwords": set(),
-            "detokenize": False,
-        }
-
-    def fetch_dataset(self, name: str, dataset_path=None):
+    def fetch_dataset(self, name: str, dataset_path=None, source: str = "github"):
         """
         Fetch a dataset by name.
 
@@ -138,21 +100,16 @@ class TMDataset(Dataset):
             Name of the dataset to fetch.
         dataset_path : str, optional
             Path to the dataset directory.
+        source : str, optional
+            Source of the dataset, by default 'github'. Use 'local' if dataset is available in locally. Then, provide the dataset_path.
         """
-        if name not in self.available_datasets:
-            logger.error(
-                f"Dataset {name} not found. Available datasets: {self.available_datasets}"
-            )
-            raise ValueError(
-                f"Dataset {name} not found. Available datasets: {self.available_datasets}"
-            )
 
         if self.name is not None:
             logger.info(
                 f"Dataset name already provided while instantiating the class: {self.name}"
             )
             logger.info(
-                f"Overwriting the dataset name with the provided name in fetch_dataset: {name}"
+                f"Overwriting the dataset name with the name provided in fetch_dataset: {name}"
             )
             self.name = name
             logger.info(f"Fetching dataset: {name}")
@@ -160,17 +117,36 @@ class TMDataset(Dataset):
             self.name = name
             logger.info(f"Fetching dataset: {name}")
 
-        if dataset_path is None:
-            dataset_path = self.get_package_dataset_path(name)
-        if os.path.exists(dataset_path):
+        if source == "github" and dataset_path is None:
+            # logger.info(f"Fetching dataset from github")
+            self.load_custom_dataset_from_url(name)
+            data_home = get_data_home()
+            dataset_path = os.path.join(
+                data_home, "preprocessed_datasets", name)
+            self.info = self.get_info(dataset_path)
+        elif source == "local" and dataset_path is not None:
+            logger.info(f"Fetching dataset from local path")
             self.load_custom_dataset_from_folder(dataset_path)
-            logger.info(f"Dataset loaded successfully from {dataset_path}")
+            self.info = self.get_info(dataset_path)
+        elif dataset_path is None:
+            logger.info(f"Fetching dataset from package path")
+            dataset_path = self.get_package_dataset_path(name)
+            if os.path.exists(dataset_path):
+                self.load_custom_dataset_from_folder(dataset_path)
+                logger.info(f"Dataset loaded successfully from {dataset_path}")
+            else:
+                logger.error(f"Dataset path {dataset_path} does not exist.")
+                raise ValueError(
+                    f"Dataset path {dataset_path} does not exist.")
+            # self._load_data_to_dataframe()
+            self.info = self.get_info(dataset_path)
         else:
-            logger.error(f"Dataset path {dataset_path} does not exist.")
-            raise ValueError(f"Dataset path {dataset_path} does not exist.")
-        # self._load_data_to_dataframe()
-
-        self.info = self.get_info(dataset_path)
+            logger.error(
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset."
+            )
+            raise ValueError(
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset."
+            )
 
     def _load_data_to_dataframe(self):
         """
@@ -182,179 +158,10 @@ class TMDataset(Dataset):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words)
+                                  for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
-
-    def get_package_dataset_path(self, name):
-        """
-        Get the path to the package dataset.
-
-        Parameters
-        ----------
-        name : str
-            Name of the dataset.
-
-        Returns
-        -------
-        str
-            Path to the dataset.
-        """
-        # Get the location of the installed package
-        package_name = "stream_topic"
-        spec = importlib.util.find_spec(package_name)
-        if spec is None:
-            raise ImportError(f"Cannot find the package '{package_name}'")
-
-        package_root_dir = os.path.dirname(spec.origin)
-
-        # Construct the full path to the dataset
-        dataset_path = os.path.join(package_root_dir, "preprocessed_datasets", name)
-
-        return dataset_path
-
-    def has_embeddings(self, embedding_model_name, path=None, file_name=None):
-        """
-        Check if embeddings are available for the dataset.
-
-        Parameters
-        ----------
-        embedding_model_name : str
-            Name of the embedding model used.
-        path : str, optional
-            Path where embeddings are expected to be saved.
-        file_name : str, optional
-            File name for the embeddings.
-
-        Returns
-        -------
-        bool
-            True if embeddings are available, False otherwise.
-        """
-        if path is None:
-            path = self.get_package_embeddings_path(self.name)
-        embeddings_file = (
-            os.path.join(path, file_name)
-            if file_name
-            else os.path.join(
-                path, f"{self.name}_embeddings_{embedding_model_name}.pkl"
-            )
-        )
-        return os.path.exists(embeddings_file)
-
-    def save_embeddings(
-        self, embeddings, embedding_model_name, path=None, file_name=None
-    ):
-        """
-        Save embeddings for the dataset.
-
-        Parameters
-        ----------
-        embeddings : np.ndarray
-            Embeddings to save.
-        embedding_model_name : str
-            Name of the embedding model used.
-        path : str, optional
-            Path to save the embeddings.
-        file_name : str, optional
-            File name for the embeddings.
-        """
-        try:
-            if path is None:
-                path = self.get_package_embeddings_path(self.name)
-
-            logger.info(f"Saving embeddings to path: {path}")
-
-            if not os.path.exists(path):
-                os.makedirs(path)
-                logger.info(f"Created directory: {path}")
-
-            embeddings_file = (
-                os.path.join(path, file_name)
-                if file_name
-                else os.path.join(
-                    path, f"{self.name}_embeddings_{embedding_model_name}.pkl"
-                )
-            )
-
-            logger.info(f"Embeddings file path: {embeddings_file}")
-
-            with open(embeddings_file, "wb") as file:
-                pickle.dump(embeddings, file)
-
-            logger.info("Embeddings saved successfully.")
-
-        except PermissionError as e:
-            logger.error(f"PermissionError: {e}")
-        except Exception as e:
-            logger.error(f"An error occurred: {e}")
-
-    def get_embeddings(self, embedding_model_name, path=None, file_name=None):
-        """
-        Get embeddings for the dataset.
-
-        Parameters
-        ----------
-        embedding_model_name : str
-            Name of the embedding model to use.
-        path : str, optional
-            Path to save the embeddings.
-        file_name : str, optional
-            File name for the embeddings.
-
-        Returns
-        -------
-        np.ndarray
-            Embeddings for the dataset.
-        """
-        if not self.has_embeddings(embedding_model_name, path, file_name):
-            raise ValueError(
-                "Embeddings are not available. Run the encoding process first or load embeddings."
-            )
-
-        # logger.info("--- Loading pre-computed document embeddings ---")
-
-        if self.embeddings is None:
-            if path is None:
-                path = self.get_package_embeddings_path(self.name)
-            embeddings_file = (
-                os.path.join(path, file_name)
-                if file_name
-                else os.path.join(
-                    path, f"{self.name}_embeddings_{embedding_model_name}.pkl"
-                )
-            )
-            with open(embeddings_file, "rb") as file:
-                self.embeddings = pickle.load(file)
-
-        return self.embeddings
-
-    def get_package_embeddings_path(self, name):
-        """
-        Get the path to the package embeddings.
-
-        Parameters
-        ----------
-        name : str
-            Name of the dataset.
-
-        Returns
-        -------
-        str
-            Path to the embeddings.
-        """
-        # Get the location of the installed package
-        package_name = "stream_topic"
-        spec = importlib.util.find_spec(package_name)
-        if spec is None:
-            raise ImportError(f"Cannot find the package '{package_name}'")
-
-        package_root_dir = os.path.dirname(spec.origin)
-
-        # Construct the full path to the dataset
-        embedding_path = os.path.join(package_root_dir, "pre_embedded_datasets", name)
-
-        return embedding_path
 
     def create_load_save_dataset(
         self,
@@ -390,18 +197,21 @@ class TMDataset(Dataset):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError("doc_column must be specified for DataFrame input")
+                raise ValueError(
+                    "doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [None] * len(documents)
+                data[label_column].tolist() if label_column else [
+                    None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError("data must be a pandas DataFrame or a list of documents")
+            raise TypeError(
+                "data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -422,9 +232,9 @@ class TMDataset(Dataset):
             logger.info(f"Creating directory: {save_dir}")
             os.makedirs(save_dir)
 
-        parquet_path = os.path.join(save_dir, f"{dataset_name}.parquet")
-        self.dataframe.to_parquet(parquet_path)
-        logger.info(f"Dataset saved to {parquet_path}")
+        local_parquet_path = os.path.join(save_dir, f"{dataset_name}.parquet")
+        self.dataframe.to_parquet(local_parquet_path)
+        logger.info(f"Dataset saved to {local_parquet_path}")
 
         # Save dataset information
         dataset_info = {
@@ -440,11 +250,6 @@ class TMDataset(Dataset):
         with open(info_path, "wb") as info_file:
             pickle.dump(dataset_info, info_file)
         logger.info(f"Dataset info saved to {info_path}")
-
-        self.available_datasets.append(dataset_name)
-        logger.info(
-            f"Dataset name appended to avaliable datasets list: {self.available_datasets}"
-        )
         # return preprocessor
 
     def preprocess(self, model_type=None, custom_stopwords=None, **preprocessing_steps):
@@ -515,7 +320,8 @@ class TMDataset(Dataset):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(
+                    f"Error in dataset preprocessing: {e}") from e
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
@@ -561,13 +367,13 @@ class TMDataset(Dataset):
             raise ValueError(f"Dataset path {dataset_path} does not exist.")
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
-        if not os.path.exists(info_path):
-            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
-
-        with open(info_path, "rb") as info_file:
-            dataset_info = pickle.load(info_file)
-
-        return dataset_info
+        if os.path.exists(info_path):
+            with open(info_path, "rb") as info_file:
+                dataset_info = pickle.load(info_file)
+            return dataset_info
+        else:
+            raise FileNotFoundError(
+                f"Dataset info file {info_path} does not exist.")
 
     @staticmethod
     def clean_text(text):
@@ -626,39 +432,6 @@ class TMDataset(Dataset):
         if self.tfidf is not None:
             item["tfidf"] = self.tfidf[idx]
         return item
-
-    def load_custom_dataset_from_folder(self, dataset_path):
-        """
-        Load a custom dataset from a folder.
-
-        Parameters
-        ----------
-        dataset_path : str
-            Path to the dataset folder.
-        """
-        parquet_path = os.path.join(dataset_path, f"{self.name}.parquet")
-        if os.path.exists(parquet_path):
-            self.load_dataset_from_parquet(parquet_path)
-        else:
-            documents_path = os.path.join(dataset_path, "corpus.txt")
-            labels_path = os.path.join(dataset_path, "labels.txt")
-
-            with open(documents_path, encoding="utf-8") as f:
-                documents = f.readlines()
-
-            with open(labels_path, encoding="utf-8") as f:
-                labels = f.readlines()
-
-            self.dataframe = pd.DataFrame(
-                {
-                    "text": [doc.strip() for doc in documents],
-                    "labels": [label.strip() for label in labels],
-                }
-            )
-
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
-            self.texts = self.dataframe["text"].tolist()
-            self.labels = self.dataframe["labels"].tolist()
 
     def get_corpus(self):
         """
@@ -752,7 +525,8 @@ class TMDataset(Dataset):
         """
         corpus = [" ".join(tokens) for tokens in self.get_corpus()]
         vectorizer = CountVectorizer(**kwargs)
-        self.bow = vectorizer.fit_transform(corpus).toarray().astype(np.float32)
+        self.bow = vectorizer.fit_transform(
+            corpus).toarray().astype(np.float32)
         return self.bow, vectorizer.get_feature_names_out()
 
     def get_tfidf(self, **kwargs):
@@ -792,26 +566,6 @@ class TMDataset(Dataset):
         """
         return self.has_embeddings(model_name, "word_embeddings")
 
-    def save_word_embeddings(
-        self, word_embeddings, model_name, path=None, file_name=None
-    ):
-        """
-        Save word embeddings for the dataset.
-
-        Parameters
-        ----------
-        word_embeddings : dict
-            Word embeddings to save.
-        model_name : str
-            Name of the pre-trained model.
-        """
-        self.save_embeddings(
-            embeddings=word_embeddings,
-            embedding_model_name=model_name,
-            path=path,
-            file_name=file_name,
-        )
-
     def get_word_embeddings(self, model_name="glove-wiki-gigaword-100", vocab=None):
         """
         Get the word embeddings for the vocabulary using a pre-trained model.
@@ -845,7 +599,8 @@ class TMDataset(Dataset):
             # Load pre-trained model
             model = api.load(model_name)
 
-            embeddings = {word: model[word] for word in vocabulary if word in model}
+            embeddings = {word: model[word]
+                          for word in vocabulary if word in model}
 
         if model_name == "paraphrase-MiniLM-L3-v2":
             model = SentenceTransformer(model_name)
@@ -854,40 +609,11 @@ class TMDataset(Dataset):
                 vocabulary, convert_to_tensor=True, show_progress_bar=True
             )
 
-            embeddings = {word: embeddings[i] for i, word in enumerate(vocabulary)}
+            embeddings = {word: embeddings[i]
+                          for i, word in enumerate(vocabulary)}
 
             assert len(embeddings) == len(
                 vocabulary
             ), "Embeddings and vocabulary length mismatch"
 
         return embeddings
-
-    def _save_to_parquet(self, save_dir, dataset_name):
-        """
-        Save the dataset to a Parquet file.
-
-        Parameters
-        ----------
-        save_dir : str
-            Directory to save the dataset.
-        dataset_name : str
-            Name of the dataset.
-        """
-        save_path = os.path.join(save_dir, f"{dataset_name}.parquet")
-        self.dataframe.to_parquet(save_path, index=False)
-
-    def load_dataset_from_parquet(self, load_path):
-        """
-        Load a dataset from a Parquet file.
-
-        Parameters
-        ----------
-        load_path : str
-            Path to the Parquet file.
-        """
-        if not os.path.exists(load_path):
-            raise FileNotFoundError(f"File {load_path} does not exist.")
-        self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
-        self.texts = self.dataframe["text"].tolist()
-        self.labels = self.dataframe["labels"].tolist()
