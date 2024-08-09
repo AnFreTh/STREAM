@@ -1,11 +1,13 @@
 import importlib.util
 import os
 import pickle
-import importlib.util
+from urllib.parse import urljoin
+
 import pandas as pd
 import requests
 from loguru import logger
-from urllib.parse import urljoin
+
+PACKAGE_NAME = "stream_topic"
 
 
 class DataDownloader:
@@ -54,11 +56,10 @@ class DataDownloader:
             Path to the dataset.
         """
         # Get the location of the installed package
-        package_name = "stream_topic"
-        spec = importlib.util.find_spec(package_name)
+        spec = importlib.util.find_spec(PACKAGE_NAME)
         package_root_dir = os.path.dirname(spec.origin)
         if package_root_dir is None:
-            raise ImportError(f"Cannot find the package '{package_name}'")
+            raise ImportError(f"Cannot find the package '{PACKAGE_NAME}'")
 
         # Construct the full path to the dataset
         dataset_path = os.path.join(
@@ -218,15 +219,14 @@ class DataDownloader:
             Path to the embeddings.
         """
         # Get the location of the installed package
-        package_name = "stream_topic"
-        spec = importlib.util.find_spec(package_name)
+        spec = importlib.util.find_spec(PACKAGE_NAME)
         package_root_dir = os.path.dirname(spec.origin)
         if package_root_dir is None:
-            raise ImportError(f"Cannot find the package '{package_name}'")
+            raise ImportError(f"Cannot find the package '{PACKAGE_NAME}'")
 
         # Construct the full path to the dataset
         embedding_path = os.path.join(
-            package_root_dir, "stream_topic_data\\pre_embedded_datasets", name
+            package_root_dir, "stream_topic_data", "pre_embedded_datasets", name
         )
 
         return embedding_path
@@ -260,7 +260,8 @@ class DataDownloader:
                 }
             )
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(
+                lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -288,7 +289,8 @@ class DataDownloader:
                 ).replace(os.sep, "/"),
             )
             data_home = get_data_home()
-            save_dir = os.path.join(data_home, "pre_embedded_datasets", self.name)
+            save_dir = os.path.join(
+                data_home, "pre_embedded_datasets", self.name)
 
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
@@ -307,15 +309,18 @@ class DataDownloader:
             BASE_URL = "https://raw.githubusercontent.com/mkumar73/stream_topic_data/main/datasets/preprocessed_datasets/"
             git_parquet_path = urljoin(
                 BASE_URL,
-                os.path.join(self.name, f"{self.name}.parquet").replace(os.sep, "/"),
+                os.path.join(self.name, f"{self.name}.parquet").replace(
+                    os.sep, "/"),
             )
             git_pkl_path = urljoin(
                 BASE_URL,
-                os.path.join(self.name, f"{self.name}_info.pkl").replace(os.sep, "/"),
+                os.path.join(self.name, f"{self.name}_info.pkl").replace(
+                    os.sep, "/"),
             )
 
             data_home = get_data_home()
-            save_dir = os.path.join(data_home, "preprocessed_datasets", self.name)
+            save_dir = os.path.join(
+                data_home, "preprocessed_datasets", self.name)
 
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
@@ -325,7 +330,8 @@ class DataDownloader:
             if url_exists(git_parquet_path):
                 logger.info(f"Downloading dataset from github")
                 download_file_from_github(git_parquet_path, local_parquet_path)
-                logger.info(f"Dataset downloaded successfully at ~/stream_topic_data/")
+                logger.info(
+                    f"Dataset downloaded successfully at ~/stream_topic_data/")
                 self.load_dataset_from_parquet(local_parquet_path)
             else:
                 # TODO: need to be refactored to include githb url for corpus and labels
@@ -404,7 +410,8 @@ class DataDownloader:
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(
+            lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -429,12 +436,12 @@ def get_data_home(data_home=None):
         Path to the data home directory.
 
     """
-    package_name = "stream_topic"
-    spec = importlib.util.find_spec(package_name)
+    spec = importlib.util.find_spec(PACKAGE_NAME)
     package_root_dir = os.path.dirname(spec.origin)
     if data_home is None:
         data_home = os.environ.get(
-            "STREAM_TOPIC_DATA", os.path.join(package_root_dir, "stream_topic_data")
+            "STREAM_TOPIC_DATA", os.path.join(
+                package_root_dir, "stream_topic_data")
         )
     # data_home = os.path.expanduser(data_home)
     if not os.path.exists(data_home):
