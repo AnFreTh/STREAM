@@ -1,13 +1,14 @@
+import importlib.util
 import os
 import pickle
 import re
-import importlib.util
+
 import gensim.downloader as api
 import numpy as np
 import pandas as pd
+import requests
 from loguru import logger
 from sentence_transformers import SentenceTransformer
-
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import Dataset, random_split
 
@@ -107,7 +108,8 @@ class TMDataset(Dataset):
         list of str
             List of available datasets.
         """
-        package_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        package_path = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))
         dataset_path = os.path.join(package_path, "preprocessed_datasets")
         datasets = os.listdir(dataset_path)
         return datasets
@@ -128,7 +130,7 @@ class TMDataset(Dataset):
             "detokenize": False,
         }
 
-    def fetch_dataset(self, name: str, dataset_path=None):
+    def fetch_dataset(self, name: str, dataset_path=None, source: str = 'github'):
         """
         Fetch a dataset by name.
 
@@ -138,6 +140,8 @@ class TMDataset(Dataset):
             Name of the dataset to fetch.
         dataset_path : str, optional
             Path to the dataset directory.
+        source : str, optional
+            Source of the dataset, by default 'github'. Use 'local' if dataset is available in locally. Then, provide the dataset_path.
         """
         if name not in self.available_datasets:
             logger.error(
@@ -152,7 +156,7 @@ class TMDataset(Dataset):
                 f"Dataset name already provided while instantiating the class: {self.name}"
             )
             logger.info(
-                f"Overwriting the dataset name with the provided name in fetch_dataset: {name}"
+                f"Overwriting the dataset name with the name provided in fetch_dataset: {name}"
             )
             self.name = name
             logger.info(f"Fetching dataset: {name}")
@@ -160,17 +164,34 @@ class TMDataset(Dataset):
             self.name = name
             logger.info(f"Fetching dataset: {name}")
 
-        if dataset_path is None:
-            dataset_path = self.get_package_dataset_path(name)
-        if os.path.exists(dataset_path):
+        if source == 'github' and dataset_path is None:
+            # logger.info(f"Fetching dataset from github")
+            self.load_custom_dataset_from_url(name)
+            data_home = get_data_home()
+            dataset_path = os.path.join(
+                data_home, "preprocessed_datasets", name)
+            self.info = self.get_info(dataset_path)
+        elif source == 'local' and dataset_path is not None:
+            logger.info(f"Fetching dataset from local path")
             self.load_custom_dataset_from_folder(dataset_path)
-            logger.info(f"Dataset loaded successfully from {dataset_path}")
+            self.info = self.get_info(dataset_path)
+        elif dataset_path is None:
+            logger.info(f"Fetching dataset from package path")
+            dataset_path = self.get_package_dataset_path(name)
+            if os.path.exists(dataset_path):
+                self.load_custom_dataset_from_folder(dataset_path)
+                logger.info(f"Dataset loaded successfully from {dataset_path}")
+            else:
+                logger.error(f"Dataset path {dataset_path} does not exist.")
+                raise ValueError(
+                    f"Dataset path {dataset_path} does not exist.")
+            # self._load_data_to_dataframe()
+            self.info = self.get_info(dataset_path)
         else:
-            logger.error(f"Dataset path {dataset_path} does not exist.")
-            raise ValueError(f"Dataset path {dataset_path} does not exist.")
-        # self._load_data_to_dataframe()
-
-        self.info = self.get_info(dataset_path)
+            logger.error(
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset.")
+            raise ValueError(
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset.")
 
     def _load_data_to_dataframe(self):
         """
@@ -182,7 +203,8 @@ class TMDataset(Dataset):
                 "labels": self.get_labels(),
             }
         )
-        self.dataframe["text"] = [" ".join(words) for words in self.dataframe["tokens"]]
+        self.dataframe["text"] = [" ".join(words)
+                                  for words in self.dataframe["tokens"]]
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
@@ -209,7 +231,8 @@ class TMDataset(Dataset):
         package_root_dir = os.path.dirname(spec.origin)
 
         # Construct the full path to the dataset
-        dataset_path = os.path.join(package_root_dir, "preprocessed_datasets", name)
+        dataset_path = os.path.join(
+            package_root_dir, "preprocessed_datasets", name)
 
         return dataset_path
 
@@ -352,7 +375,8 @@ class TMDataset(Dataset):
         package_root_dir = os.path.dirname(spec.origin)
 
         # Construct the full path to the dataset
-        embedding_path = os.path.join(package_root_dir, "pre_embedded_datasets", name)
+        embedding_path = os.path.join(
+            package_root_dir, "pre_embedded_datasets", name)
 
         return embedding_path
 
@@ -390,18 +414,21 @@ class TMDataset(Dataset):
         """
         if isinstance(data, pd.DataFrame):
             if doc_column is None:
-                raise ValueError("doc_column must be specified for DataFrame input")
+                raise ValueError(
+                    "doc_column must be specified for DataFrame input")
             documents = [
                 self.clean_text(str(row[doc_column])) for _, row in data.iterrows()
             ]
             labels = (
-                data[label_column].tolist() if label_column else [None] * len(documents)
+                data[label_column].tolist() if label_column else [
+                    None] * len(documents)
             )
         elif isinstance(data, list):
             documents = [self.clean_text(doc) for doc in data]
             labels = [None] * len(documents)
         else:
-            raise TypeError("data must be a pandas DataFrame or a list of documents")
+            raise TypeError(
+                "data must be a pandas DataFrame or a list of documents")
 
         # Initialize preprocessor with kwargs
         preprocessor = TextPreprocessor(**kwargs)
@@ -422,9 +449,9 @@ class TMDataset(Dataset):
             logger.info(f"Creating directory: {save_dir}")
             os.makedirs(save_dir)
 
-        parquet_path = os.path.join(save_dir, f"{dataset_name}.parquet")
-        self.dataframe.to_parquet(parquet_path)
-        logger.info(f"Dataset saved to {parquet_path}")
+        local_parquet_path = os.path.join(save_dir, f"{dataset_name}.parquet")
+        self.dataframe.to_parquet(local_parquet_path)
+        logger.info(f"Dataset saved to {local_parquet_path}")
 
         # Save dataset information
         dataset_info = {
@@ -515,7 +542,8 @@ class TMDataset(Dataset):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(
+                    f"Error in dataset preprocessing: {e}") from e
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
@@ -561,13 +589,13 @@ class TMDataset(Dataset):
             raise ValueError(f"Dataset path {dataset_path} does not exist.")
 
         info_path = os.path.join(dataset_path, f"{self.name}_info.pkl")
-        if not os.path.exists(info_path):
-            raise FileNotFoundError(f"Dataset info file {info_path} does not exist.")
-
-        with open(info_path, "rb") as info_file:
-            dataset_info = pickle.load(info_file)
-
-        return dataset_info
+        if os.path.exists(info_path):
+            with open(info_path, "rb") as info_file:
+                dataset_info = pickle.load(info_file)
+            return dataset_info
+        else:
+            raise FileNotFoundError(
+                f"Dataset info file {info_path} does not exist.")
 
     @staticmethod
     def clean_text(text):
@@ -656,9 +684,67 @@ class TMDataset(Dataset):
                 }
             )
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(
+                lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
+
+    def load_custom_dataset_from_url(self, dataset_path=None):
+        """
+        Load a custom dataset from a folder.
+
+        Parameters
+        ----------
+        dataset_path : str
+            Path to the dataset folder.
+        """
+        BASE_URL = "https://raw.githubusercontent.com/mkumar73/stream_topic_data/main/datasets/preprocessed_datasets/"
+        git_parquet_path = os.path.join(
+            BASE_URL, self.name, f"{self.name}.parquet")
+        git_pkl_path = os.path.join(
+            BASE_URL, self.name, f"{self.name}_info.pkl")
+        data_home = get_data_home()
+        save_dir = os.path.join(data_home, "preprocessed_datasets", self.name)
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        local_parquet_path = os.path.join(save_dir, f"{self.name}.parquet")
+        local_pkl_path = os.path.join(save_dir, f"{self.name}_info.pkl")
+
+        if url_exists(git_parquet_path):
+            logger.info(f"Downloading dataset from github")
+            download_file_from_github(git_parquet_path, local_parquet_path)
+            logger.info(
+                f"Dataset downloaded successfully at ~/stream_topic_data/ folder")
+            self.load_dataset_from_parquet(local_parquet_path)
+        else:
+            # TODO: need to be refactored to include githb url for corpus and labels
+            documents_path = os.path.join(dataset_path, "corpus.txt")
+            labels_path = os.path.join(dataset_path, "labels.txt")
+
+            with open(documents_path, encoding="utf-8") as f:
+                documents = f.readlines()
+
+            with open(labels_path, encoding="utf-8") as f:
+                labels = f.readlines()
+
+            self.dataframe = pd.DataFrame(
+                {
+                    "text": [doc.strip() for doc in documents],
+                    "labels": [label.strip() for label in labels],
+                }
+            )
+
+            self.dataframe["tokens"] = self.dataframe["text"].apply(
+                lambda x: x.split())
+            self.texts = self.dataframe["text"].tolist()
+            self.labels = self.dataframe["labels"].tolist()
+
+        if url_exists(git_pkl_path):
+            logger.info(f"Downloading dataset info from github")
+            download_file_from_github(git_pkl_path, local_pkl_path)
+            logger.info(
+                f"Dataset info downloaded successfully at ~/stream_topic_data/ folder")
 
     def get_corpus(self):
         """
@@ -752,7 +838,8 @@ class TMDataset(Dataset):
         """
         corpus = [" ".join(tokens) for tokens in self.get_corpus()]
         vectorizer = CountVectorizer(**kwargs)
-        self.bow = vectorizer.fit_transform(corpus).toarray().astype(np.float32)
+        self.bow = vectorizer.fit_transform(
+            corpus).toarray().astype(np.float32)
         return self.bow, vectorizer.get_feature_names_out()
 
     def get_tfidf(self, **kwargs):
@@ -845,7 +932,8 @@ class TMDataset(Dataset):
             # Load pre-trained model
             model = api.load(model_name)
 
-            embeddings = {word: model[word] for word in vocabulary if word in model}
+            embeddings = {word: model[word]
+                          for word in vocabulary if word in model}
 
         if model_name == "paraphrase-MiniLM-L3-v2":
             model = SentenceTransformer(model_name)
@@ -854,7 +942,8 @@ class TMDataset(Dataset):
                 vocabulary, convert_to_tensor=True, show_progress_bar=True
             )
 
-            embeddings = {word: embeddings[i] for i, word in enumerate(vocabulary)}
+            embeddings = {word: embeddings[i]
+                          for i, word in enumerate(vocabulary)}
 
             assert len(embeddings) == len(
                 vocabulary
@@ -888,6 +977,63 @@ class TMDataset(Dataset):
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(
+            lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
+
+
+def get_data_home(data_home=None):
+    """
+    Get the data home directory.
+
+    Parameters
+    ----------
+    data_home : str, optional
+        Path to the data home directory, defaults to None.
+
+
+    Notes
+    -----   
+    If environment variable STREAM_TOPIC_DATA is not set, the default path is `~/stream_topic_data`.
+
+    Returns
+    -------
+    str
+        Path to the data home directory.
+
+    """
+    if data_home is None:
+        data_home = os.environ.get(
+            'STREAM_TOPIC_DATA', os.path.join('~', 'stream_topic_data'))
+    data_home = os.path.expanduser(data_home)
+    if not os.path.exists(data_home):
+        os.makedirs(data_home)
+    return data_home
+
+
+def url_exists(url):
+    try:
+        response = requests.head(url)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def download_file_from_github(url: str, save_dir: str):
+    """
+    Downloads a file from a GitHub repository.
+
+    Parameters
+    ----------
+    url : str
+        URL of the file.
+    save_path : str
+        Path to save the file.
+    """
+    response = requests.get(url)
+    response.raise_for_status()  # Check if the download was successful
+
+    with open(save_dir, 'wb') as file:
+        file.write(response.content)
+    # logger.info(f"File downloaded and saved to {save_dir}")
