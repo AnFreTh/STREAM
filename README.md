@@ -80,6 +80,9 @@ Make additionally sure to download the necessary [nltk](https://www.nltk.org/) r
 
 ```python
 import nltk
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
 nltk.download('averaged_perceptron_tagger')
 ```
 
