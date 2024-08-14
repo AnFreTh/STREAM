@@ -5,7 +5,7 @@ import pandas as pd
 from gensim.models import Word2Vec
 from loguru import logger
 from sklearn.mixture import GaussianMixture
-
+import os
 from ..commons.check_steps import check_dataset_steps
 from ..preprocessor._embedder import BaseEmbedder, GensimBackend
 from ..utils.dataset import TMDataset
@@ -14,6 +14,9 @@ from .abstract_helper_models.base import BaseModel, TrainingStatus
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "WordCluTM"
 # logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+WORD_EMBEDDING_MODEL_NAME = (
+    "paraphrase-MiniLM-L3-v2"  # use this model for word embeddings for now
+)
 
 
 class WordCluTM(BaseModel):
@@ -26,23 +29,26 @@ class WordCluTM(BaseModel):
         umap_args: dict = None,
         random_state: int = None,
         gmm_args: dict = None,
+        train_word_embeddings: bool = True,
         embeddings_folder_path: str = None,
         embeddings_file_path: str = None,
+        word_embedding_model_name: str = WORD_EMBEDDING_MODEL_NAME,
         save_embeddings: bool = False,
         **kwargs,
     ):
         """
-        Initialize the WordCluTM model.
+        Initializes the WordCluTM model with specified parameters.
 
         Args:
-            num_topics (int): Number of topics.
-            vector_size (int): Dimensionality of the word vectors.
-            window (int): Maximum distance between the current and predicted word within a sentence.
-            min_count (int): Ignores all words with total frequency lower than this.
-            workers (int): Number of worker threads to train the Word2Vec model.
-            umap_args (dict): Arguments for UMAP dimensionality reduction.
-            gmm_args (dict): Arguments for Gaussian Mixture Model (GMM).
-            random_state (int): Random seed.
+            umap_args (dict, optional): Parameters for UMAP dimensionality reduction. Defaults to a pre-defined dictionary if not provided.
+            random_state (int, optional): Seed for random number generation to ensure reproducibility. Defaults to None.
+            gmm_args (dict, optional): Parameters for Gaussian Mixture Model (GMM) clustering. Defaults to a pre-defined dictionary if not provided.
+            train_word_embeddings (bool, optional): Flag indicating whether to train Word2Vec embeddings or use pre-trained embeddings. Defaults to True.
+            embeddings_folder_path (str, optional): Path to the folder where word embeddings should be saved. Defaults to None.
+            embeddings_file_path (str, optional): Path to the file containing pre-trained word embeddings. Defaults to None.
+            word_embedding_model_name (str, optional): The name of the pre-trained model to be used for word embeddings. Defaults to 'paraphrase-MiniLM-L3-v2'.
+            save_embeddings (bool, optional): Flag indicating whether to save the trained word embeddings. Defaults to False.
+            **kwargs: Additional keyword arguments passed to the BaseModel initialization.
         """
         super().__init__(use_pretrained_embeddings=True, **kwargs)
         self.save_hyperparameters(
@@ -82,11 +88,19 @@ class WordCluTM(BaseModel):
         if random_state is not None:
             self.umap_args["random_state"] = random_state
 
-        self.embeddings_path = embeddings_folder_path
-        self.embeddings_file_path = embeddings_file_path
-        self.save_embeddings = save_embeddings
+        self.hparams["umap_args"] = self.umap_args
+        self.hparams["gmm_args"] = self.gmm_args
+
+        self.word_embeddings_path = embeddings_folder_path
+        self.word_embedding_model_name = word_embedding_model_name
+        self.word_embeddings_file_path = embeddings_file_path
+        self.save_word_embeddings = save_embeddings
 
         self._status = TrainingStatus.NOT_STARTED
+
+        self.word_embeddings_prepared = False
+        self.train_word_embeddings = train_word_embeddings
+        self.optimize = False
 
     def get_info(self):
         """
@@ -108,7 +122,7 @@ class WordCluTM(BaseModel):
         return info
 
     def train_word2vec(
-        self, sentences, epochs, vector_size, window, min_count, workers
+        self, sentences, epochs, vector_size, window, min_count, workers, logger
     ):
         """
         Train a Word2Vec model on the given sentences.
@@ -127,14 +141,62 @@ class WordCluTM(BaseModel):
         # Build the vocabulary from the sentences
         self.word2vec_model.build_vocab(sentences)
 
+        logger.info(f"--- Train Word2Vec ---")
         # Train the Word2Vec model
         self.word2vec_model.train(
             sentences, total_examples=len(sentences), epochs=epochs
         )
 
         # Initialize BaseEmbedder with GensimBackend
-        self.base_embedder = BaseEmbedder(
-            GensimBackend(self.word2vec_model.wv))
+        self.base_embedder = BaseEmbedder(GensimBackend(self.word2vec_model.wv))
+
+    def _prepare_word_embeddings(self, dataset, logger):
+        """
+        Prepare the word embeddings for the dataset.
+
+        Parameters
+        ----------
+        data_module : TMDataModule
+            The data module used for training. This contains the actually used vocabulary after preprocessing.
+        dataset : TMDataset
+            The dataset to be used for training.
+        logger : Logger
+            The logger to log messages.
+        """
+
+        if dataset.has_word_embeddings(self.word_embedding_model_name):
+            logger.info(
+                f"--- Loading precomputed {self.word_embedding_model_name} word embeddings ---"
+            )
+            self.word_embeddings = dataset.get_word_embeddings(
+                self.word_embedding_model_name,
+                self.word_embeddings_path,
+                self.word_embeddings_file_path,
+            )
+
+        else:
+            logger.info(
+                f"--- Creating {self.word_embedding_model_name} word embeddings ---"
+            )
+            self.word_embeddings = dataset.get_word_embeddings(
+                model_name=self.word_embedding_model_name,
+                vocab=dataset.get_vocabulary(),  # use the vocabulary from the data module
+            )
+            if (
+                self.save_word_embeddings
+                and self.word_embeddings_path is not None
+                and not os.path.exists(self.word_embeddings_path)
+            ):
+                os.makedirs(self.word_embeddings_path)
+            if self.save_word_embeddings:
+                dataset.save_word_embeddings(
+                    word_embeddings=self.word_embeddings,
+                    model_name=self.word_embedding_model_name,
+                    path=self.word_embeddings_path,
+                    file_name=self.word_embeddings_file_path,
+                )
+
+        self.word_embeddings_prepared = True
 
     def _clustering(self):
         """
@@ -146,8 +208,7 @@ class WordCluTM(BaseModel):
             If an error occurs during clustering.
         """
         assert (
-            hasattr(
-                self, "reduced_embeddings") and self.reduced_embeddings is not None
+            hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
 
         self.gmm_args["n_components"] = self.n_topics
@@ -191,33 +252,38 @@ class WordCluTM(BaseModel):
         sentences = dataset.get_corpus()
         self._status = TrainingStatus.INITIALIZED
 
+        unique_words = list(set(word for sentence in sentences for word in sentence))
+
         try:
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            self.train_word2vec(
-                sentences=sentences,
-                epochs=word2vec_epochs,
-                vector_size=vector_size,
-                window=window,
-                min_count=min_count,
-                workers=workers,
-            )  # Train Word2Vec model
+            if self.train_word_embeddings:
+                self.train_word2vec(
+                    sentences=sentences,
+                    epochs=word2vec_epochs,
+                    vector_size=vector_size,
+                    window=window,
+                    min_count=min_count,
+                    workers=workers,
+                    logger=logger,
+                )  # Train Word2Vec model
 
-            logger.info(f"--- Compute word embeddings ---")
-            unique_words = list(
-                set(word for sentence in sentences for word in sentence)
-            )
-            word_to_index = {word: i for i, word in enumerate(unique_words)}
-            self.embeddings = np.array(
-                [
-                    (
-                        self.word2vec_model.wv[word]
-                        if word in self.word2vec_model.wv
-                        else np.zeros(vector_size)
-                    )
-                    for word in unique_words
-                ]
-            )
+                self.embeddings = np.array(
+                    [
+                        (
+                            self.word2vec_model.wv[word]
+                            if word in dataset.get_vocabulary()
+                            else np.zeros(vector_size)
+                        )
+                        for word in unique_words
+                    ]
+                )
+
+            else:
+                self._prepare_word_embeddings(dataset, logger)
+                self.embeddings = np.stack(list(self.word_embeddings.values()))
+                if self.embeddings[0].shape != self.vector_size:
+                    self.vector_size = self.embeddings[0].shape
 
             self.reduced_embeddings = self.dim_reduction(logger)
             self._clustering()
@@ -227,15 +293,19 @@ class WordCluTM(BaseModel):
             logger.info(f"--- Compute doc embeddings ---")
             for doc in sentences:
                 # Collect word embeddings for the document
-                word_embeddings = [
-                    self.word2vec_model.wv[word]
-                    for word in doc
-                    if word in self.word2vec_model.wv
-                ]
+                if self.train_word_embeddings:
+                    word_embeddings = [
+                        self.word2vec_model.wv[word]
+                        for word in doc
+                        if word in self.word2vec_model.wv
+                    ]
+                else:
+                    word_embeddings = [
+                        np.array(self.word_embeddings[word]) for word in doc
+                    ]
                 # Compute the mean embedding for the document if there are valid word embeddings
                 if word_embeddings:
-                    self.doc_embeddings.append(
-                        np.mean(word_embeddings, axis=0))
+                    self.doc_embeddings.append(np.mean(word_embeddings, axis=0))
                 else:
                     # Append a zero array if no valid word embeddings are found
                     self.doc_embeddings.append(np.zeros(self.vector_size))
@@ -247,11 +317,9 @@ class WordCluTM(BaseModel):
             ]
             if len(self.doc_embeddings) > 0:
                 # Reduce the dimensionality of the document embedding
-                reduced_doc_embedding = self.reducer.transform(
-                    self.doc_embeddings)
+                reduced_doc_embedding = self.reducer.transform(self.doc_embeddings)
                 # Predict the topic distribution for the reduced document embedding
-                doc_topic_distribution = self.GMM.predict_proba(
-                    reduced_doc_embedding)
+                doc_topic_distribution = self.GMM.predict_proba(reduced_doc_embedding)
                 # Add the topic distribution to the list
                 doc_topic_distributions.append(doc_topic_distribution[0])
 
@@ -284,3 +352,85 @@ class WordCluTM(BaseModel):
 
     def predict(self, texts):
         pass
+
+    def suggest_hyperparameters(self, trial):
+        # Suggest UMAP parameters
+        self.hparams["umap_args"]["n_neighbors"] = trial.suggest_int(
+            "n_neighbors", 10, 50
+        )
+        self.hparams["umap_args"]["n_components"] = trial.suggest_int(
+            "n_components", 5, 50
+        )
+        self.hparams["umap_args"]["metric"] = trial.suggest_categorical(
+            "metric", ["cosine", "euclidean"]
+        )
+
+        # Suggest GMM parameters
+        self.hparams["gmm_args"]["covariance_type"] = trial.suggest_categorical(
+            "covariance_type", ["full", "tied", "diag", "spherical"]
+        )
+        self.hparams["gmm_args"]["tol"] = trial.suggest_float(
+            "tol", 1e-4, 1e-1, log=True
+        )
+        self.hparams["gmm_args"]["reg_covar"] = trial.suggest_float(
+            "reg_covar", 1e-6, 1e-3, log=True
+        )
+        self.hparams["gmm_args"]["max_iter"] = trial.suggest_int("max_iter", 100, 1000)
+        self.hparams["gmm_args"]["n_init"] = trial.suggest_int("n_init", 1, 10)
+        self.hparams["gmm_args"]["init_params"] = trial.suggest_categorical(
+            "init_params", ["kmeans", "random"]
+        )
+
+        self.umap_args = self.hparams.get("umap_args")
+        self.gmmargs = self.hparams.get("gmm_args")
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        min_topics=2,
+        max_topics=20,
+        criterion="aic",
+        n_trials=100,
+        custom_metric=None,
+    ):
+        """
+        A new method in the child class that optimizes and fits the model.
+
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        min_topics : int, optional
+            Minimum number of topics to evaluate, by default 2.
+        max_topics : int, optional
+            Maximum number of topics to evaluate, by default 20.
+        criterion : str, optional
+            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+        n_trials : int, optional
+            Number of trials for optimization, by default 100.
+        custom_metric : object, optional
+            Custom metric object with a `score` method for evaluation, by default None.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the best parameters and the optimal number of topics.
+        """
+        best_params = super().optimize_hyperparameters(
+            dataset=dataset,
+            min_topics=min_topics,
+            max_topics=max_topics,
+            criterion=criterion,
+            n_trials=n_trials,
+            custom_metric=custom_metric,
+        )
+
+        return best_params
+
+    def calculate_aic(self, n_topics=None):
+
+        return self.GMM.aic(self.reduced_embeddings)
+
+    def calculate_bic(self, n_topics=None):
+
+        return self.GMM.bic(self.reduced_embeddings)
