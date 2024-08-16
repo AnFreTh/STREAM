@@ -343,8 +343,9 @@ class BaseModel(ABC):
         assert criterion in [
             "aic",
             "bic",
+            "recon",
             "custom",
-        ], "Criterion must be either 'aic', 'bic', or 'custom'."
+        ], "Criterion must be either 'aic', 'bic', 'recon' or 'custom'."
         if criterion == "custom":
             assert (
                 custom_metric is not None
@@ -363,12 +364,14 @@ class BaseModel(ABC):
             self.fit(dataset)
 
             # Calculate the score based on the criterion
-            if criterion in ["aic", "bic"]:
+            if criterion in ["aic", "bic", "recon"]:
 
                 if criterion == "aic":
                     score = self.calculate_aic(n_topics=self.hparams["n_topics"])
-                else:
+                elif criterion == "bic":
                     score = self.calculate_bic(n_topics=self.hparams["n_topics"])
+                elif criterion == "recon":
+                    score = self.reconstruction_loss()
             else:
                 # Compute the custom metric score
                 topics = self.get_topics()

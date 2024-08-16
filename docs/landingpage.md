@@ -52,6 +52,10 @@ STREAM offers a variety of neural as well as non-neural topic models and we are 
         <td>Latent Dirichlet Allocation</td>
       </tr>
       <tr>
+        <td><a href="https://www.nature.com/articles/44565">NMF</a></td>
+        <td>Non-negative Matrix Factorization</td>
+      </tr>
+      <tr>
         <td><a href="https://arxiv.org/abs/2004.14914">WordCluTM</a></td>
         <td>Tired of topic models?</td>
       </tr>
