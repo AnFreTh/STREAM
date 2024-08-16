@@ -17,7 +17,7 @@
 
 
 # STREAM
-We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. 
+We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. Our paper can be found [here](https://aclanthology.org/2024.acl-short.41.pdf).
 
 # Table of Contents
 - [STREAM](#stream)
@@ -46,7 +46,7 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
       - [Validation Criteria](#validation-criteria)
       - [Submitting Your Contribution](#submitting-your-contribution)
 - [Citation](#citation)
-    - [Paper 1 TBD](#paper-1-tbd)
+    - [STREAM](#stream-1)
     - [Metrics and CEDC](#metrics-and-cedc)
     - [TNTM](#tntm)
     - [DCTE](#dcte)
@@ -80,6 +80,9 @@ Make additionally sure to download the necessary [nltk](https://www.nltk.org/) r
 
 ```python
 import nltk
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
 nltk.download('averaged_perceptron_tagger')
 ```
 
@@ -604,18 +607,16 @@ If you want to include a new model where these guidelines are not approriate ple
 
 If you use this project in your research, please consider citing:
 
-### Paper 1 TBD
+### STREAM
 
 ```bibtex
-@article{your_paper_key1,
-  title={Your Paper Title},
-  author={Your Name and Co-Author's Name},
-  journal={Journal/Conference Name},
-  year={Year},
-  volume={Volume},
-  number={Number},
-  pages={Pages},
-  doi={link_to_doi}
+@inproceedings{thielmann-etal-2024-stream,
+    title = {STREAM: Simplified Topic Retrieval, Exploration, and Analysis Module},
+    author = {Thielmann, Anton  and Reuter, Arik  and Weisser, Christoph  and Kant, Gillian  and Kumar, Manish  and S{\"a}fken, Benjamin},
+    booktitle = {Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)},
+    year = {2024},
+    publisher = {Association for Computational Linguistics},
+    pages = {435--444},
 }
 ```
 

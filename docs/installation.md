@@ -19,9 +19,13 @@ pip install stream_topic
 
 ### Install the required dependencies:
 
-Make sure you have installed the required dependencies before installing `stream_topic`. You can install the required dependencies using the following command:
+Make sure you have installed the required dependencies before running any models from `stream_topic`. You can install the required dependencies using the following command:
 
 ```bash
 import nltk
+
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
 ```
