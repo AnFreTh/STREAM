@@ -2,11 +2,6 @@ Models
 ========
 
 
-.. autoclass:: stream_topic.models.BERTopicTM
-    :members:
-
-.. autoclass:: stream_topic.models.CBC
-    :members:
 
 .. autoclass:: stream_topic.models.CEDC
     :members:
@@ -39,4 +34,13 @@ Models
     :members:
 
 .. autoclass:: stream_topic.models.CTMNeg
+    :members:
+
+.. autoclass:: stream_topic.models.NMFTM
+    :members:
+
+.. autoclass:: stream_topic.models.BERTopicTM
+    :members:
+
+.. autoclass:: stream_topic.models.CBC
     :members:
