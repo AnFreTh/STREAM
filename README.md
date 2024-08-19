@@ -16,13 +16,24 @@
 </div>
 
 
-# STREAM
-We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for user-friendly topic modelling and especially subsequent interactive topic visualization and analysis. Our paper can be found [here](https://aclanthology.org/2024.acl-short.41.pdf).
+<h1>STREAM: A Simplified Topic Retrieval, Exploration, and Analysis Module</h1>
 
-# Table of Contents
-- [STREAM](#stream)
-- [Table of Contents](#table-of-contents)
-      - [Speed](#speed)
+<h3 style="text-align: center;">- Topic Modeling in Python -</h3>
+
+<p>We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for User-Friendly and Interactive Topic Modeling and Visualization. Our paper can be found <a href="https://aclanthology.org/2024.acl-short.41.pdf">here</a>.</p>
+
+
+
+<table>
+  <tr>
+    <td><img src="./docs/images/gif1.gif" alt="First GIF" width="400"/></td>
+    <td><img src="./docs/images/gif2.gif" alt="Second GIF" width="400"/></td>
+  </tr>
+</table>
+
+<h2> Table of Contents </h2>
+
+
 - [Installation](#installation)
 - [Available Models](#available-models)
 - [Available Metrics](#available-metrics)
@@ -31,10 +42,6 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
   - [Preprocessing](#preprocessing)
   - [Model fitting](#model-fitting)
   - [Evaluation](#evaluation)
-    - [Expressivity](#expressivity)
-    - [Intruder Accuracy (INT)](#intruder-accuracy-int)
-    - [Average Intruder Similarity (ISIM)](#average-intruder-similarity-isim)
-    - [Intruder Shift (ISH)](#intruder-shift-ish)
   - [Hyperparameter optimization](#hyperparameter-optimization)
   - [Visualization](#visualization)
   - [Downstream Tasks](#downstream-tasks)
@@ -46,24 +53,8 @@ We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Modul
       - [Validation Criteria](#validation-criteria)
       - [Submitting Your Contribution](#submitting-your-contribution)
 - [Citation](#citation)
-    - [STREAM](#stream-1)
-    - [Metrics and CEDC](#metrics-and-cedc)
-    - [TNTM](#tntm)
-    - [DCTE](#dcte)
-    - [CBC](#cbc)
 
 
-
-For better topic analysis, we implement multiple intruder-word based topic evaluation metrics. Additionally, we publicize multiple new datasets that can extend the so far very limited number of publicly available benchmark datasets in topic modeling. We integrate downstream interpretable analysis modules to enable users to easily analyse the created topics in downstream tasks together with additional tabular information.
-
-#### Speed
-Since most of STREAMs models are centered around Document embeddings, STREAM comes along with a set of pre-embedded datasets.
-Additionally, once a user fits a model that leverages document embeddings, the embeddings are saved and automatically loaded the next time the user wants to fit any model with the same set of embeddings.
-
-
-<p align="center">
-    <img src="assets/model_plot.png" alt="Figure Description" width="400"/>
-</p>
 
 Installation
 =============
@@ -335,56 +326,7 @@ Depending on the model, check the documentation for hyperparameter settings. To 
 
 ## Evaluation
 
-In this section, we describe the three metrics used to evaluate topic models' performance: **Intruder Shift (ISH)**, **Intruder Accuracy (INT)**, and **Average Intruder Similarity (ISIM)**.
-
-### Expressivity
-**Expressivity**,  evaluates the meaningfulness of a topic by leveraging stopwords. Stopwords primarily serve a grammatical role and don't contribute to the document's meaning. The steps to calculate Expressivity are as follows:
-
-1. Compute vector embeddings for all stopwords and calculate their centroid embedding, ${\psi}$.
-2. For each topic, compute the weighted centroid of the top $Z$ words, normalized so that their weights sum up to 1: ${\gamma}_k = \frac{1}{Z}\sum_{i=1}^{Z} \phi_{k,i}{\omega_i}$.
-3. Calculate the cosine similarity between each topic centroid ${\gamma}_k$ and the stopword centroid ${\psi}$.
-4. The Expressivity metric is then defined as the average similarity across all $K$ topics:
-
-$$\small{EXPRS({\gamma}, {\psi}) = \frac{1}{K} \sum_{k=1}^{K} sim({\gamma}_k, {\psi})}$$
-
-Note that ${\gamma}_k$ is different from ${\mu}_k$, where the latter is the centroid of the document cluster associated with topic $t_k$. Expressivity can vary based on the chosen stopwords, allowing for domain-specific adjustments to evaluate a topic's expressivity based on a custom stopword set.
-
-This approach provides a quantifiable measure of how well a topic conveys meaningful information, distinct from grammatical structure alone.
-
-
-### Intruder Accuracy (INT)
-
-The **Intruder Accuracy (INT)** metric aims to improve the identification of intruder words within a topic. Here's how it works:
-
-1. Given the top Z words of a topic, randomly select an intruder word from another topic.
-2. Calculate the cosine similarity between all possible pairs of words within the set of the top Z words and the intruder word.
-3. Compute the fraction of top words for which the intruder has the least similar word embedding using the following formula:
- 
-$$\small{INT(t_k) = \frac{1}{Z}\sum_{i=1}^Z {1}(\forall j: sim({\omega}_i, {\hat{\omega}}) < sim({\omega}_i, {\omega}_j))}$$
-
-
-INT measures how effectively the intruder word can be distinguished from the top words in a topic. A larger value is better.
-
-### Average Intruder Similarity (ISIM)
-
-The **Average Intruder Similarity (ISIM)** metric calculates the average cosine similarity between each word in a topic and an intruder word:
-$$ISIM(t_k) = \frac{1}{Z} \sum_{i=1}^{Z} sim({\omega}_i, {\hat{\omega}})$$
-
-To enhance the metrics' robustness against the specific selection of intruder words, ISH, INT, and ISIM are computed multiple times with different randomly chosen intruder words, and the results are averaged.
-
-These metrics provide insights into the performance of topic models and their ability to maintain topic coherence and diversity. A smaller value is better.
-
-### Intruder Shift (ISH)
-
-The **Intruder Shift (ISH)** metric quantifies the shift in a topic's centroid when an intruder word is substituted. This process involves the following steps:
-
-1. Compute the unweighted centroid of a topic and denote it as $\tilde{\boldsymbol{\gamma}}_i$.
-2. Randomly select a word from that topic and replace it with a randomly selected word from a different topic.
-3. Recalculate the centroid of the resulting words and denote it as $\hat{\boldsymbol{\gamma}}_i$.
-4. Calculate the ISH score for a topic by averaging the cosine similarity between $\tilde{{\gamma}}_i$ and $\hat{\boldsymbol{\gamma}}_i$ for all topics using the formula:
-5. 
-$$ISH(T) = \frac{1}{K} \sum_{i=1}^{K} sim(\tilde{{\gamma}}_i, \hat{{\gamma}}_i)$$
-A lower ISH score indicates a more coherent and diverse topic model.
+stream-topic implements various evaluation metrics, mostly focused around the intruder word task. The implemented metrics achieve high correlations with human evaluation. See [here](https://direct.mit.edu/coli/article/50/2/619/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality) for the detailed description of the metrics.
 
 To evaluate your model simply use one of the metrics.
 ```python
@@ -438,7 +380,7 @@ visualize_topic_model(
 ```
 
 <p align="center">
-    <img src="assets/topical_distances.png" alt="Figure Description" width="600"/>
+    <img src="docs/images/gif1.gif" alt="Figure Description" width="750"/>
 </p>
 
 ## Downstream Tasks
@@ -611,7 +553,7 @@ If you want to include a new model where these guidelines are not approriate ple
 
 If you use this project in your research, please consider citing:
 
-### STREAM
+<h3> STREAM <h/3>
 
 ```bibtex
 @inproceedings{thielmann-etal-2024-stream,
@@ -624,7 +566,7 @@ If you use this project in your research, please consider citing:
 }
 ```
 
-###  Metrics and CEDC
+<h3> Metrics and CEDC <h/3>
 
 ```bibtex
 @article{thielmann2024topics,
@@ -637,7 +579,7 @@ If you use this project in your research, please consider citing:
 }
 ```
 
-### TNTM
+<h3> TNTM <h/3>
 
 ```bibtex
 @article{reuter2024probabilistic,
@@ -649,7 +591,7 @@ If you use this project in your research, please consider citing:
 ```
 
 
-### DCTE
+<h3> DCTE <h/3>
 
 ```bibtex
 @inproceedings{thielmann2024human,
@@ -661,7 +603,7 @@ If you use this project in your research, please consider citing:
 }
 ```
 
-### CBC
+<h3> CBC <h/3>
 
 ```bibtex
 @inproceedings{thielmann2023coherence,
