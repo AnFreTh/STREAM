@@ -16,9 +16,10 @@
 </div>
 
 
-<h1>STREAM: A Simplified Topic Retrieval, Exploration, and Analysis Module</h1>
+<h1 style="text-align: center;">STREAM: Simplified Topic Retrieval, Exploration, and Analysis Module</h1>
 
-<h3 style="text-align: center;">- Topic Modeling in Python -</h3>
+<h3 style="text-align: center;">- Topic Modeling Made Easy in Python -</h3>
+
 
 <p>We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for User-Friendly and Interactive Topic Modeling and Visualization. Our paper can be found <a href="https://aclanthology.org/2024.acl-short.41.pdf">here</a>.</p>
 
@@ -34,50 +35,68 @@
 <h2> Table of Contents </h2>
 
 
-- [Installation](#installation)
-- [Available Models](#available-models)
-- [Available Metrics](#available-metrics)
-- [Available Datasets](#available-datasets)
-- [Usage](#usage)
-  - [Preprocessing](#preprocessing)
-  - [Model fitting](#model-fitting)
-  - [Evaluation](#evaluation)
-  - [Hyperparameter optimization](#hyperparameter-optimization)
-  - [Visualization](#visualization)
-  - [Downstream Tasks](#downstream-tasks)
-    - [How to use](#how-to-use)
-  - [Contributing and Testing New Models](#contributing-and-testing-new-models)
-    - [Steps for Contributing](#steps-for-contributing)
-      - [Example Model Structure](#example-model-structure)
-      - [Testing Your Model](#testing-your-model)
-      - [Validation Criteria](#validation-criteria)
-      - [Submitting Your Contribution](#submitting-your-contribution)
-- [Citation](#citation)
+- [🏃 Quick Start](#-quick-start)
+- [🚀 Installation](#-installation)
+- [📦 Available Models](#-available-models)
+- [📊 Available Metrics](#-available-metrics)
+- [🗂️ Available Datasets](#️-available-datasets)
+- [🔧 Usage](#-usage)
+  - [🛠️ Preprocessing](#️-preprocessing)
+  - [🚀 Model fitting](#-model-fitting)
+  - [✅ Evaluation](#-evaluation)
+  - [🔍 Hyperparameter optimization](#-hyperparameter-optimization)
+  - [🖼️ Visualization](#️-visualization)
+  - [📈 Downstream Tasks](#-downstream-tasks)
+  - [🤝 Contributing and Testing New Models](#-contributing-and-testing-new-models)
+- [📜 Citation](#-citation)
+- [📝 License](#-license)
 
 
+# 🏃 Quick Start
 
-Installation
-=============
-stream_topic is available on PyPI. To install STREAM, you can either install it directly from the GitHub repository using the following command:
-
-```sh
-pip install git+https://github.com/AnFreTh/STREAM.git
-```
-or simply install via:
-```sh
-pip install stream_topic
-```
-Make additionally sure to download the necessary [nltk](https://www.nltk.org/) ressources, e.g. via:
+Get started with STREAM in just a few lines of code:
 
 ```python
-import nltk
-nltk.download('stopwords')
-nltk.download('punkt')
-nltk.download('wordnet')
-nltk.download('averaged_perceptron_tagger')
+from stream_topic.models import KmeansTM
+from stream_topic.utils import TMDataset
+
+dataset = TMDataset()
+dataset.fetch_dataset("BBC_News")
+dataset.preprocess(model_type="KmeansTM")
+
+model = KmeansTM()
+model.fit(dataset, n_topics=20)
+
+topics = model.get_topics()
+print(topics)
 ```
 
-# Available Models
+
+# 🚀 Installation
+
+You can install STREAM directly from PyPI or from the GitHub repository:
+
+1. **PyPI (Recommended)**:
+    ```bash
+    pip install stream_topic
+    ```
+
+2. **GitHub**:
+    ```bash
+    pip install git+https://github.com/AnFreTh/STREAM.git
+    ```
+
+3. **Download NLTK Resources**:
+    Ensure you have the necessary NLTK resources installed:
+    ```python
+    import nltk
+    nltk.download('stopwords')
+    nltk.download('punkt')
+    nltk.download('wordnet')
+    nltk.download('averaged_perceptron_tagger')
+    ```
+
+# 📦 Available Models
 STREAM offers a variety of neural as well as non-neural topic models and we are always trying to incorporate more and new models. If you wish to incorporate your own model, or want another model incorporated please raise an issue with the required information. Currently, the following models are implemented:
 
 <div align="center" style="width: 100%;">
@@ -151,7 +170,7 @@ STREAM offers a variety of neural as well as non-neural topic models and we are 
 
 
 
-# Available Metrics
+# 📊 Available Metrics
 Since evaluating topic models, especially automatically, STREAM implements numerous evaluation metrics. Especially, the intruder based metrics, while they might take some time to compute, have shown great correlation with human evaluation. 
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
@@ -197,7 +216,7 @@ Since evaluating topic models, especially automatically, STREAM implements numer
 
 
 
-# Available Datasets
+# 🗂️ Available Datasets
 To integrate custom datasets for modeling with STREAM, please follow the example notebook in the examples folder. For benchmarking new models, STREAM already includes the following datasets:
 <div align="center" style="width: 100%;">
   <table style="margin: 0 auto;">
@@ -288,7 +307,7 @@ If you wish yo include and publish one of your datasets directly into the packag
 
 
 
-# Usage
+# 🔧 Usage
 To use one of the available models, follow the simple steps below:
 1. Import the necessary modules:
 
@@ -296,7 +315,7 @@ To use one of the available models, follow the simple steps below:
     from stream_topic.models import KmeansTM
     from stream_topic.utils import TMDataset
     ```
-## Preprocessing
+## 🛠️ Preprocessing
 2. Get your dataset and preprocess for your model:
     ```python
     dataset = TMDataset()
@@ -307,7 +326,7 @@ To use one of the available models, follow the simple steps below:
 The specified model_type is optional and further arguments can be specified. Default steps are predefined for all included models.
 Steps like stopword removal and lemmatizing are automatically performed for models like e.g. LDA.
 
-## Model fitting
+## 🚀 Model fitting
 Fitting a model from STREAM follows a simple, sklearn-like logic and every model can be fit identically.
 
 3. Choose the model you want to use and train it:
@@ -324,7 +343,7 @@ Depending on the model, check the documentation for hyperparameter settings. To 
     topics = model.get_topics()
     ```
 
-## Evaluation
+## ✅ Evaluation
 
 stream-topic implements various evaluation metrics, mostly focused around the intruder word task. The implemented metrics achieve high correlations with human evaluation. See [here](https://direct.mit.edu/coli/article/50/2/619/118990/Topics-in-the-Haystack-Enhancing-Topic-Quality) for the detailed description of the metrics.
 
@@ -355,7 +374,7 @@ topic_diversity_score = metric.score(model_output)
 
 Similarly to use one of STREAMS metrics for any model, use the topics and occasionally the $\beta$ (topic-word-matrix) of the model to calculate the score.
 
-## Hyperparameter optimization
+## 🔍 Hyperparameter optimization
 If you want to optimize the hyperparameters, simply run:
 ```python
 model.optimize_and_fit(
@@ -366,7 +385,7 @@ model.optimize_and_fit(
     n_trials=20,
 )
 ```
-## Visualization
+## 🖼️ Visualization
 You can also specify to optimize with respect to any evaluation metric from stream_topic.
 Visualize the results:
 
@@ -383,7 +402,7 @@ visualize_topic_model(
     <img src="docs/images/gif1.gif" alt="Figure Description" width="750"/>
 </p>
 
-## Downstream Tasks
+## 📈 Downstream Tasks
 
 The general formulation of a Neural Additive Model (NAM) can be summarized by the equation:
 
@@ -405,7 +424,6 @@ In this setup, visualizing the shape function `k` reveals the impact of a topic 
 
 Fitting a downstream model with a pre-trained topic model is straightforward using the PyTorch Trainer class. Subsequently, visualizing all shape functions can be done similarly to the approach described by Agarwal et al. (2021).
 
-### How to use
 
 ```python
 from lightning import Trainer
@@ -432,11 +450,19 @@ plot_downstream_model(downstream_model)
 
 
 
-## Contributing and Testing New Models
+## 🤝 Contributing and Testing New Models
 
-We welcome contributions to enhance the functionality of our topic modeling package. To ensure your new models integrate seamlessly, please follow the guidelines and testing instructions provided below.
+We welcome contributions! Before you start, please:
 
-### Steps for Contributing
+1. **Check Existing Issues**: Look for existing issues or discussions that may cover your idea.
+2. **Fork and Clone**: Fork the repository and clone it to your local machine.
+3. **Create a Branch**: Work on a new branch to keep your changes organized.
+4. **Develop and Test**: Develop your model and validate it using our provided testing script.
+5. **Submit a Pull Request**: Once ready, submit a PR with a clear description of your changes.
+
+For detailed guidelines on how to structure your contributions, see below.ng instructions provided below.
+
+<h3> Steps for Contributing </h3>
 
 1. **Fork the Repository**:
    - Fork the repository to your GitHub account.
@@ -458,7 +484,7 @@ We welcome contributions to enhance the functionality of our topic modeling pack
    - Create your model class file, ensuring it follows the expected structure and naming conventions.
    - Implement the required methods (`get_info`, `fit`, `predict`) and attributes (`topic_dict`). Optionally, implement `beta`, `theta`, or corresponding methods (`get_beta`, `get_theta`).
 
-#### Example Model Structure
+<h4> Example Model Structure </h4>
 
 Here is an example of how your model class should be structured:
 
@@ -494,7 +520,7 @@ class ExampleModel(BaseModel):
         return self.theta
 ```
 
-#### Testing Your Model
+<h4> Testing Your Model </h4>
 
 1. **Install Dependencies**:
    - Ensure all dependencies are installed.
@@ -511,7 +537,7 @@ class ExampleModel(BaseModel):
    ```
 If this validation fails, it will tell you 
 
-#### Validation Criteria
+<h4> Validation Criteria </h4>
 
 The following checks are performed during validation:
 - Presence of required methods (`get_info`, `fit`, `predict`).
@@ -523,7 +549,7 @@ The following checks are performed during validation:
 
 Refer to the `tests/model_validation.py` script for detailed validation logic.
 
-#### Submitting Your Contribution
+<h4> Submitting Your Contribution </h4>
 
 1. **Commit Your Changes**:
    - Commit your changes to your branch.
@@ -549,11 +575,11 @@ If you want to include a new model where these guidelines are not approriate ple
 
 
 
-# Citation
+# 📜 Citation
 
 If you use this project in your research, please consider citing:
 
-<h3> STREAM <h/3>
+<h3> STREAM </h3>
 
 ```bibtex
 @inproceedings{thielmann-etal-2024-stream,
@@ -566,7 +592,7 @@ If you use this project in your research, please consider citing:
 }
 ```
 
-<h3> Metrics and CEDC <h/3>
+<h3> Metrics and CEDC </h3>
 
 ```bibtex
 @article{thielmann2024topics,
@@ -579,7 +605,7 @@ If you use this project in your research, please consider citing:
 }
 ```
 
-<h3> TNTM <h/3>
+<h3> TNTM </h3>
 
 ```bibtex
 @article{reuter2024probabilistic,
@@ -591,7 +617,7 @@ If you use this project in your research, please consider citing:
 ```
 
 
-<h3> DCTE <h/3>
+<h3> DCTE </h3>
 
 ```bibtex
 @inproceedings{thielmann2024human,
@@ -603,7 +629,7 @@ If you use this project in your research, please consider citing:
 }
 ```
 
-<h3> CBC <h/3>
+<h3> CBC </h3>
 
 ```bibtex
 @inproceedings{thielmann2023coherence,
@@ -629,3 +655,7 @@ If you use one of the Reddit or GME datasets, consider citing:
   publisher={Springer}
 }
 ```
+
+# 📝 License
+
+STREAM is released under the [MIT License](./LICENSE). © 2024 
