@@ -57,7 +57,7 @@ class TextPreprocessor:
     remove_words_with_numbers : bool, optional
         Whether to remove words containing numbers from the text data (default is False).
     remove_words_with_special_chars : bool, optional
-        Whether to remove words containing special characters from the text data (default is False). 
+        Whether to remove words containing special characters from the text data (default is False).
 
     """
 
@@ -73,15 +73,18 @@ class TextPreprocessor:
         self.remove_html_tags = kwargs.get("remove_html_tags", True)
         self.remove_special_chars = kwargs.get("remove_special_chars", True)
         self.remove_accents = kwargs.get("remove_accents", True)
-        self.custom_stopwords = set(kwargs.get("custom_stopwords", []))
+        self.custom_stopwords = (
+            set(kwargs.get("custom_stopwords", []))
+            if kwargs.get("custom_stopwords")
+            else set()
+        )
         self.detokenize = kwargs.get("detokenize", False)
         self.min_word_freq = kwargs.get("min_word_freq", 2)
         self.max_word_freq = kwargs.get("max_word_freq", None)
         self.min_word_length = kwargs.get("min_word_length", 3)
         self.max_word_length = kwargs.get("max_word_length", None)
         self.dictionary = set(kwargs.get("dictionary", []))
-        self.remove_words_with_numbers = kwargs.get(
-            "remove_words_with_numbers", False)
+        self.remove_words_with_numbers = kwargs.get("remove_words_with_numbers", False)
         self.remove_words_with_special_chars = kwargs.get(
             "remove_words_with_special_chars", False
         )
@@ -186,23 +189,19 @@ class TextPreprocessor:
             ]
 
         if self.min_word_length is not None:
-            words = [word for word in words if len(
-                word) >= self.min_word_length]
+            words = [word for word in words if len(word) >= self.min_word_length]
 
         if self.max_word_length is not None:
-            words = [word for word in words if len(
-                word) <= self.max_word_length]
+            words = [word for word in words if len(word) <= self.max_word_length]
 
         if self.dictionary != set():
             words = [word for word in words if word in self.dictionary]
 
         if self.remove_words_with_numbers:
-            words = [word for word in words if not any(
-                char.isdigit() for char in word)]
+            words = [word for word in words if not any(char.isdigit() for char in word)]
 
         if self.remove_words_with_special_chars:
-            words = [word for word in words if not re.search(
-                r"[^a-zA-Z0-9\s]", word)]
+            words = [word for word in words if not re.search(r"[^a-zA-Z0-9\s]", word)]
 
         if self.detokenize:
             text = TreebankWordDetokenizer().detokenize(words)
