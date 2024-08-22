@@ -3,9 +3,12 @@ from wordcloud import WordCloud
 
 from ..models.abstract_helper_models.base import BaseModel, TrainingStatus
 from ..utils import TMDataset
-from ._interactive import (_visualize_topic_model_2d,
-                           _visualize_topic_model_3d, _visualize_topics_2d,
-                           _visualize_topics_3d)
+from ._interactive import (
+    _visualize_topic_model_2d,
+    _visualize_topic_model_3d,
+    _visualize_topics_2d,
+    _visualize_topics_3d,
+)
 from ._octis_visuals import OctisWrapperVisualModel
 
 
@@ -43,7 +46,7 @@ def visualize_topics_as_wordclouds(
         hasattr(model, "topic_dict") and model._status == TrainingStatus.SUCCEEDED
     ), "Model must have been trained with topics extracted."
 
-    topics = model.get_topics()
+    topics = model.topic_dict
 
     for topic_id, topic_words in topics.items():
         # Generate a word frequency dictionary for the topic
@@ -153,24 +156,24 @@ def visualize_topics(
     use_average: bool = True,
 ):
     """
-        Visualize topics in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
+    Visualize topics in either 2D or 3D space using UMAP, t-SNE, or PCA dimensionality reduction techniques.
 
-        Args:
-            model (AbstractModel): The trained topic model instance.
-            model_output (dict, optional): The output of the topic model, typically including topic-word distributions and document-topic distributions. Required if the model does not have an 'output' attribute.
-            dataset (TMDataset, optional): The dataset used for training the topic model. Required if the model does not have an 'output' attribute.
-            three_dim (bool, optional): Flag to visualize in 3D if True, otherwise in 2D. Defaults to False.
-            reduce_first (bool, optional): Indicates whether to perform dimensionality reduction on embeddings before computing topic centroids. Defaults to False.
-            reducer (str, optional): Choice of dimensionality reduction technique. Supported values are 'umap', 'tsne', and 'pca'. Defaults to 'umap'.
-            port (int, optional): The port number on which the visualization dashboard will run. Defaults to 8050.
-            embedding_model_name (str, optional): Name of the embedding model used for generating document embeddings. Defaults to "all-MiniLM-L6-v2".
-            embeddings_folder_path (str, optional): Path to the folder containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
-            embeddings_file_path (str, optional): Path to the file containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
+    Args:
+        model (AbstractModel): The trained topic model instance.
+        model_output (dict, optional): The output of the topic model, typically including topic-word distributions and document-topic distributions. Required if the model does not have an 'output' attribute.
+        dataset (TMDataset, optional): The dataset used for training the topic model. Required if the model does not have an 'output' attribute.
+        three_dim (bool, optional): Flag to visualize in 3D if True, otherwise in 2D. Defaults to False.
+        reduce_first (bool, optional): Indicates whether to perform dimensionality reduction on embeddings before computing topic centroids. Defaults to False.
+        reducer (str, optional): Choice of dimensionality reduction technique. Supported values are 'umap', 'tsne', and 'pca'. Defaults to 'umap'.
+        port (int, optional): The port number on which the visualization dashboard will run. Defaults to 8050.
+        embedding_model_name (str, optional): Name of the embedding model used for generating document embeddings. Defaults to "all-MiniLM-L6-v2".
+        embeddings_folder_path (str, optional): Path to the folder containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
+        embeddings_file_path (str, optional): Path to the file containing precomputed embeddings. If not provided, embeddings will be computed on the fly.
 
 
-        Returns:
-            None
-                The function launches a Dash server to visualize the topic model.
+    Returns:
+        None
+            The function launches a Dash server to visualize the topic model.
 
     """
     if not isinstance(model, BaseModel):
