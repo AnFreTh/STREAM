@@ -21,7 +21,7 @@ def c_tf_idf(documents, m, ngram_range=(1, 1)):
     w = t.sum(axis=1)
 
     # Suppress divide by zero warning
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         tf = np.divide(t.T, w)
         if np.any(np.isnan(tf)) or np.any(np.isinf(tf)):
             logger.warning("NaNs or inf in tf matrix")
@@ -34,7 +34,7 @@ def c_tf_idf(documents, m, ngram_range=(1, 1)):
     return tf_idf, count
 
 
-def extract_tfidf_topics(tf_idf, count, docs_per_topic, n=10):
+def extract_tfidf_topics(tf_idf, count, docs_per_topic, n=100):
     """class based tf_idf retrieval from cluster of documents
 
     Args:
@@ -51,8 +51,7 @@ def extract_tfidf_topics(tf_idf, count, docs_per_topic, n=10):
     tf_idf_transposed = tf_idf.T
     indices = tf_idf_transposed.argsort()[:, -n:]
     top_n_words = {
-        label: [((words[j]), (tf_idf_transposed[i][j]))
-                for j in indices[i]][::-1]
+        label: [((words[j]), (tf_idf_transposed[i][j])) for j in indices[i]][::-1]
         for i, label in enumerate(labels)
     }
 
