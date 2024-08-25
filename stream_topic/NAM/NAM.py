@@ -323,6 +323,9 @@ class DownstreamModel(pl.LightningModule):
             columns=["text", "tokens"], errors="ignore"
         )
 
+        if "predictions" in self.structured_data.columns:
+            self.structured_data = self.structured_data.drop(columns=["predictions"])
+
         self.target_column = target_column
 
         # Combine topic probabilities with structured data
