@@ -520,7 +520,6 @@ class DownstreamModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        print(y)
         y_hat = self(x)
         loss = self.loss_fn(y_hat, y)
 
