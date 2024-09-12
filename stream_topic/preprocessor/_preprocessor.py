@@ -306,7 +306,7 @@ class TextPreprocessor:
                 return text
         except LangDetectException:
             pass
-        return self._clean_text(text)                                   
+        return self._clean_text(text, language)                                   
 
     def preprocess_dataframe(self, df, text_column):
         """
