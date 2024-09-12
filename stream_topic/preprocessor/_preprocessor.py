@@ -98,7 +98,8 @@ class TextPreprocessor:
         else:                                                        
             self.stop_words = set(stopwords.words("english"))
 
-        self.stop_words.update(self.custom_stopwords)                
+        if self.language != "zh":
+            self.stop_words.update(self.custom_stopwords)                
 
         if self.lemmatize:                                           
             self.lemmatizer = WordNetLemmatizer()
