@@ -11,6 +11,7 @@ from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
 import jieba
+import pandas as pd
 
 
 class TextPreprocessor:
