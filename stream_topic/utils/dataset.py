@@ -310,7 +310,7 @@ class TMDataset(Dataset, DataDownloader):
                 self.dataframe["text"] = self.texts
                 if self.language == "zh":        #添加部分
                     # 使用结巴分词进行分词
-                    self.dataframe["tokens"] = self.texts.apply(lambda x: list(jieba.cut(x)))
+                    self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
                 else:
                     self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
 
