@@ -167,8 +167,8 @@ class TextPreprocessor:
         text = text.encode("ascii", "ignore")
         return text.decode("utf-8")
 
-    def _clean_text(self, text, language):
-        if language != "zh":
+    def _clean_text(self, text):
+        if self.language != "zh":
             text = text.strip()                                               
             if self.lowercase:                                                
                 text = text.lower()
@@ -287,7 +287,7 @@ class TextPreprocessor:
 
         return text
 
-    def preprocess_text(self, text, language):
+    def preprocess_text(self, text):
         """
         Preprocess a single text document.
 
@@ -302,7 +302,13 @@ class TextPreprocessor:
             Preprocessed text document.
 
         """
-        return self._clean_text(text, language)                                   
+        try:
+            language = detect(text)
+            if language != self.language:
+                return text
+        except LangDetectException:
+            pass
+        return self._clean_text(text)                                   
 
     def preprocess_dataframe(self, df, text_column):
         """
