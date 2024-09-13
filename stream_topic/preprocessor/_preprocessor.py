@@ -287,7 +287,7 @@ class TextPreprocessor:
 
         return text
 
-    def preprocess_text(self, text):
+    def preprocess_text(self, text, language):
         """
         Preprocess a single text document.
 
@@ -302,12 +302,6 @@ class TextPreprocessor:
             Preprocessed text document.
 
         """
-        try:                                                            
-            language = detect(text)                                     
-            if language != self.language:                               
-                return text
-        except LangDetectException:
-            pass
         return self._clean_text(text, language)                                   
 
     def preprocess_dataframe(self, df, text_column):
