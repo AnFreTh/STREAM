@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+import jieba
 
 import gensim.downloader as api
 import numpy as np
