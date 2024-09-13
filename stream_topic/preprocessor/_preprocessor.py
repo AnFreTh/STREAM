@@ -248,7 +248,7 @@ class TextPreprocessor:
             if self.remove_punctuation:
                 text = re.sub(r"[^\w\s]", " ", text)
 
-            words = segment_text(text)
+            words = self.segment_text(text)
 
             # Update word frequency counter
             self.word_freq.update(words)  
