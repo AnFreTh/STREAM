@@ -21,7 +21,8 @@ MODEL_NAME = "NSTM"
 
 class NSTM(BaseModel):
     """
-    NSTM (Neural Topic Model via Optimal Transport) class.
+    Neural Topic Model via Optimal Transport (NSTM). Based on the paper presented at ICLR 2021 by
+    He Zhao, Dinh Phung, Viet Huynh, Trung Le, and Wray Buntine.
 
     This class initializes and configures the NSTM model with the specified
     hyperparameters and dataset. It inherits from the `BaseModel` class.
