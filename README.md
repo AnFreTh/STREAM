@@ -164,6 +164,10 @@ STREAM offers a variety of neural as well as non-neural topic models and we are 
         <td><a href="https://arxiv.org/abs/1703.01488">NeuralLDA</a></td>
         <td>Autoencoding Variational Inference For Topic Models</td>
       </tr>
+      <tr>
+        <td><a href="https://arxiv.org/abs/2008.13537">NSTM</a></td>
+        <td>Neural Topic Model via Optimal Transport</td>
+      </tr>
     </tbody>
   </table>
 </div>
