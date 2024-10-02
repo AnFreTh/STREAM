@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="./docs/images/logos/STREAM_2.jpg" width="400"/>
+  <a href="#get-started">
+    <img src="./assets/stream-topic-gif.gif" width="800"/>
+  </a>
+
 
 
 [![PyPI](https://img.shields.io/pypi/v/stream_topic)](https://pypi.org/project/stream_topic)
@@ -23,14 +26,6 @@
 
 <p>We present STREAM, a Simplified Topic Retrieval, Exploration, and Analysis Module for User-Friendly and Interactive Topic Modeling and Visualization. Our paper can be found <a href="https://aclanthology.org/2024.acl-short.41.pdf">here</a>.</p>
 
-
-
-<table>
-  <tr>
-    <td><img src="./docs/images/gif1.gif" alt="First GIF" width="400"/></td>
-    <td><img src="./docs/images/gif2.gif" alt="Second GIF" width="400"/></td>
-  </tr>
-</table>
 
 <h2> Table of Contents </h2>
 
