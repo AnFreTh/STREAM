@@ -62,7 +62,6 @@ autodoc_mock_imports = [
     "plotly",
     "matplotlib",
     "gensim",
-    "octis",
     "nltk",
     "langdetect",
     "loguru",
