@@ -44,3 +44,6 @@ Models
 
 .. autoclass:: stream_topic.models.CBC
     :members:
+
+.. autoclass:: stream_topic.models.NSTM
+    :members:
