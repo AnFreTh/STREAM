@@ -13,6 +13,7 @@ from .neurallda import NeuralLDA
 from .ctmneg import CTMNeg
 from .tntm import TNTM
 from .nmf import NMFTM
+from .nstm import NSTM
 
 __all__ = [
     "BERTopicTM",
@@ -30,4 +31,5 @@ __all__ = [
     "CTMNeg",
     "TNTM",
     "NMFTM",
+    "NSTM",
 ]

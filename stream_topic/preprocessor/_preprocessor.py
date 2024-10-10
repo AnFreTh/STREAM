@@ -77,15 +77,18 @@ class TextPreprocessor:
         self.remove_html_tags = kwargs.get("remove_html_tags", True)
         self.remove_special_chars = kwargs.get("remove_special_chars", True)
         self.remove_accents = kwargs.get("remove_accents", True)
-        self.custom_stopwords = set(kwargs.get("custom_stopwords", []))
+        self.custom_stopwords = (
+            set(kwargs.get("custom_stopwords", []))
+            if kwargs.get("custom_stopwords")
+            else set()
+        )
         self.detokenize = kwargs.get("detokenize", False)
         self.min_word_freq = kwargs.get("min_word_freq", 2)
         self.max_word_freq = kwargs.get("max_word_freq", None)
         self.min_word_length = kwargs.get("min_word_length", 3)
         self.max_word_length = kwargs.get("max_word_length", None)
         self.dictionary = set(kwargs.get("dictionary", []))
-        self.remove_words_with_numbers = kwargs.get(
-            "remove_words_with_numbers", False)
+        self.remove_words_with_numbers = kwargs.get("remove_words_with_numbers", False)
         self.remove_words_with_special_chars = kwargs.get(
             "remove_words_with_special_chars", False)
         self.stopwords_path = kwargs.get("stopwords_path", None)
@@ -168,6 +171,7 @@ class TextPreprocessor:
         return text.decode("utf-8")
 
     def _clean_text(self, text):
+
         if self.language != "zh":
             text = text.strip()                                               
             if self.lowercase:                                                
