@@ -47,6 +47,7 @@ class ISIM(BaseMetric):
         metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
+        embeddings=None
     ):
         """
         Initializes the ISIM object with the number of top words to consider
@@ -239,7 +240,7 @@ class ISIM(BaseMetric):
         if new_embeddings:
             self.embeddings = None
 
-        return float(np.mean(list(self.score_per_topic(topics).values())))
+        return float(np.mean(list(self.score_per_topic(topics, new_embeddings=new_embeddings).values())))
 
 
 class INT(BaseMetric):
@@ -278,6 +279,7 @@ class INT(BaseMetric):
         metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
+        embeddings=None
     ):
         """
         Initializes the INT object with the number of top words to consider
@@ -484,7 +486,7 @@ class INT(BaseMetric):
         if new_embeddings:
             self.embeddings = None
 
-        return float(np.mean(list(self.score_per_topic(topics).values())))
+        return float(np.mean(list(self.score_per_topic(topics, new_embeddings=new_embeddings).values())))
 
 
 class ISH(BaseMetric):
@@ -524,6 +526,7 @@ class ISH(BaseMetric):
         metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
+        embeddings=None
     ):
         """
         Initializes the ISH object with the number of top words to consider
@@ -597,7 +600,7 @@ class ISH(BaseMetric):
         if new_embeddings:
             self.embeddings = None
 
-        return float(np.mean(list(self.score_per_topic(topics).values())))
+        return float(np.mean(list(self.score_per_topic(topics, new_embeddings=new_embeddings).values())))
 
     def score_per_topic(self, topics, new_embeddings=None):
         """

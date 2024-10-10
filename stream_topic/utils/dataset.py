@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+import jieba
 
 import gensim.downloader as api
 import numpy as np
@@ -76,7 +77,7 @@ class TMDataset(Dataset, DataDownloader):
 
     """
 
-    def __init__(self, name=None, language="en"):
+    def __init__(self, name=None, **kwargs):
         super().__init__()
 
         self.name = name
@@ -87,8 +88,9 @@ class TMDataset(Dataset, DataDownloader):
         self.tokens = None
         self.texts = None
         self.labels = None
-        self.language = language
+        self.language = kwargs.get("language", "en")
         self.preprocessing_steps = self.default_preprocessing_steps()
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def fetch_dataset(self, name: str, dataset_path=None, source: str = "github"):
         """
@@ -302,13 +304,16 @@ class TMDataset(Dataset, DataDownloader):
             try:
                 preprocessor = TextPreprocessor(
                     language=self.language,
+                    stopwords_path=self.stopwords_path,
                     **preprocessing_steps,
                 )
                 self.texts = preprocessor.preprocess_documents(self.texts)
                 self.dataframe["text"] = self.texts
-                self.dataframe["tokens"] = self.dataframe["text"].apply(
-                    lambda x: x.split()
-                )
+                if self.language == "zh":        #添加部分
+                    # 使用结巴分词进行分词
+                    self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+                else:
+                    self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
 
                 self.info.update(
                     {
