@@ -191,7 +191,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         only_nouns: bool = False,
         clean: bool = False,
         clean_threshold: float = 0.85,
-        expansion_corpus: str = "octis",
+        expansion_corpus: str = "brown",
         n_words: int = 20,
     ):
         """
@@ -210,7 +210,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         clean_threshold : float, optional
             Threshold for cleaning topics based on similarity (default is 0.85).
         expansion_corpus : str, optional
-            Corpus for expanding topics (default is 'octis').
+            Corpus for expanding topics (default is 'brown').
         n_words : int, optional
             Number of top words to include in each topic (default is 20).
 

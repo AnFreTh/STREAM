@@ -8,7 +8,7 @@ from nltk import pos_tag
 from nltk.corpus import brown as nltk_words
 from nltk.corpus import words as eng_dict
 from numpy.linalg import norm
-from octis.dataset.dataset import Dataset as OCDataset
+from ..utils.dataset import TMDataset
 
 from ._embedder import BaseEmbedder
 
@@ -37,7 +37,7 @@ class TopicExtractor:
         self.embedder = BaseEmbedder(embedding_model)
         self.n_topics = n_topics
 
-    def _noun_extractor_haystack(self, embeddings, n, corpus="octis", only_nouns=True):
+    def _noun_extractor_haystack(self, embeddings, n, corpus="brown", only_nouns=True):
         """
         Extracts the topics most probable words, which are the words nearest to the topics centroid.
         We extract all nouns from the corpus and the brown corpus. Afterwards we compute the cosine similarity between every word and every centroid.
@@ -51,6 +51,7 @@ class TopicExtractor:
         Args:
             embeddings (_type_): _document embeddings to compute centroid of the topic
             n (_type_): n_top number of words per topic
+            corpus (str, optional): corpus to be used for word extraction. Defaults to "brown". One of "brown", "stream", "words".
 
         Returns:
             dict: extracted topics
@@ -67,20 +68,20 @@ class TopicExtractor:
         if corpus == "brown":
             word_list = nltk_words.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word)
-                         for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         elif corpus == "words":
             word_list = eng_dict.words()
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word)
-                         for word in word_list]
-        elif corpus == "octis":
-            data = OCDataset()
-            data.fetch_dataset("20NewsGroup")
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+        elif corpus == "stream":
+            data = TMDataset()
+            data.fetch_dataset("20NewsGroups")
             word_list = data.get_vocabulary()
-            data.fetch_dataset("M10")
+            data.fetch_dataset("Spotify")
             word_list += data.get_vocabulary()
             data.fetch_dataset("BBC_News")
+            word_list += data.get_vocabulary()
+            data.fetch_dataset("Poliblogs")
             word_list += data.get_vocabulary()
 
             # include reuters etc datasets
@@ -90,16 +91,14 @@ class TopicExtractor:
             word_list += self.dataset.get_vocabulary()
 
             word_list = [word.lower().strip() for word in word_list]
-            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word)
-                         for word in word_list]
+            word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         else:
             raise ValueError(
                 "There are no words to be extracted for the Topics: Please specify a corpus"
             )
 
         if only_nouns:
-            word_list = [word for (word, pos) in pos_tag(
-                word_list) if is_noun(pos)]
+            word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
         else:
             word_list = [word for (word, pos) in pos_tag(word_list)]
 
