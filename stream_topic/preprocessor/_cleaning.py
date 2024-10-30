@@ -1,11 +1,10 @@
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
-
 from ._embedder import BaseEmbedder
 
-
 def clean_topics(topics, embedding_model, similarity=0.75):
+
     """Cleans the topics based on their cosine similarity between
     all words in the topic. Although we are only extracting nouns, and lemmatize them, it is possible that e.g.
     "tiger" and "tigers" are the top words in a topic. Therefore it could also happen, that
@@ -32,54 +31,59 @@ def clean_topics(topics, embedding_model, similarity=0.75):
         dict: cleaned topics
     """
 
-    word_embedding_model = BaseEmbedder(embedding_model)
+   word_embedding_model = BaseEmbedder(embedding_model)
+   cleaned_topics = []
 
-    cleaned_topics = []
-    # iterate through every topic
-    for topic in tqdm(range(len(topics))):
-        # extract words from topics
-        keys = [word for t in topics[topic]
-                for word in t if isinstance(word, str)]
-
-        keys_ = word_embedding_model.create_word_embeddings(keys)
-
-        mat = cosine_similarity(keys_)
-
-        np.fill_diagonal(mat, 0)
-        mat = np.triu(mat)
-
-        sim_mat = np.where(mat >= similarity)
-
-        word_list = []
-        for a, b in zip(sim_mat[0], sim_mat[1]):
-            word_list.append((keys[a], keys[b]))
-
-        drop_values = []
-        for i in range(len(word_list)):
-            if word_list[i][0] not in drop_values:
-                drop_values.append(word_list[i][1])
-
-        k = [key for key in topics[topic] if key[0] not in drop_values]
-        cleaned_topics.append(k)
+   for topic in tqdm(range(len(topics))):
+       # Extract and encode words properly
+       keys = [word.encode('utf-8').decode('utf-8') 
+              for t in topics[topic]
+              for word in t if isinstance(word, str)]
+       
+       # Get embeddings
+       keys_ = word_embedding_model.create_word_embeddings(keys)
+       
+       # Calculate similarities
+       mat = cosine_similarity(keys_)
+       np.fill_diagonal(mat, 0)
+       mat = np.triu(mat)
+       
+       # Find similar pairs
+       sim_mat = np.where(mat >= similarity)
+       word_list = []
+       for a, b in zip(sim_mat[0], sim_mat[1]):
+           word_list.append((keys[a], keys[b]))
+           
+       # Remove similar words
+       drop_values = []
+       for i in range(len(word_list)):
+           if word_list[i][0] not in drop_values:
+               drop_values.append(word_list[i][1])
+               
+       # Keep unique words
+       k = [key for key in topics[topic] if key[0] not in drop_values]
+       cleaned_topics.append(k)
 
     # create dictionary of cleaned topics
     dict_tops = {}
     for i in range(len(cleaned_topics)):
         dict_tops[i] = cleaned_topics[i]
+   
+   # Calculate mean embeddings
+   topic_mean_embeddings = []
+   for k in range(len(dict_tops)):
+       temp = 0
+       words = [word.encode('utf-8').decode('utf-8')
+               for t in dict_tops[k] 
+               for word in t if isinstance(word, str)]
+               
+       weights = [weight for t in dict_tops[k] 
+                 for weight in t if isinstance(weight, float)]
+       weights = [weight / sum(weights) for weight in weights]
+       
+       for i in range(len(words)):
+           temp += word_embedding_model.create_word_embeddings(words[i]) * weights[i]
+       temp /= len(words)
+       topic_mean_embeddings.append(temp)
 
-    topic_mean_embeddings = []
-    for k in range(len(dict_tops)):
-        temp = 0
-        words = [word for t in dict_tops[k]
-                 for word in t if isinstance(word, str)]
-        weights = [
-            weight for t in dict_tops[k] for weight in t if isinstance(weight, float)
-        ]
-        weights = [weight / sum(weights) for weight in weights]
-        for i in range(len(words)):
-            temp += word_embedding_model.create_word_embeddings(
-                words[i]) * weights[i]
-        temp /= len(words)
-        topic_mean_embeddings.append(temp)
-
-    return dict_tops, topic_mean_embeddings
+   return dict_tops, topic_mean_embeddings
