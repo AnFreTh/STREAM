@@ -13,6 +13,7 @@ from ..utils.cbc_utils import (DocumentCoherence,
                                get_top_tfidf_words_per_document)
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
+import pandas as pd
 
 MODEL_NAME = "CBC"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -20,7 +21,9 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
 class CBC(BaseModel):
-    def __init__(self):
+    def __init__(
+        self, 
+        **kwargs):
         """
         Initializes the DocumentClusterer with a DataFrame of coherence scores.
 
@@ -29,6 +32,7 @@ class CBC(BaseModel):
         """
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
         """
@@ -259,10 +263,18 @@ class CBC(BaseModel):
             {"text": " ".join}
         )
         logger.info("--- Extract topics ---")
-        tfidf, count = c_tf_idf(
-            docs_per_topic["text"].values, m=len(self.dataframe))
-        self.topic_dict = extract_tfidf_topics(
+        if self.stopwords_path is not None:
+            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            stopwords_list = set(stopwords['w'])
+            tfidf, count = c_tf_idf(
+            docs_per_topic["text"].values, m=len(self.dataframe),stop_words=stopwords_list)
+            self.topic_dict = extract_tfidf_topics(
             tfidf, count, docs_per_topic, n=10)
+        else:
+            tfidf, count = c_tf_idf(
+                docs_per_topic["text"].values, m=len(self.dataframe))
+            self.topic_dict = extract_tfidf_topics(
+                tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(
             sparse=False

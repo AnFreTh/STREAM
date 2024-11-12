@@ -42,6 +42,8 @@ class TextPreprocessor:
         Whether to remove special characters from the text data (default is True).
     remove_accents : bool, optional
         Whether to remove accents from the text data (default is True).
+    remove_english: bool, optional
+        Whether to remove english words from the chinese text data (default is True).
     custom_stopwords : set, optional
         Custom stopwords to remove from the text data (default is []).
     detokenize : bool, optional
@@ -77,6 +79,7 @@ class TextPreprocessor:
         self.remove_html_tags = kwargs.get("remove_html_tags", True)
         self.remove_special_chars = kwargs.get("remove_special_chars", True)
         self.remove_accents = kwargs.get("remove_accents", True)
+        self.remove_english = kwargs.get("remove_english", True)
         self.custom_stopwords = (
             set(kwargs.get("custom_stopwords", []))
             if kwargs.get("custom_stopwords")
@@ -94,14 +97,14 @@ class TextPreprocessor:
         self.stopwords_path = kwargs.get("stopwords_path", None)
         
 
-        if self.language == "zh":                 
+        if self.language == "zh-cn":                 
             self.stoplist = self.load_stopwords()    
         elif self.language != "en" and self.remove_stopwords:          
             self.stop_words = set(stopwords.words(self.language))
         else:                                                        
             self.stop_words = set(stopwords.words("english"))
 
-        if self.language != "zh":
+        if self.language != "zh-cn":
             self.stop_words.update(self.custom_stopwords)                
 
         if self.lemmatize:                                           
@@ -120,7 +123,7 @@ class TextPreprocessor:
     
     def segment_text(self, text):
         # tokenize and remove stopwords for Chinese text
-        words = jieba.cut(text)
+        words = list(jieba.cut(text))
         filtered_words = [w for w in words if w not in self.stoplist['w'].tolist()]
         return filtered_words
     
@@ -159,7 +162,7 @@ class TextPreprocessor:
         return re.sub(clean, " ", text)
 
     def _remove_special_characters(self, text, language):                           
-        if language != "zh":
+        if language != "zh-cn":
             return re.sub(r"[^a-zA-Z0-9\s]", " ", text)
         else:
             return re.sub(r'[^\u4e00-\u9fff\d]+', '', text)
@@ -172,7 +175,7 @@ class TextPreprocessor:
 
     def _clean_text(self, text):
 
-        if self.language != "zh":
+        if self.language != "zh-cn":
             text = text.strip()                                               
             if self.lowercase:                                                
                 text = text.lower()
@@ -246,11 +249,13 @@ class TextPreprocessor:
             if self.remove_html_tags:
                 text = self._remove_html_tags(text)
             if self.remove_special_chars:
-                text = self._remove_special_characters(text, language="zh")
+                text = self._remove_special_characters(text, language="zh-cn")
             if self.remove_numbers:
                 text = re.sub(r"\d+", " ", text)
             if self.remove_punctuation:
                 text = re.sub(r"[^\w\s]", " ", text)
+            if self.remove_english:
+                text = re.sub(r"[a-zA-Z]+", " ", text)
 
             words = self.segment_text(text)
 
@@ -286,11 +291,23 @@ class TextPreprocessor:
                 words = [word for word in words if not re.search(
                     r'[^\u4e00-\u9fff\d]+', word)]
 
+            if self.detokenize:
+                text = "".join(words)
+            else:
+                text = " ".join(words)
+                
             # Remove double spaces
             text = re.sub(r"\s+", " ", text)
 
         return text
-
+    
+    def detect_language(self, text):
+        # 使用正则表达式匹配中文字符
+        if re.search(r'[\u4e00-\u9fff]', text):
+            return "zh-cn"
+        else:
+            return "en"
+    
     def preprocess_text(self, text):
         """
         Preprocess a single text document.
@@ -307,7 +324,7 @@ class TextPreprocessor:
 
         """
         try:
-            language = detect(text)
+            language = self.detect_language(text)
             if language != self.language:
                 return text
         except LangDetectException:
