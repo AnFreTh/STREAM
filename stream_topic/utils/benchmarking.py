@@ -3,7 +3,6 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
-from .dataset import TMDataset
 
 __all__ = ["benchmarking"]
 
@@ -14,7 +13,7 @@ def benchmarking(
     metrics: List[Callable[..., Any]],
     model_args: Optional[List[Dict[str, Any]]] = None,
     metric_args: List[Dict[str, Any]] = None,
-    dataset: TMDataset = None,
+    dataset = None,
     embedding_model_name: str = "all-MiniLM-L6-v2",
 ) -> Dict[str, Dict[str, float]]:
     """
@@ -33,6 +32,10 @@ def benchmarking(
     Returns:
     - A dictionary mapping model names to another dictionary of metric names and their corresponding scores.
     """
+    from .dataset import TMDataset   # to avoid circular import issue
+    if dataset is None:
+        dataset = TMDataset()
+    
     if model_args is None:
         model_args = [{}] * len(models)
     if metric_args is None:
