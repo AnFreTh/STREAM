@@ -6,9 +6,10 @@ from .constants import (
     EMBEDDING_PATH,
     PARAPHRASE_TRANSFORMER_MODEL,
     SENTENCE_TRANSFORMER_MODEL,
-)
+)  
 from .TopwordEmbeddings import TopwordEmbeddings
-
+import os
+from .metrics_config import MetricsConfig
 
 class ISIM(BaseMetric):
     """
@@ -44,7 +45,7 @@ class ISIM(BaseMetric):
         self,
         n_words=10,
         n_intruders=1,
-        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
+        metric_embedder: str = None,
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
     ):
@@ -65,6 +66,15 @@ class ISIM(BaseMetric):
         emb_path : str, optional
             The path to the embedding model. Defaults to EMBEDDING_PATH.
         """
+        
+        # Check if embedder is a local path or model name and load accordingly
+        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+        if os.path.exists(metric_embedder_name):
+            print(f"Loading model from local path: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        else:
+            print(f"Downloading model: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
@@ -275,7 +285,7 @@ class INT(BaseMetric):
         self,
         n_words=10,
         n_intruders=1,
-        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
+        metric_embedder: str = None,
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
     ):
@@ -296,6 +306,13 @@ class INT(BaseMetric):
         emb_path : str, optional
             The path to use for saving embeddings. Defaults to "Embeddings/".
         """
+        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+        if os.path.exists(metric_embedder_name):
+            print(f"Loading model from local path: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        else:
+            print(f"Downloading model: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
@@ -521,7 +538,7 @@ class ISH(BaseMetric):
         self,
         n_words=10,
         n_intruders=1,
-        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
+        metric_embedder: str = None,
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
     ):
@@ -542,6 +559,13 @@ class ISH(BaseMetric):
         emb_path : str, optional
             The path to use for saving embeddings. Defaults to "Embeddings/".
         """
+        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+        if os.path.exists(metric_embedder_name):
+            print(f"Loading model from local path: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        else:
+            print(f"Downloading model: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
