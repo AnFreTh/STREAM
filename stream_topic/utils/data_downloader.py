@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 from loguru import logger
+import jieba
 
 PACKAGE_NAME = "stream_topic"
 
@@ -259,9 +260,11 @@ class DataDownloader:
                     "labels": [label.strip() for label in labels],
                 }
             )
-
-            self.dataframe["tokens"] = self.dataframe["text"].apply(
-                lambda x: x.split())
+            
+            if self.language == "zh-cn":
+                self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+            else:
+                self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -410,8 +413,10 @@ class DataDownloader:
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(
-            lambda x: x.split())
+        if self.language == "zh-cn":
+            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+        else:
+            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 

@@ -14,6 +14,8 @@ from ..commons.check_steps import check_dataset_steps
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
+import pandas as pd
+import os
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "DCTE"
@@ -61,11 +63,19 @@ class DCTE(BaseModel):
             ]
         )
         self.n_topics = None
-
-        self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
+        self.local_model_path = kwargs.get("local_model_path", None)
+        if self.local_model_path is not None:
+            if not os.path.exists(self.local_model_path):
+                raise FileNotFoundError(f"Model path '{self.local_model_path}' does not exist.")
+            else:
+                self.model = SetFitModel.from_pretrained(self.local_model_path)
+                self.embedding_model_name = self.hparams.get("embedding_model_name", os.path.basename(self.local_model_path))
+        else:
+            self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
+            self.embedding_model_name = self.hparams.get("embedding_model_name", model)
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
-        self.embedding_model_name = self.hparams.get("embedding_model_name", model)
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
         """
@@ -114,13 +124,24 @@ class DCTE(BaseModel):
         docs_per_topic = predict_df.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
-        topic_dict = extract_tfidf_topics(
+        if self.stopwords_path is not None:
+            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            stopwords_list = set(stopwords['w'])
+            tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df),stop_words=stopwords_list)
+            topic_dict = extract_tfidf_topics(
             tfidf,
             count,
             docs_per_topic,
             n=top_words,
-        )
+            )
+        else:
+            tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
+            topic_dict = extract_tfidf_topics(
+                tfidf,
+                count,
+                docs_per_topic,
+                n=top_words,
+            )
 
         one_hot_encoder = OneHotEncoder(sparse=False)
         predictions_one_hot = one_hot_encoder.fit_transform(predict_df[["predictions"]])

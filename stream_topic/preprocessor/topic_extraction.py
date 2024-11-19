@@ -8,7 +8,7 @@ from nltk import pos_tag
 from nltk.corpus import brown as nltk_words
 from nltk.corpus import words as eng_dict
 from numpy.linalg import norm
-from ..utils.dataset import TMDataset
+
 
 from ._embedder import BaseEmbedder
 
@@ -57,6 +57,7 @@ class TopicExtractor:
             dict: extracted topics
         """
 
+        from ..utils.dataset import TMDataset   # to avoid circular import issue
         # define whether word is a noun
         def is_noun(pos):
             return pos[:2] == "NN"

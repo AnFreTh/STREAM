@@ -10,6 +10,8 @@ from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
+import jieba
+import pandas as pd
 
 
 class TextPreprocessor:
@@ -40,6 +42,8 @@ class TextPreprocessor:
         Whether to remove special characters from the text data (default is True).
     remove_accents : bool, optional
         Whether to remove accents from the text data (default is True).
+    remove_english: bool, optional
+        Whether to remove english words from the chinese text data (default is True).
     custom_stopwords : set, optional
         Custom stopwords to remove from the text data (default is []).
     detokenize : bool, optional
@@ -57,7 +61,9 @@ class TextPreprocessor:
     remove_words_with_numbers : bool, optional
         Whether to remove words containing numbers from the text data (default is False).
     remove_words_with_special_chars : bool, optional
-        Whether to remove words containing special characters from the text data (default is False).
+        Whether to remove words containing special characters from the text data (default is False). 
+    stopwords_path : char, optional
+        Chinese only, path to stored Chinese stopwords (default is None)
 
     """
 
@@ -73,6 +79,7 @@ class TextPreprocessor:
         self.remove_html_tags = kwargs.get("remove_html_tags", True)
         self.remove_special_chars = kwargs.get("remove_special_chars", True)
         self.remove_accents = kwargs.get("remove_accents", True)
+        self.remove_english = kwargs.get("remove_english", True)
         self.custom_stopwords = (
             set(kwargs.get("custom_stopwords", []))
             if kwargs.get("custom_stopwords")
@@ -86,25 +93,40 @@ class TextPreprocessor:
         self.dictionary = set(kwargs.get("dictionary", []))
         self.remove_words_with_numbers = kwargs.get("remove_words_with_numbers", False)
         self.remove_words_with_special_chars = kwargs.get(
-            "remove_words_with_special_chars", False
-        )
+            "remove_words_with_special_chars", False)
+        self.stopwords_path = kwargs.get("stopwords_path", None)
+        
 
-        if self.language != "en" and self.remove_stopwords:
+        if self.language == "zh-cn":                 
+            self.stoplist = self.load_stopwords()    
+        elif self.language != "en" and self.remove_stopwords:          
             self.stop_words = set(stopwords.words(self.language))
-        else:
+        else:                                                        
             self.stop_words = set(stopwords.words("english"))
 
-        self.stop_words.update(self.custom_stopwords)
+        if self.language != "zh-cn":
+            self.stop_words.update(self.custom_stopwords)                
 
-        if self.lemmatize:
+        if self.lemmatize:                                           
             self.lemmatizer = WordNetLemmatizer()
 
-        if self.stem:
+        if self.stem:                                                
             self.stemmer = PorterStemmer()
 
-        self.contractions_dict = self._load_contractions()
-        self.word_freq = Counter()
+        self.contractions_dict = self._load_contractions()           
+        self.word_freq = Counter()                                  
 
+
+    def load_stopwords(self):
+        # load Chinese stopwords list
+        return pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+    
+    def segment_text(self, text):
+        # tokenize and remove stopwords for Chinese text
+        words = list(jieba.cut(text))
+        filtered_words = [w for w in words if w not in self.stoplist['w'].tolist()]
+        return filtered_words
+    
     def _load_contractions(self):
         # Load a dictionary of contractions and their expansions
         contractions_dict = {
@@ -121,8 +143,8 @@ class TextPreprocessor:
         }
         return contractions_dict
 
-    def _expand_contractions(self, text):
-        contractions_pattern = re.compile(
+    def _expand_contractions(self, text):                                 
+        contractions_pattern = re.compile(                                
             "({})".format("|".join(self.contractions_dict.keys())),
             flags=re.IGNORECASE | re.DOTALL,
         )
@@ -132,87 +154,160 @@ class TextPreprocessor:
             expanded_contraction = self.contractions_dict.get(match.lower())
             return expanded_contraction
 
-        expanded_text = contractions_pattern.sub(expand_match, text)
+        expanded_text = contractions_pattern.sub(expand_match, text)      
         return expanded_text
 
-    def _remove_html_tags(self, text):
+    def _remove_html_tags(self, text):                                    
         clean = re.compile("<.*?>")
         return re.sub(clean, " ", text)
 
-    def _remove_special_characters(self, text):
-        return re.sub(r"[^a-zA-Z0-9\s]", " ", text)
+    def _remove_special_characters(self, text, language):                           
+        if language != "zh-cn":
+            return re.sub(r"[^a-zA-Z0-9\s]", " ", text)
+        else:
+            return re.sub(r'[^\u4e00-\u9fff\d]+', '', text)
 
-    def _remove_accents(self, text):
+
+    def _remove_accents(self, text):                                      
         text = unicodedata.normalize("NFD", text)
         text = text.encode("ascii", "ignore")
         return text.decode("utf-8")
 
     def _clean_text(self, text):
-        text = text.strip()
-        if self.lowercase:
-            text = text.lower()
-        if self.expand_contractions:
-            text = self._expand_contractions(text)
-        if self.remove_html_tags:
-            text = self._remove_html_tags(text)
-        if self.remove_special_chars:
-            text = self._remove_special_characters(text)
-        if self.remove_accents:
-            text = self._remove_accents(text)
-        if self.remove_numbers:
-            text = re.sub(r"\d+", " ", text)
-        if self.remove_punctuation:
-            text = re.sub(r"[^\w\s]", " ", text)
 
-        words = word_tokenize(text)
-
-        # Update word frequency counter
-        self.word_freq.update(words)
-
-        if self.remove_stopwords:
-            words = [word for word in words if word not in self.stop_words]
-
-        if self.lemmatize:
-            words = [self.lemmatizer.lemmatize(word) for word in words]
-
-        if self.stem:
-            words = [self.stemmer.stem(word) for word in words]
-
-        if self.min_word_freq is not None:
-            words = [
-                word for word in words if self.word_freq[word] >= self.min_word_freq
-            ]
-
-        if self.max_word_freq is not None:
-            words = [
-                word for word in words if self.word_freq[word] <= self.max_word_freq
-            ]
-
-        if self.min_word_length is not None:
-            words = [word for word in words if len(word) >= self.min_word_length]
-
-        if self.max_word_length is not None:
-            words = [word for word in words if len(word) <= self.max_word_length]
-
-        if self.dictionary != set():
-            words = [word for word in words if word in self.dictionary]
-
-        if self.remove_words_with_numbers:
-            words = [word for word in words if not any(char.isdigit() for char in word)]
-
-        if self.remove_words_with_special_chars:
-            words = [word for word in words if not re.search(r"[^a-zA-Z0-9\s]", word)]
-
-        if self.detokenize:
-            text = TreebankWordDetokenizer().detokenize(words)
+        if self.language != "zh-cn":
+            text = text.strip()                                               
+            if self.lowercase:                                                
+                text = text.lower()
+            if self.expand_contractions:
+                text = self._expand_contractions(text)                       
+            if self.remove_html_tags:
+                text = self._remove_html_tags(text)
+            if self.remove_special_chars:
+                text = self._remove_special_characters(text, language="en")
+            if self.remove_accents:
+                text = self._remove_accents(text)
+            if self.remove_numbers:
+                text = re.sub(r"\d+", " ", text)
+            if self.remove_punctuation:
+                text = re.sub(r"[^\w\s]", " ", text)
+    
+            words = word_tokenize(text)                                       
+    
+            # Update word frequency counter
+            self.word_freq.update(words)                                      
+    
+            if self.remove_stopwords:
+                words = [word for word in words if word not in self.stop_words]  
+    
+            if self.lemmatize:
+                words = [self.lemmatizer.lemmatize(word) for word in words]
+    
+            if self.stem:
+                words = [self.stemmer.stem(word) for word in words]
+    
+            if self.min_word_freq is not None:                                
+                words = [
+                    word for word in words if self.word_freq[word] >= self.min_word_freq
+                ]
+    
+            if self.max_word_freq is not None:                                
+                words = [
+                    word for word in words if self.word_freq[word] <= self.max_word_freq
+                ]
+    
+            if self.min_word_length is not None:
+                words = [word for word in words if len(
+                    word) >= self.min_word_length]
+    
+            if self.max_word_length is not None:
+                words = [word for word in words if len(
+                    word) <= self.max_word_length]
+    
+            if self.dictionary != set():                                    
+                words = [word for word in words if word in self.dictionary]
+    
+            if self.remove_words_with_numbers:
+                words = [word for word in words if not any(
+                    char.isdigit() for char in word)]
+    
+            if self.remove_words_with_special_chars:
+                words = [word for word in words if not re.search(
+                    r"[^a-zA-Z0-9\s]", word)]
+    
+            if self.detokenize:                                             
+                text = TreebankWordDetokenizer().detokenize(words)          
+            else:
+                text = " ".join(words)                                      
+    
+            # Remove double spaces
+            text = re.sub(r"\s+", " ", text)
+        
         else:
-            text = " ".join(words)
+            text = text.strip()  
+            
+            if self.remove_html_tags:
+                text = self._remove_html_tags(text)
+            if self.remove_special_chars:
+                text = self._remove_special_characters(text, language="zh-cn")
+            if self.remove_numbers:
+                text = re.sub(r"\d+", " ", text)
+            if self.remove_punctuation:
+                text = re.sub(r"[^\w\s]", " ", text)
+            if self.remove_english:
+                text = re.sub(r"[a-zA-Z]+", " ", text)
 
-        # Remove double spaces
-        text = re.sub(r"\s+", " ", text)
+            words = self.segment_text(text)
+
+            # Update word frequency counter
+            self.word_freq.update(words)  
+
+            if self.min_word_freq is not None:  
+                words = [
+                    word for word in words if self.word_freq[word] >= self.min_word_freq
+                ]
+
+            if self.max_word_freq is not None:  
+                words = [
+                    word for word in words if self.word_freq[word] <= self.max_word_freq
+                ]
+
+            if self.min_word_length is not None:
+                words = [word for word in words if len(
+                    word) >= self.min_word_length]
+
+            if self.max_word_length is not None:
+                words = [word for word in words if len(
+                    word) <= self.max_word_length]
+
+            if self.dictionary != set():  
+                words = [word for word in words if word in self.dictionary]
+
+            if self.remove_words_with_numbers:
+                words = [word for word in words if not any(
+                    char.isdigit() for char in word)]
+
+            if self.remove_words_with_special_chars:
+                words = [word for word in words if not re.search(
+                    r'[^\u4e00-\u9fff\d]+', word)]
+
+            if self.detokenize:
+                text = "".join(words)
+            else:
+                text = " ".join(words)
+                
+            # Remove double spaces
+            text = re.sub(r"\s+", " ", text)
 
         return text
-
+    
+    def detect_language(self, text):
+        # 使用正则表达式匹配中文字符
+        if re.search(r'[\u4e00-\u9fff]', text):
+            return "zh-cn"
+        else:
+            return "en"
+    
     def preprocess_text(self, text):
         """
         Preprocess a single text document.
@@ -229,12 +324,12 @@ class TextPreprocessor:
 
         """
         try:
-            language = detect(text)
+            language = self.detect_language(text)
             if language != self.language:
                 return text
         except LangDetectException:
             pass
-        return self._clean_text(text)
+        return self._clean_text(text)                                   
 
     def preprocess_dataframe(self, df, text_column):
         """
@@ -253,16 +348,16 @@ class TextPreprocessor:
             Preprocessed DataFrame.
 
         """
-        df[text_column] = df[text_column].apply(self.preprocess_text)
+        df[text_column] = df[text_column].apply(self.preprocess_text)     
         return df
 
-    def preprocess_documents(self, documents: List[str]) -> List[str]:
+    def preprocess_documents(self, documents: List[str]) -> List[str]:    
         preprocessed_docs = []
-        for doc in tqdm(documents, desc="Preprocessing documents"):
+        for doc in tqdm(documents, desc="Preprocessing documents"):       
             preprocessed_docs.append(self.preprocess_text(doc))
         return preprocessed_docs
 
-    def add_custom_stopwords(self, stopwords: Set[str]):
+    def add_custom_stopwords(self, stopwords: Set[str]):      #not implemented  for Chinese yet        
         """
         Add custom stopwords to the preprocessor.
 
@@ -274,7 +369,7 @@ class TextPreprocessor:
         self.custom_stopwords.update(stopwords)
         self.stop_words.update(stopwords)
 
-    def remove_custom_stopwords(self, stopwords: Set[str]):
+    def remove_custom_stopwords(self, stopwords: Set[str]):      #not implemented  for Chinese yet           
         """
         Remove custom stopwords from the preprocessor.
 
