@@ -1,0 +1,75 @@
+تداول ناشطون مشاهد فيديو تظهر رجالا مسلحين في الموصل في العراق يرتدون زيا عسكريا، وهم يقومون بارتكاب انتهاكات بحق مدنيين عزل من بينها رميهم من بنايات شاهقة وهم أحياء وإطلاق النار عليهم. ويعرض موقع "الحدث" الفيديو الذي يتضمن مشاهد قاسية جدا. وأثارت المشاهد المسربة التي تظهر عناصر من الأمن العراقي يقتلون سجناء من الموصل استياء كبيرا في الشارع العراقي، حيث طالب متحدث باسم العشائر العراقية بتحرير الموصل من الحشد الشعبي بعد تحريرها من داعش. وهذه الممارسات ليست الأولى التي تتهم بها عناصر الجيش العراقي والميليشيات العراقية لا سيما الحشد الشعبي المدعوم من ايران والمتهم من قبل منظمات دولية بارتكاب فظاعات ترقى لجرائم حرب وكلها تأتي بغطاء مذهبي. من جانبه قال سعد معن المتحدث باسم وزارة الداخلية  والناطق باسم عمليات بغداد إن فيديو رمي مواطنين عراقيين من علو مرتفع يخضع للتحقيق رافضا أي انتهاك بحق أي مواطن مهما كان.
+
+
+
+
+
+
+
+
+
+
+
+
+
+To view this video please enable JavaScript, and consider upgrading your web browser
+
+
+
+		var vidplayersubMediaplayer = videojs('html5videosubMediaplayer');     
+
+		var rndsubMediaplayer = Math.floor((Math.random()*100000000000)+1);      
+
+		vidplayersubMediaplayer.ads();          
+
+		vidplayersubMediaplayer.vast({  
+
+					url:'http://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/5113/alarabiya.net/Arabic/Videos&ciu_szs=300x250,728x90&impl=s&gdfp_req=1&env=vp&output=xml_vast2&unviewed_position_start=1&url=[referrer_url]&correlator=' + rndsubMediaplayer,
+
+					skip: -1
+
+					});
+
+		vidplayersubMediaplayer.ready(function() {  
+
+							var videoPlayer = this;  
+
+							var adExists = false; 
+
+							videoPlayer.on("readyforpreroll", function(){adExists = true;});
+
+							videoPlayer.on("play", function(){ if(!adExists){
+
+																 vidplayersubMediaplayer.overlay({overlays:[{}]});
+
+																 }
+
+																 $('.video-span-caption').hide();
+
+													});
+
+							videoPlayer.on("ended", function(){ vidplayersubMediaplayer.overlay({ overlays: [{}] });});
+
+							});
+
+		vidplayersubMediaplayer.overlay({ overlays: [{ content: 'مادة إعلانية', start: 1, end: 5, align: 'bottom-left'}]  }); 
+
+		
+
+		
+
+		function vjsSeekto(time) {
+
+		   vidplayersubMediaplayer.currentTime(time);
+
+		}
+
+					
+
+		
+
+	
+
+
+
+وكان رئيس الوزراء العراقي، حيدر #العبادي، أكد أن بغداد لن "تصدر عفواً عن الإرهابيين القتلة". واعتبر، في كلمة له افتتح بها جلسة مجلس الوزراء أمس الأربعاء أن الجنود العراقيين "هم المدافعون عن حقوق الإنسان ويضحون بأنفسهم من أجل تحرير الإنسان وإنقاذ المدنيين. والحكومة داعمة لجهود الدفاع عن حقوق الإنسان وتحاسب على أي انتهاك".

@@ -1,0 +1,75 @@
+أقرت قيادة عمليات بغداد الثلاثاء، باختطاف عدد من الطلاب والناشطين وسط العاصمة. وقالت القيادة في بيان مقتضب إن القوات الامنية والجهد الاستخباري مستمر في عمليات البحث والتحري لكشف مصير الناشطين المدنيين المختطفين في منطقه البتاوين وسط العاصمة. وكشف سمير السلمان قريب أحد الناشطين المختطفين في العاصمة العراقية "للحدث"، عن تفاصيل عملية الخطف التي لم تستغرق سوى 4 دقائق، حيث وصلت سيارتان فيها اشخاص ملثمين ومسلحين قاموا باقتياد الشباب الـ 4، مؤكدا ان عملية الخطف تمت في منطقة حيوية بها أمن وحركة تجارية. وأكد السلمان، أن قريبه لا علاقه له بأي نشاط سياسي.
+
+
+
+
+
+
+
+
+
+
+
+
+
+To view this video please enable JavaScript, and consider upgrading your web browser
+
+
+
+		var vidplayersubMediaplayer = videojs('html5videosubMediaplayer');     
+
+		var rndsubMediaplayer = Math.floor((Math.random()*100000000000)+1);      
+
+		vidplayersubMediaplayer.ads();          
+
+		vidplayersubMediaplayer.vast({  
+
+					url:'http://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/5113/alarabiya.net/Arabic/Videos&ciu_szs=300x250,728x90&impl=s&gdfp_req=1&env=vp&output=xml_vast2&unviewed_position_start=1&url=[referrer_url]&correlator=' + rndsubMediaplayer,
+
+					skip: -1
+
+					});
+
+		vidplayersubMediaplayer.ready(function() {  
+
+							var videoPlayer = this;  
+
+							var adExists = false; 
+
+							videoPlayer.on("readyforpreroll", function(){adExists = true;});
+
+							videoPlayer.on("play", function(){ if(!adExists){
+
+																 vidplayersubMediaplayer.overlay({overlays:[{}]});
+
+																 }
+
+																 $('.video-span-caption').hide();
+
+													});
+
+							videoPlayer.on("ended", function(){ vidplayersubMediaplayer.overlay({ overlays: [{}] });});
+
+							});
+
+		vidplayersubMediaplayer.overlay({ overlays: [{ content: 'مادة إعلانية', start: 1, end: 5, align: 'bottom-left'}]  }); 
+
+		
+
+		
+
+		function vjsSeekto(time) {
+
+		   vidplayersubMediaplayer.currentTime(time);
+
+		}
+
+					
+
+		
+
+	
+
+
+
+وكان المرصد العراقي أعلن أن على الحكومة إعلان موقفها الصريح والجاد تجاه عمليات الخطف المتكررة في بغداد، خاصة بعد حادثة إختطاف سبعة شباب من مقر إقامتهم وسط العاصمة. هذا وتعرض عدد من #النشطاء المدنيين في الساعات الأولى من صباح اليوم الاثنين إلى عملية #خطف من قبل جهات مسلحة مجهولة هاجمت مقر سكنهم في منطقة البتاويين وسط #العاصمة_العراقية بغداد، واقتادتهم إلى جهة مجهولة بعد ضربهم المبرح. المختطفون وعددهم سبعة، ثلاثة منهم طلاب في معهد الفنون الجميلة وأعضاء في الاتحاد العام للطلبة، أما البقية فهم #ناشطون في مجال #منظمات_المجتمع_المدني، وأيضاً منظمون لعدد من التظاهرات التي تشهدها بغداد بين فترة وأخرى، من ضمنها تظاهرات يوم الجمعة الأسبوعية التي تطالب بتعديل مسار عمل #الحكومة_العراقية بكل مفاصلها. عملية الخطف تمت قرابة الساعة الثانية من فجر الاثنين، حيث هاجم الخاطفون مقر إقامة الشباب السبعة وهم ملثمو الوجه. وبحسب أحد زملاء المختطفين الذي كان متواجداً فوق سطح البناية التي يسكنونها، فإنه يرجح أن يكون الخاطفون من #الميليشيات لأنهم لا يرتدون زياً عسكرياً رسمياً بل كانوا مدنيين.

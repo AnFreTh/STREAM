@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+from pathlib import Path
 
 import gensim.downloader as api
 import numpy as np
@@ -11,8 +12,21 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.utils.data import Dataset, random_split
 
 from ..commons.load_steps import load_model_preprocessing_steps
-from ..preprocessor import TextPreprocessor
+# from ..preprocessor import TextPreprocessor :  moved to preprocessor function
 from .data_downloader import DataDownloader, get_data_home
+
+
+
+AVAILABLE_DATASETS = {
+    "BBC_News": "bbc_news",
+    "20NewsGroups": "20newsgroups",
+    # Add separate entries for each folder
+    "Arabic_News": "Arabiya"
+
+}
+
+
+
 
 
 class TMDataset(Dataset, DataDownloader):
@@ -90,6 +104,102 @@ class TMDataset(Dataset, DataDownloader):
         self.language = language
         self.preprocessing_steps = self.default_preprocessing_steps()
 
+    def _load_arabic_dataset(self, dataset_path):
+        """Load Arabic dataset from a specific folder path."""
+        try:
+            # Get the project root directory (where stream_topic is located)
+            project_root = Path(__file__).parent.parent.parent
+            
+            # Define paths relative to project root
+            data_path = project_root / "data" / "arabic_datasets" / "arabic_news" / "Arabiya"
+            alt_path = Path(dataset_path)  # Use provided path as alternative
+            
+            # Try different possible paths
+            possible_paths = [
+                data_path,
+                alt_path,
+                Path("data/arabic_datasets/arabic_news/Arabiya"),
+                Path(os.getcwd()) / "data" / "arabic_datasets" / "arabic_news" / "Arabiya",
+                Path("C:/Users/yahya/my_projects/STREAM/stream_topic/data/arabic_datasets/arabic_news/Arabiya")
+            ]
+            
+            # Find first valid path
+            valid_path = None
+            for path in possible_paths:
+                if path.exists():
+                    valid_path = path
+                    logger.info(f"Found valid dataset path: {valid_path}")
+                    break
+                else:
+                    logger.debug(f"Tried path (not found): {path}")
+            
+            if valid_path is None:
+                raise FileNotFoundError(
+                    f"Arabic dataset not found in any of the following locations:\n"
+                    f"{chr(10).join(str(p) for p in possible_paths)}\n"
+                    f"Please ensure the dataset is placed in one of these locations."
+                )
+
+            # Initialize lists for texts and labels
+            texts = []
+            labels = []
+            
+            logger.info(f"Loading data from: {valid_path}")
+            
+            # Track number of files processed and errors
+            files_processed = 0
+            errors = 0
+            
+            # Iterate through topic directories
+            for topic_dir in valid_path.iterdir():
+                if topic_dir.is_dir():
+                    logger.info(f"Processing topic: {topic_dir.name}")
+                    
+                    # Process all txt files in this topic directory
+                    for file_path in topic_dir.glob('*.txt'):
+                        try:
+                            text = file_path.read_text(encoding='utf-8').strip()
+                            if text:  # Only add non-empty texts
+                                texts.append(text)
+                                labels.append(topic_dir.name)
+                                files_processed += 1
+                        except Exception as e:
+                            logger.error(f"Error reading {file_path}: {e}")
+                            errors += 1
+            
+            if not texts:
+                raise ValueError(
+                    f"No valid text files found in {valid_path}. "
+                    "Please check the dataset structure and file contents."
+                )
+            
+            logger.info(f"Successfully processed {files_processed} files with {errors} errors")
+            logger.info(f"Found {len(set(labels))} unique topics")
+            
+            # Create DataFrame
+            import pandas as pd
+            self.dataframe = pd.DataFrame({
+                'text': texts,
+                'labels': labels
+            })
+            
+            # Create cache directory if it doesn't exist
+            cache_dir = project_root / "cache" / "preprocessed_datasets"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Save preprocessed version to cache
+            cache_path = cache_dir / "arabic_news.parquet"
+            self.dataframe.to_parquet(cache_path)
+            logger.info(f"Cached preprocessed dataset to {cache_path}")
+            
+            return self.dataframe
+
+        except Exception as e:
+            logger.error(f"Error in _load_arabic_dataset: {e}")
+            raise
+        
+        
+
     def fetch_dataset(self, name: str, dataset_path=None, source: str = "github"):
         """
         Fetch a dataset by name.
@@ -101,10 +211,14 @@ class TMDataset(Dataset, DataDownloader):
         dataset_path : str, optional
             Path to the dataset directory.
         source : str, optional
-            Source of the dataset, by default 'github'. Use 'local' if dataset is available in locally. Then, provide the dataset_path.
+            Source of the dataset. Options:
+            - 'github': Default, fetch from GitHub
+            - 'local': Load from local path
+            - 'arabic': Load Arabic dataset from local path
         """
-
-        if self.name is not None:
+        if self.name is None:
+            self.name = name
+        else:
             logger.info(
                 f"Dataset name already provided while instantiating the class: {self.name}"
             )
@@ -112,42 +226,102 @@ class TMDataset(Dataset, DataDownloader):
                 f"Overwriting the dataset name with the name provided in fetch_dataset: {name}"
             )
             self.name = name
-            logger.info(f"Fetching dataset: {name}")
-        else:
-            self.name = name
-            logger.info(f"Fetching dataset: {name}")
 
+        logger.info(f"Fetching dataset: {name}")
+
+        # Handle Arabic datasets
+        if name.startswith('Arabic_'):
+            try:
+                # Define base paths
+                project_root = Path(__file__).parent.parent.parent
+                default_data_path = project_root / "data" / "arabic_datasets"
+                
+                # Set dataset path
+                if dataset_path is None:
+                    data_home = get_data_home()
+                    dataset_path = Path(data_home) / "arabic_datasets"
+                else:
+                    dataset_path = Path(dataset_path)
+
+                # Get specific folder path based on dataset name
+                if name in AVAILABLE_DATASETS:
+                    specific_path = dataset_path / AVAILABLE_DATASETS[name]
+                else:
+                    raise ValueError(f"Unknown Arabic dataset: {name}. Available datasets: {list(AVAILABLE_DATASETS.keys())}")
+
+                # Try to load from cache first
+                cache_dir = Path(get_data_home()) / "cache" / "preprocessed_datasets"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_path = cache_dir / f"{name.lower()}.parquet"
+
+                if cache_path.exists():
+                    logger.info(f"Loading cached Arabic dataset from {cache_path}")
+                    self.dataframe = pd.read_parquet(cache_path)
+                else:
+                    logger.info(f"Processing Arabic dataset from {specific_path}")
+                    self._load_arabic_dataset(specific_path)
+
+                # Initialize info dictionary for Arabic dataset
+                self.info = {
+                    "name": name,
+                    "language": "ar",
+                    "source": "local",
+                    "preprocessing_steps": {},
+                    "num_documents": len(self.dataframe) if self.dataframe is not None else 0,
+                    "num_topics": len(self.dataframe['labels'].unique()) if self.dataframe is not None else 0
+                }
+
+                if self.dataframe is None or len(self.dataframe) == 0:
+                    raise ValueError("No data loaded from the Arabic dataset")
+
+                logger.info(f"Successfully loaded Arabic dataset '{name}' with {len(self.dataframe)} documents")
+                return
+
+            except Exception as e:
+                logger.error(f"Error loading Arabic dataset: {e}")
+                raise
+
+        # Handle other datasets (original functionality)
         if source == "github" and dataset_path is None:
-            # logger.info(f"Fetching dataset from github")
             self.load_custom_dataset_from_url(name)
             data_home = get_data_home()
-            dataset_path = os.path.join(
-                data_home, "preprocessed_datasets", name)
+            dataset_path = os.path.join(data_home, "preprocessed_datasets", name)
             self.info = self.get_info(dataset_path)
+        
         elif source == "local" and dataset_path is not None:
-            logger.info(f"Fetching dataset from local path")
+            logger.info("Fetching dataset from local path")
             self.load_custom_dataset_from_folder(dataset_path)
             self.info = self.get_info(dataset_path)
+        
         elif dataset_path is None:
-            logger.info(f"Fetching dataset from package path")
+            logger.info("Fetching dataset from package path")
             dataset_path = self.get_package_dataset_path(name)
             if os.path.exists(dataset_path):
                 self.load_custom_dataset_from_folder(dataset_path)
                 logger.info(f"Dataset loaded successfully from {dataset_path}")
             else:
                 logger.error(f"Dataset path {dataset_path} does not exist.")
-                raise ValueError(
-                    f"Dataset path {dataset_path} does not exist.")
-            # self._load_data_to_dataframe()
+                raise ValueError(f"Dataset path {dataset_path} does not exist.")
             self.info = self.get_info(dataset_path)
+        
         else:
             logger.error(
-                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset."
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the existing dataset."
             )
             raise ValueError(
-                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the exiting dataset."
+                f"Dataset path {dataset_path} does not exist. Please provide the correct path or use the existing dataset."
             )
 
+    # After loading any dataset, validate the dataframe
+        if self.dataframe is None or len(self.dataframe) == 0:
+            raise ValueError("Dataset loading failed: empty or invalid dataframe")
+
+        if 'text' not in self.dataframe.columns:
+            raise ValueError("Dataset loading failed: 'text' column missing from dataframe")
+
+        logger.info(f"Dataset loaded successfully with {len(self.dataframe)} documents")
+        
+        
     def _load_data_to_dataframe(self):
         """
         Load data into a pandas DataFrame.
@@ -276,6 +450,17 @@ class TMDataset(Dataset, DataDownloader):
         the object's `texts` attribute. The preprocessed text is then stored back into the
         `texts` attribute and updated in the `dataframe["text"]` column.
         """
+        from ..preprocessor import TextPreprocessor , ArabicPreprocessor
+
+        # First ensure we have texts to process
+        if self.texts is None and self.dataframe is not None:
+            self.texts = self.dataframe['text'].tolist()
+
+        if self.texts is None:
+            raise ValueError("No texts available for preprocessing. Make sure to load the dataset first.")
+
+        print(f"Found {len(self.texts)} documents to preprocess")
+
         if model_type:
             preprocessing_steps = load_model_preprocessing_steps(model_type)
         previous_steps = self.preprocessing_steps
@@ -300,11 +485,25 @@ class TMDataset(Dataset, DataDownloader):
 
         if filtered_steps:
             try:
-                preprocessor = TextPreprocessor(
-                    language=self.language,
-                    **preprocessing_steps,
-                )
-                self.texts = preprocessor.preprocess_documents(self.texts)
+                # Don't pass language if it's already in filtered_steps
+                language = filtered_steps.pop('language', self.language)
+
+                if language == "ar":
+                    preprocessor = ArabicPreprocessor(
+                        remove_diacritics=filtered_steps.get("remove_diacritics", True),
+                        remove_punctuation=filtered_steps.get("remove_punctuation", True),
+                        remove_numbers=filtered_steps.get("remove_numbers", True),
+                        remove_stopwords=filtered_steps.get("remove_stopwords", True),
+                        normalize_arabic=filtered_steps.get("normalize_arabic", True)
+                    )
+                    self.texts = [preprocessor.preprocess(text) for text in self.texts]
+                else:
+                    preprocessor = TextPreprocessor(
+                        language=language,
+                        **filtered_steps,
+                    )
+                    self.texts = preprocessor.preprocess_documents(self.texts)
+
                 self.dataframe["text"] = self.texts
                 self.dataframe["tokens"] = self.dataframe["text"].apply(
                     lambda x: x.split()

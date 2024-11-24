@@ -1,0 +1,24 @@
+Jeddah Real Estate Market Overview - Q1 2016 - Ara.pdf
+
+
+X
+
+
+
+		                    
+		                    	var sAgent = window.navigator.userAgent;
+								var Idx = sAgent.indexOf("MSIE");
+								var Id11 = sAgent.indexOf("Trident/");
+								var Idedg = sAgent.indexOf('Edge/');
+									  
+								if(Idx>0 ||  Id11>0 || Idedg>0){
+								     document.getElementById("lnk_pdf").href = "http://static.alarabiya.net/files/PDF/2016/05/04/32c38a2d-fa75-475c-8182-2eb72f9029f2.pdf";
+								}else{
+									var contextPath = "";
+			                        $(document).ready(function() {
+			                    	    $('#pdf_promo').popup({
+			                                pagecontainer: '.container',
+			                                transition: 'all 0.3s'
+			                             });
+			                        });	
+								}
