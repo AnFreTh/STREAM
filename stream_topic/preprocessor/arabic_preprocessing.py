@@ -19,7 +19,7 @@ except Exception as e:
 
 try:
     from pyarabic import araby
-    from pyarabic.normalize import normalize_hamza, normalize_lamalef
+    from pyarabic.normalize import normalize_hamza, normalize_lamalef, normalize_tah_marbuta
     PYARABIC_AVAILABLE = True
 except ImportError:
     print("PyArabic not available. Installing basic preprocessing...")
@@ -39,6 +39,14 @@ class ArabicPreprocessor:
         self.remove_numbers = remove_numbers
         self.remove_stopwords = remove_stopwords
         self.normalize_arabic = normalize_arabic
+
+        # NEW: Added custom normalize_tah_marbuta function
+        def custom_normalize_tah_marbuta(text: str) -> str:
+            """Replace tah marbuta with ha."""
+            return text.replace('ة', 'ه')
+
+        # Use custom function if pyarabic not available
+        self.normalize_tah_marbuta = normalize_tah_marbuta if PYARABIC_AVAILABLE else custom_normalize_tah_marbuta
         
         # Basic Arabic stopwords
         self.arabic_stopwords = {
@@ -60,7 +68,7 @@ class ArabicPreprocessor:
         if PYARABIC_AVAILABLE:
             text = normalize_hamza(text)
             text = normalize_lamalef(text)
-            text = normalize_tah_marbota(text)
+            text = self.normalize_tah_marbuta(text) 
         return text
 
     def remove_arabic_diacritics(self, text: str) -> str:
@@ -122,6 +130,29 @@ class ArabicPreprocessor:
             print(f"Error preprocessing text: {e}")
             return text
 
-    def preprocess_documents(self, documents: List[str]) -> List[str]:
-        """Process a list of documents."""
-        return [self.preprocess(doc) for doc in documents if doc]
+    # def preprocess_documents(self, documents: List[str]) -> List[str]:
+    #     """Process a list of documents."""
+    #     processed_docs = []
+    #     for i, doc in enumerate(documents):
+    #         if i % 100 == 0:
+    #             print(f"Processing document {i}/{len(documents)}")
+    #         processed_docs.append(self.preprocess(doc))
+    #     return processed_docs
+
+    def preprocess_documents_in_batches(self, documents: List[str], batch_size: int) -> List[str]:
+        """Process documents in batches."""
+        processed_docs = []
+        total_docs = len(documents)
+        
+        for start in range(0, total_docs, batch_size):
+            end = min(start + batch_size, total_docs)
+            batch = documents[start:end]
+            
+            # Process each document in the batch
+            for doc in batch:
+                processed_doc = self.preprocess(doc)
+                processed_docs.append(processed_doc)
+            
+            print(f"Processed batch {start // batch_size + 1} of {total_docs // batch_size + 1}")
+        
+        return processed_docs
