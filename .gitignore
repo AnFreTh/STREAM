@@ -197,3 +197,4 @@ embeddings/*
 .ipynb_checkpoints/*
 stream_topic.egg-info/
 stream_topic.egg-info/*
+stream_topic/stream_topic_data/*
