@@ -14,6 +14,7 @@ from .constants import (
 from .TopwordEmbeddings import TopwordEmbeddings
 import os
 from .metrics_config import MetricsConfig
+import jieba
 
 GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
 
@@ -75,6 +76,7 @@ class NPMI(BaseMetric):
             self.custom_stopwords = list(set(list(nltk_stopwords) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS)))
         else:
             self.custom_stopwords = custom_stopwords
+            self.language = language
         self.dataset = dataset
 
         files = self.dataset.get_corpus()
@@ -151,6 +153,31 @@ class NPMI(BaseMetric):
                         word_to_file_mult[word].append(file_num)
 
                 process_files.append(proc_file)
+        elif self.language == "zh-cn":
+            for file_num in range(0, len(data)):
+                words = data[file_num]
+                words = words.strip()
+                words = re.sub(r"[^\u4e00-\u9fff\d]+", " ", words)
+                words = re.sub(" +", " ", words)
+                # .translate(strip_punct).translate(strip_digit)
+                words = list(jieba.cut(words))
+                # words = [w.strip() for w in words]
+                proc_file = []
+
+                for word in words:
+                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
+                        continue
+                    if word in word_to_file:
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+                    else:
+                        word_to_file[word] = set()
+                        word_to_file_mult[word] = []
+
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+
+                process_files.append(proc_file)
         else:
             for file_num in range(0, len(data)):
                 words = data[file_num]
@@ -178,10 +205,16 @@ class NPMI(BaseMetric):
                 process_files.append(proc_file)
 
 
-        for word in list(word_to_file):
-            if len(word_to_file[word]) <= preprocess or len(word) <= 3:
-                word_to_file.pop(word, None)
-                word_to_file_mult.pop(word, None)
+        if self.language == "zh-cn":
+            for word in list(word_to_file):
+                if len(word_to_file[word]) <= preprocess or len(word) <= 1:
+                    word_to_file.pop(word, None)
+                    word_to_file_mult.pop(word, None)
+        else:
+            for word in list(word_to_file):
+                if len(word_to_file[word]) <= preprocess or len(word) <= 3:
+                    word_to_file.pop(word, None)
+                    word_to_file_mult.pop(word, None)
 
         if process_data:
             vocab = word_to_file.keys()

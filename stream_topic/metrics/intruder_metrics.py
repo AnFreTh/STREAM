@@ -71,17 +71,18 @@ class ISIM(BaseMetric):
         metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
         if os.path.exists(metric_embedder_name):
             print(f"Loading model from local path: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
+            self.metric_embedder = SentenceTransformer(metric_embedder_name)
         else:
             print(f"Downloading model: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
+            self.metric_embedder = SentenceTransformer(metric_embedder_name)
 
         self.topword_embeddings = TopwordEmbeddings(
-            word_embedding_model=metric_embedder,
+            word_embedding_model=self.metric_embedder,
             emb_filename=emb_filename,
             emb_path=emb_path,
         )
 
+        self.metric_embedder = metric_embedder
         self.n_words = n_words
         self.n_intruders = n_intruders
 
@@ -310,6 +311,7 @@ class INT(BaseMetric):
         if os.path.exists(metric_embedder_name):
             print(f"Loading model from local path: {metric_embedder_name}")
             metric_embedder = SentenceTransformer(metric_embedder_name)
+            
         else:
             print(f"Downloading model: {metric_embedder_name}")
             metric_embedder = SentenceTransformer(metric_embedder_name)
@@ -320,6 +322,7 @@ class INT(BaseMetric):
             emb_path=emb_path,
         )
 
+        self.metric_embedder = metric_embedder
         self.n_words = n_words
         self.n_intruders = n_intruders
 
@@ -574,7 +577,7 @@ class ISH(BaseMetric):
         )
 
         self.n_words = n_words
-
+        self.metric_embedder = metric_embedder
         self.embeddings = None
         self.n_intruders = n_intruders
 
