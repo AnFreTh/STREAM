@@ -191,3 +191,9 @@ docs/notebooks/embeddings
 docs/notebooks/embeddings/*
 docs/notebooks/checkpoints
 docs/notebooks/checkpoints/*
+embeddings
+embeddings/*
+.ipynb_checkpoints/
+.ipynb_checkpoints/*
+stream_topic.egg-info/
+stream_topic.egg-info/*
