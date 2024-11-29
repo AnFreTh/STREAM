@@ -82,6 +82,7 @@ class ISIM(BaseMetric):
             emb_path=emb_path,
         )
 
+        self.metric_embedder = metric_embedder
         self.n_words = n_words
         self.n_intruders = n_intruders
 
@@ -310,6 +311,7 @@ class INT(BaseMetric):
         if os.path.exists(metric_embedder_name):
             print(f"Loading model from local path: {metric_embedder_name}")
             metric_embedder = SentenceTransformer(metric_embedder_name)
+            
         else:
             print(f"Downloading model: {metric_embedder_name}")
             metric_embedder = SentenceTransformer(metric_embedder_name)
@@ -320,6 +322,7 @@ class INT(BaseMetric):
             emb_path=emb_path,
         )
 
+        self.metric_embedder = metric_embedder
         self.n_words = n_words
         self.n_intruders = n_intruders
 
@@ -574,7 +577,7 @@ class ISH(BaseMetric):
         )
 
         self.n_words = n_words
-
+        self.metric_embedder = metric_embedder
         self.embeddings = None
         self.n_intruders = n_intruders
 
