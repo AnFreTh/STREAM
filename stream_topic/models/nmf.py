@@ -8,6 +8,7 @@ from loguru import logger
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
+import pandas as pd
 
 MODEL_NAME = "NMFTM"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -86,6 +87,7 @@ class NMFTM(BaseModel):
         self._status = TrainingStatus.NOT_STARTED
         self.nmf_model = None
         self.use_tfidf = use_tfidf
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
         """
@@ -161,41 +163,80 @@ class NMFTM(BaseModel):
         self.dataset = dataset
 
         self._status = TrainingStatus.RUNNING
-        try:
-            logger.info(f"--- Training {MODEL_NAME} topic model ---")
-            matrix = self.vectorizer.fit_transform(self.dataset.texts)
-            self._clustering(matrix)
+        if self.stopwords_path is not None:
+            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            stopwords_list = set(stopwords['w'])
+            try:
+                logger.info(f"--- Training {MODEL_NAME} topic model ---")
+                matrix = self.vectorizer.fit_transform(self.dataset.texts)
+                self._clustering(matrix)
 
-            # Prepare data for visualization
-            topic_data = pd.DataFrame(columns=["predictions", "text"])
-            for i in range(self.nmf_model.n_components_):
-                topic_texts = [
-                    self.dataset.texts[j]
-                    for j, z in enumerate(self.theta[:, i])
-                    if z > 0.1
-                ]
-                if not topic_texts:
-                    continue
-                aggregated_texts = " ".join(topic_texts)
-                new_row = pd.DataFrame({"predictions": [i], "text": [aggregated_texts]})
-                topic_data = pd.concat([topic_data, new_row], ignore_index=True)
+                # Prepare data for visualization
+                topic_data = pd.DataFrame(columns=["predictions", "text"])
+                for i in range(self.nmf_model.n_components_):
+                    topic_texts = [
+                        self.dataset.texts[j]
+                        for j, z in enumerate(self.theta[:, i])
+                        if z > 0.1
+                    ]
+                    if not topic_texts:
+                        continue
+                    aggregated_texts = " ".join(topic_texts)
+                    new_row = pd.DataFrame({"predictions": [i], "text": [aggregated_texts]})
+                    topic_data = pd.concat([topic_data, new_row], ignore_index=True)
 
-            if topic_data.empty:
-                raise RuntimeError("No topics were extracted, model training failed.")
+                if topic_data.empty:
+                    raise RuntimeError("No topics were extracted, model training failed.")
 
-            tfidf, count = c_tf_idf(
-                topic_data["text"].tolist(), len(self.dataset.texts)
-            )
-            self.topic_dict = extract_tfidf_topics(tfidf, count, topic_data)
+                tfidf, count = c_tf_idf(
+                    topic_data["text"].tolist(), len(self.dataset.texts),stop_words=stopwords_list
+                )
+                self.topic_dict = extract_tfidf_topics(tfidf, count, topic_data)
 
-        except Exception as e:
-            logger.error(f"Error in training: {e}")
-            self._status = TrainingStatus.FAILED
-            raise
-        except KeyboardInterrupt:
-            logger.error("Training interrupted.")
-            self._status = TrainingStatus.INTERRUPTED
-            raise
+            except Exception as e:
+                logger.error(f"Error in training: {e}")
+                self._status = TrainingStatus.FAILED
+                raise
+            except KeyboardInterrupt:
+                logger.error("Training interrupted.")
+                self._status = TrainingStatus.INTERRUPTED
+                raise
+        else:
+            try:
+                logger.info(f"--- Training {MODEL_NAME} topic model ---")
+                matrix = self.vectorizer.fit_transform(self.dataset.texts)
+                self._clustering(matrix)
+
+                # Prepare data for visualization
+                topic_data = pd.DataFrame(columns=["predictions", "text"])
+                for i in range(self.nmf_model.n_components_):
+                    topic_texts = [
+                        self.dataset.texts[j]
+                        for j, z in enumerate(self.theta[:, i])
+                        if z > 0.1
+                    ]
+                    if not topic_texts:
+                        continue
+                    aggregated_texts = " ".join(topic_texts)
+                    new_row = pd.DataFrame({"predictions": [i], "text": [aggregated_texts]})
+                    topic_data = pd.concat([topic_data, new_row], ignore_index=True)
+
+                if topic_data.empty:
+                    raise RuntimeError("No topics were extracted, model training failed.")
+
+                tfidf, count = c_tf_idf(
+                    topic_data["text"].tolist(), len(self.dataset.texts)
+                )
+                self.topic_dict = extract_tfidf_topics(tfidf, count, topic_data)
+
+            except Exception as e:
+                logger.error(f"Error in training: {e}")
+                self._status = TrainingStatus.FAILED
+                raise
+            except KeyboardInterrupt:
+                logger.error("Training interrupted.")
+                self._status = TrainingStatus.INTERRUPTED
+                raise
 
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED

@@ -1,25 +1,34 @@
 import pickle
-
+import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 
 from .constants import EMBEDDING_PATH, SENTENCE_TRANSFORMER_MODEL
+from .metrics_config import MetricsConfig
 
 
 def embed_corpus(dataset,
-                 embedder: SentenceTransformer = SentenceTransformer(
-                     SENTENCE_TRANSFORMER_MODEL),
+                 embedder: str = None,
                  emb_filename: str = None,
                  emb_path: str = EMBEDDING_PATH,
-                 save: bool = False):
+                 save: bool = False,
+):
     """
     Create a dictionary with the word embedding of every word in the dataset.
     Use the embedder. If the file 'Embeddings/{emb_filename}.pickle' is available, 
     read the embeddings from this file. Otherwise create new embeddings.
     Returns the embedding dict
     """
+    # Check if embedder is a local path or model name and load accordingly
+    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+    if os.path.exists(embedder_name):
+        print(f"Loading model from local path: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
+    else:
+        print(f"Downloading model: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
 
     if emb_filename is None:
         emb_filename = str(dataset)
@@ -46,8 +55,7 @@ def embed_corpus(dataset,
 def update_corpus_dic_list(
     word_lis: list,
     emb_dic: dict,
-    embedder: SentenceTransformer = SentenceTransformer(
-        SENTENCE_TRANSFORMER_MODEL),
+    embedder: str = None,
     emb_filename: str = None,
     emb_path: str = EMBEDDING_PATH,
     save: bool = False,
@@ -55,6 +63,15 @@ def update_corpus_dic_list(
     """
     Updates embedding dict with embeddings in word_lis
     """
+
+    # Check if embedder is a local path or model name and load accordingly
+    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+    if os.path.exists(embedder_name):
+        print(f"Loading model from local path: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
+    else:
+        print(f"Downloading model: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
 
     try:
         emb_dic = pickle.load(open(f"{emb_path}{emb_filename}.pickle", "rb"))
@@ -78,13 +95,21 @@ def embed_topic(
     topics_tw,
     corpus_dict: dict,
     n_words: int = 10,
-    embedder: SentenceTransformer = SentenceTransformer(
-        SENTENCE_TRANSFORMER_MODEL),
+    embedder: str = None,
 ):
     """
     takes the list of topics and embed the top n_words words with the corpus dict
     if possible, else use the embedder.
     """
+    # Check if embedder is a local path or model name and load accordingly
+    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+    if os.path.exists(embedder_name):
+        print(f"Loading model from local path: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
+    else:
+        print(f"Downloading model: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
+
     topic_embeddings = []
     for topic in tqdm(topics_tw):
         if n_words is not None:
@@ -105,12 +130,20 @@ def embed_topic(
 
 def embed_stopwords(
     stopwords: list,
-    embedder: SentenceTransformer = SentenceTransformer(
-        SENTENCE_TRANSFORMER_MODEL),
+    embedder: str = None,
 ):
     """
     take the list of stopwords and embeds them with embedder
     """
+
+    # Check if embedder is a local path or model name and load accordingly
+    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+    if os.path.exists(embedder_name):
+        print(f"Loading model from local path: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
+    else:
+        print(f"Downloading model: {embedder_name}")
+        embedder = SentenceTransformer(embedder_name)
 
     sw_dic = {}  # first create dictionary with embedding of every unique word
     stopwords_set = set(stopwords)

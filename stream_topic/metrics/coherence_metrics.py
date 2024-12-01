@@ -12,12 +12,11 @@ from .constants import (
     PARAPHRASE_TRANSFORMER_MODEL,
 )
 from .TopwordEmbeddings import TopwordEmbeddings
+import os
+from .metrics_config import MetricsConfig
+import jieba
 
 GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
-NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-STOPWORDS = list(
-    set(list(NLTK_STOPWORDS) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS))
-)
 
 
 class NPMI(BaseMetric):
@@ -52,7 +51,8 @@ class NPMI(BaseMetric):
     def __init__(
         self,
         dataset,
-        stopwords: list = None,
+        language: str = None,
+        custom_stopwords: list = None,
     ):
         """
         Initializes the NPMI object with a dataset, stopwords, and a specified number of topics.
@@ -64,9 +64,19 @@ class NPMI(BaseMetric):
         stopwords : list, optional
             A list of stopwords to exclude from analysis. Default includes GenSim, NLTK, and Scikit-learn stopwords.
         """
-        self.stopwords = stopwords
-        if stopwords is None:
-            self.stopwords = STOPWORDS
+        # Dynamically set NLTK stopwords based on the chosen language
+        if custom_stopwords is None:
+            try:
+                nltk_stopwords = stopwords.words(language)
+                self.language = language
+            except OSError:
+                print(f"Language '{language}' not supported in NLTK. Defaulting to English.")
+                nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
+                self.language = NLTK_STOPWORD_LANGUAGE
+            self.custom_stopwords = list(set(list(nltk_stopwords) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS)))
+        else:
+            self.custom_stopwords = custom_stopwords
+            self.language = language
         self.dataset = dataset
 
         files = self.dataset.get_corpus()
@@ -118,35 +128,93 @@ class NPMI(BaseMetric):
         word_to_file_mult = {}
 
         process_files = []
-        for file_num in range(0, len(data)):
-            words = data[file_num].lower()
-            words = words.strip()
-            words = re.sub(r"[^a-zA-Z0-9]+\s*", " ", words)
-            words = re.sub(" +", " ", words)
-            # .translate(strip_punct).translate(strip_digit)
-            words = words.split()
-            # words = [w.strip() for w in words]
-            proc_file = []
+        if self.language == NLTK_STOPWORD_LANGUAGE:
+            for file_num in range(0, len(data)):
+                words = data[file_num].lower()
+                words = words.strip()
+                words = re.sub(r"[^a-zA-Z0-9]+\s*", " ", words)
+                words = re.sub(" +", " ", words)
+                # .translate(strip_punct).translate(strip_digit)
+                words = words.split()
+                # words = [w.strip() for w in words]
+                proc_file = []
 
-            for word in words:
-                if word in self.stopwords or word == "dlrs" or word == "revs":
-                    continue
-                if word in word_to_file:
-                    word_to_file[word].add(file_num)
-                    word_to_file_mult[word].append(file_num)
-                else:
-                    word_to_file[word] = set()
-                    word_to_file_mult[word] = []
+                for word in words:
+                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
+                        continue
+                    if word in word_to_file:
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+                    else:
+                        word_to_file[word] = set()
+                        word_to_file_mult[word] = []
 
-                    word_to_file[word].add(file_num)
-                    word_to_file_mult[word].append(file_num)
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
 
-            process_files.append(proc_file)
+                process_files.append(proc_file)
+        elif self.language == "zh-cn":
+            for file_num in range(0, len(data)):
+                words = data[file_num]
+                words = words.strip()
+                words = re.sub(r"[^\u4e00-\u9fff\d]+", " ", words)
+                words = re.sub(" +", " ", words)
+                # .translate(strip_punct).translate(strip_digit)
+                words = list(jieba.cut(words))
+                # words = [w.strip() for w in words]
+                proc_file = []
 
-        for word in list(word_to_file):
-            if len(word_to_file[word]) <= preprocess or len(word) <= 3:
-                word_to_file.pop(word, None)
-                word_to_file_mult.pop(word, None)
+                for word in words:
+                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
+                        continue
+                    if word in word_to_file:
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+                    else:
+                        word_to_file[word] = set()
+                        word_to_file_mult[word] = []
+
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+
+                process_files.append(proc_file)
+        else:
+            for file_num in range(0, len(data)):
+                words = data[file_num]
+                words = words.strip()
+                words = re.sub(r"[^\u4e00-\u9fff\d]+", " ", words)
+                words = re.sub(" +", " ", words)
+                # .translate(strip_punct).translate(strip_digit)
+                words = words.split()
+                # words = [w.strip() for w in words]
+                proc_file = []
+
+                for word in words:
+                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
+                        continue
+                    if word in word_to_file:
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+                    else:
+                        word_to_file[word] = set()
+                        word_to_file_mult[word] = []
+
+                        word_to_file[word].add(file_num)
+                        word_to_file_mult[word].append(file_num)
+
+                process_files.append(proc_file)
+
+
+        if self.language == "zh-cn":
+            for word in list(word_to_file):
+                if len(word_to_file[word]) <= preprocess or len(word) <= 1:
+                    word_to_file.pop(word, None)
+                    word_to_file_mult.pop(word, None)
+        else:
+            for word in list(word_to_file):
+                if len(word_to_file[word]) <= preprocess or len(word) <= 3:
+                    word_to_file.pop(word, None)
+                    word_to_file_mult.pop(word, None)
 
         if process_data:
             vocab = word_to_file.keys()
@@ -327,7 +395,7 @@ class Embedding_Coherence(BaseMetric):
     def __init__(
         self,
         n_words=10,
-        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
+        metric_embedder: str = None,
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
     ):
@@ -347,6 +415,15 @@ class Embedding_Coherence(BaseMetric):
             The path to the embedding model. Defaults to EMBEDDING_PATH.
         """
 
+        # Check if embedder is a local path or model name and load accordingly
+        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+        if os.path.exists(metric_embedder_name):
+            print(f"Loading model from local path: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        else:
+            print(f"Downloading model: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        print(1)
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
@@ -354,7 +431,27 @@ class Embedding_Coherence(BaseMetric):
         )
 
         self.n_words = n_words
+        
+    def get_info(self):
+        """
+        Get information about the metric.
 
+        Returns
+        -------
+        dict
+            Dictionary containing model information including metric name,
+            number of top words, number of intruders, embedding model name,
+            metric range and metric description.
+        """
+
+        info = {
+            "metric_name": "Embedding_Coherence",
+            "n_words": self.n_words,
+            "description": "Embedding_Coherence",
+        }
+
+        return info
+    
     def score_per_topic(self, topics):
         """
         Calculates coherence scores for each topic individually based on embedding similarities.

@@ -17,6 +17,8 @@ from .constants import (
     SENTENCE_TRANSFORMER_MODEL,
 )
 from .TopwordEmbeddings import TopwordEmbeddings
+import os
+from .metrics_config import MetricsConfig
 
 GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
 NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
@@ -55,7 +57,7 @@ class Embedding_Topic_Diversity(BaseMetric):
     def __init__(
         self,
         n_words=10,
-        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
+        metric_embedder: str = None,
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
     ):
@@ -74,6 +76,15 @@ class Embedding_Topic_Diversity(BaseMetric):
         emb_path : str, optional
             The path to the embeddings file. Defaults to "/embeddings".
         """
+
+        # Check if embedder is a local path or model name and load accordingly
+        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+        if os.path.exists(metric_embedder_name):
+            print(f"Loading model from local path: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        else:
+            print(f"Downloading model: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
@@ -237,10 +248,11 @@ class Expressivity(BaseMetric):
     def __init__(
         self,
         n_words=10,
-        stopwords=list,
-        metric_embedder=SentenceTransformer(PARAPHRASE_TRANSFORMER_MODEL),
+        custom_stopwords: list = None,
+        metric_embedder: str = None,
         emb_filename=None,
         emb_path: str = EMBEDDING_PATH,
+        language: str = None,
     ):
         """
         Initializes the Expressivity object with the number of top words to consider
@@ -259,9 +271,28 @@ class Expressivity(BaseMetric):
         emb_path : str, optional
             The path to the embeddings file. Defaults to "/embeddings".
         """
-        self.stopwords = stopwords
-        if stopwords is None:
-            self.stopwords = STOPWORDS
+
+        # Check if embedder is a local path or model name and load accordingly
+        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+        if os.path.exists(metric_embedder_name):
+            print(f"Loading model from local path: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+        else:
+            print(f"Downloading model: {metric_embedder_name}")
+            metric_embedder = SentenceTransformer(metric_embedder_name)
+
+        # Dynamically set NLTK stopwords based on the chosen language
+        if custom_stopwords is None:
+            try:
+                nltk_stopwords = stopwords.words(language)
+                self.language = language
+            except OSError:
+                print(f"Language '{language}' not supported in NLTK. Defaulting to English.")
+                nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
+                self.language = NLTK_STOPWORD_LANGUAGE
+            self.custom_stopwords = list(set(list(nltk_stopwords) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS)))
+        else:
+            self.custom_stopwords = custom_stopwords
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
@@ -272,7 +303,7 @@ class Expressivity(BaseMetric):
         self.n_words = n_words
 
         self.stopword_emb = embed_stopwords(
-            self.stopwords, metric_embedder
+            self.custom_stopwords, metric_embedder
         )  # embed all the stopwords size: (n_stopwords, emb_dim)
         self.stopword_mean = np.mean(
             np.array(self.stopword_emb), axis=0
