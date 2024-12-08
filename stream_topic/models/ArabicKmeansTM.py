@@ -210,20 +210,22 @@ class ArabicKmeansTM(KmeansTM):
         self.n_topics = num_topics
         self._status = TrainingStatus.NOT_STARTED
         
-        # NEW: Store embedding model name if provided
+        # Store embedding model name if provided
         self.embedding_model_name = embedding_model_name
         
         # Core attributes
         self.clustering_model = None
         self.labels = None
-        self.topic_dict = None
+        self.topic_dict = {} #  Initialize as empty dict instead of None
         self.dataframe = None
         self.beta = None
         self.theta = None
         self.embeddings = None
         self.reduced_embeddings = None
+        self.dataset = None  # Added for visualization support
         
-        # NEW: Enhanced Arabic stopwords initialization
+        
+        # Enhanced Arabic stopwords initialization
         self.arabic_stop_words = self._get_enhanced_stopwords()
         
     # NEW: Enhanced stopwords method
@@ -250,9 +252,17 @@ class ArabicKmeansTM(KmeansTM):
             # Other common stopwords
             'ان', 'إن', 'كما', 'لكن', 'لذلك', 'ايضا',
             'و', 'أو', 'ثم', 'أم', 'أن', 'لقد', 'إذ', 'إذا',
-            'كل', 'وقد', 'فقد', 'نفى', 'ذكر', 'ذكرت'
+            'كل', 'وقد', 'فقد', 'نفى', 'ذكر', 'ذكرت',
+            
+            # Additional common words
+            'يمكن', 'سوف', 'حيث', 'جدا', 'فقط', 'عندما', 'هناك',
+            'الان', 'اليوم', 'امس', 'غدا', 'دائما', 'ابدا',
+            'نعم', 'لا', 'ربما', 'هكذا', 'هنا', 'هنالك',
+            'انه', 'انها', 'انهم', 'لماذا', 'كيف', 'متى', 'اين',
+            'عند', 'فوق', 'تحت', 'امام', 'خلف', 'بجانب',
+            'منها', 'منه', 'منهم', 'عنها', 'عنه', 'عنهم',
+            'لها', 'له', 'لهم', 'بها', 'به', 'بهم'
         }
-        
         # NEW: Add variations with different Arabic characters
         variations = set()
         for word in additional_stops:
@@ -291,8 +301,11 @@ class ArabicKmeansTM(KmeansTM):
             # Calculate TF-IDF
             tfidf_matrix = vectorizer.fit_transform(docs_per_topic)
             feature_names = vectorizer.get_feature_names_out()
+
+            # Store vectorizer vocabulary for beta matrix
+            self.vocabulary = vectorizer.vocabulary_
             
-            # NEW: Enhanced topic word extraction with filtering
+            # Enhanced topic word extraction with filtering
             topics = []
             for topic_idx in range(self.num_topics):
                 scores = tfidf_matrix[topic_idx].toarray()[0]
@@ -313,7 +326,10 @@ class ArabicKmeansTM(KmeansTM):
                             break
                 
                 topics.append(filtered_words)
-            
+
+                # Store in topic_dict
+                self.topic_dict[topic_idx] = filtered_words
+
             return topics
 
         except Exception as e:
@@ -330,8 +346,11 @@ class ArabicKmeansTM(KmeansTM):
         try:
             logger.info(f"Training {MODEL_NAME}")
             self._status = TrainingStatus.RUNNING
-
-            # NEW: Flexible processing based on embedding configuration
+            
+            # Store dataset for visualization
+            self.dataset = dataset
+            
+            # Flexible processing based on embedding configuration
             if self.embedding_model_name:
                 logger.info("Using embedding-based approach")
                 self.dataset, self.embeddings = self._prepare_embeddings(dataset, logger)
@@ -374,7 +393,15 @@ class ArabicKmeansTM(KmeansTM):
                 np.array(self.labels).reshape(-1, 1)
             )
             self.theta = normalize(self.theta, norm='l1', axis=1)
-
+            
+            if not hasattr(self, 'embeddings') or self.embeddings is None:
+                self.embeddings = self.encode_documents(
+                    dataset.dataframe['text'].tolist(),
+                    encoder_model="paraphrase-MiniLM-L3-v2",
+                    use_average=True
+                )
+                self.reduced_embeddings = self.dim_reduction(logger)
+    
             logger.info("Training completed successfully")
             self._status = TrainingStatus.SUCCEEDED
             return self
