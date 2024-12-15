@@ -1,4 +1,20 @@
-# In stream_topic/preprocessor/arabic_preprocessing.py
+"""
+Arabic Text Preprocessor
+
+This module provides specialized preprocessing for Arabic text, which requires different handling 
+compared to Latin-based languages due to:
+1. Unique Arabic characters and diacritics
+2. Different normalization requirements (e.g., handling of Hamza, Tah Marbuta)
+3. Special punctuation marks and symbols
+4. Specific stopwords for Arabic language
+
+This preprocessor complements the main TextPreprocessor class but focuses on Arabic-specific 
+preprocessing tasks. It's automatically used by the main TextPreprocessor when language="ar".
+
+Dependencies:
+- pyarabic (optional): Provides advanced Arabic text processing capabilities
+- nltk: For basic text processing and stopwords
+"""
 
 import os
 import re
@@ -7,7 +23,7 @@ import nltk
 from pathlib import Path
 from typing import List
 
-# Download required NLTK data
+# Download required NLTK data for tokenization and stopwords
 try:
     nltk.download('punkt')
     nltk.download('stopwords')
@@ -17,6 +33,7 @@ except Exception as e:
     print(f"NLTK download failed: {e}")
     NLTK_AVAILABLE = False
 
+# Try to import pyarabic for advanced Arabic processing
 try:
     from pyarabic import araby
     from pyarabic.normalize import normalize_hamza, normalize_lamalef, normalize_tah_marbuta
@@ -26,6 +43,13 @@ except ImportError:
     PYARABIC_AVAILABLE = False
 
 class ArabicPreprocessor:
+    """
+    A specialized preprocessor for Arabic text that handles Arabic-specific preprocessing tasks.
+    
+    This class can work in two modes:
+    1. Full mode (with pyarabic): Provides comprehensive Arabic text processing
+    2. Basic mode (without pyarabic): Provides essential preprocessing using built-in functions
+    """
     def __init__(
         self,
         remove_diacritics: bool = True,
@@ -64,7 +88,10 @@ class ArabicPreprocessor:
                 print("Using basic Arabic stopwords")
 
     def normalize_arabic_text(self, text: str) -> str:
-        """Normalize Arabic text."""
+        """
+        Normalize Arabic text by standardizing various forms of characters.
+        Handles Hamza, Lam-Alef combinations, and Tah Marbuta if pyarabic is available.
+        """
         if PYARABIC_AVAILABLE:
             text = normalize_hamza(text)
             text = normalize_lamalef(text)
@@ -72,7 +99,10 @@ class ArabicPreprocessor:
         return text
 
     def remove_arabic_diacritics(self, text: str) -> str:
-        """Remove Arabic diacritical marks."""
+        """
+        Remove Arabic diacritical marks (tashkeel) and tatweel.
+        Uses pyarabic if available, falls back to unicode category filtering if not.
+        """
         if PYARABIC_AVAILABLE:
             text = araby.strip_tashkeel(text)
             text = araby.strip_tatweel(text)
@@ -81,13 +111,28 @@ class ArabicPreprocessor:
         return text
 
     def remove_arabic_punctuation(self, text: str) -> str:
-        """Remove Arabic punctuation."""
+        """
+        Remove Arabic-specific punctuation marks and symbols.
+        Includes both Arabic and Latin punctuation marks commonly used in Arabic text.
+        """
         arabic_punctuation = '''`÷×؛<>_()*&^%][ـ،/:"؟.,'{}~¦+|!"…"–ـ'''
         text = text.translate(str.maketrans('', '', arabic_punctuation))
         return text
 
     def preprocess(self, text: str) -> str:
-        """Main preprocessing function."""
+        """
+        Main preprocessing pipeline for Arabic text.
+        
+        Processing steps:
+        1. Text normalization (if enabled)
+        2. Diacritics removal (if enabled)
+        3. Punctuation removal (if enabled)
+        4. Number removal (if enabled)
+        5. Stopword removal (if enabled)
+        6. Whitespace normalization
+        
+        Returns empty string for None or non-string inputs.
+        """
         if not text or not isinstance(text, str):
             return ""
 
@@ -130,17 +175,13 @@ class ArabicPreprocessor:
             print(f"Error preprocessing text: {e}")
             return text
 
-    # def preprocess_documents(self, documents: List[str]) -> List[str]:
-    #     """Process a list of documents."""
-    #     processed_docs = []
-    #     for i, doc in enumerate(documents):
-    #         if i % 100 == 0:
-    #             print(f"Processing document {i}/{len(documents)}")
-    #         processed_docs.append(self.preprocess(doc))
-    #     return processed_docs
+
 
     def preprocess_documents_in_batches(self, documents: List[str], batch_size: int) -> List[str]:
-        """Process documents in batches."""
+        """
+        Process multiple documents in batches to manage memory usage for large datasets.
+        Provides progress tracking for batch processing.
+        """
         processed_docs = []
         total_docs = len(documents)
         

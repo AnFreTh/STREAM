@@ -1,177 +1,33 @@
-# # Create new file: stream_topic/models/arabic_kmeans.py
-# import nltk
-# from datetime import datetime
-# import numpy as np
-# from sklearn.cluster import KMeans
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.preprocessing import OneHotEncoder
-# from loguru import logger
-# from nltk.corpus import stopwords
+"""
+Arabic-Specific KMeans Topic Modeling Implementation
 
-# from .KmeansTM import KmeansTM
-# from ..commons.check_steps import check_dataset_steps
-# from ..preprocessor import c_tf_idf, extract_tfidf_topics
-# from ..utils.dataset import TMDataset
-# from .abstract_helper_models.base import TrainingStatus
+This implementation was created to address specific challenges in Arabic text processing:
 
-# time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-# MODEL_NAME = "ArabicKmeansTM"
+1. Arabic Text Characteristics:
+   - Complex morphology and word formation
+   - Right-to-left script
+   - Multiple forms of the same letter
+   - Diacritical marks
+   - Different word variations and normalizations
 
-# class ArabicKmeansTM(KmeansTM):
-#     """
-#     Arabic-specific implementation of KMeans topic modeling.
-#     Inherits from KmeansTM but modifies text processing for Arabic language support.
-#     """
+2. Stopwords Handling:
+   - Enhanced Arabic stopwords list
+   - Includes various forms of common Arabic words
+   - Handles different Arabic character variations
 
-#     def __init__(self, num_topics=10, **kwargs):
-#         super().__init__(**kwargs)
-#         self.num_topics = num_topics
-#         self.n_topics = num_topics
-#         self._status = TrainingStatus.NOT_STARTED
-        
-#     def get_info(self):
-#         """Get model information."""
-#         info = super().get_info()
-#         info["model_name"] = MODEL_NAME
-#         info["language"] = "ar"
-#         return info
+3. Topic Extraction Improvements:
+   - Better filtering for Arabic-specific patterns
+   - Enhanced TF-IDF configuration for Arabic text
+   - Improved word selection criteria
 
-#     def _extract_topics(self, texts, labels):
-#         """
-#         Extract topics using TF-IDF with Arabic-specific settings.
-#         """
-#         try:
-#             # Create document groups by topic
-#             docs_by_topic = {}
-#             for text, label in zip(texts, labels):
-#                 docs_by_topic.setdefault(label, []).append(text)
-            
-#             # Join documents for each topic
-#             docs_per_topic = []
-#             for topic_idx in range(self.num_topics):
-#                 topic_docs = docs_by_topic.get(topic_idx, [""])
-#                 docs_per_topic.append(" ".join(topic_docs))
-            
-#             nltk.download('stopwords')
-#             # Configure vectorizer for Arabic
-#             vectorizer = TfidfVectorizer(
-#                 max_features=10000,
-#                 lowercase=False,  # Important for Arabic
-#                 strip_accents=None,
-#                 token_pattern=r'[^\s]+',  # Modified pattern for Arabic words
-#                 stop_words=stopwords.words('arabic'),
-#             )
-            
-#             # Calculate TF-IDF
-#             tfidf_matrix = vectorizer.fit_transform(docs_per_topic)
-#             feature_names = vectorizer.get_feature_names_out()
-            
-#             # Extract top words for each topic
-#             topics = []
-#             for topic_idx in range(self.num_topics):
-#                 top_indices = np.argsort(tfidf_matrix[topic_idx].toarray()[0])[-20:][::-1]
-#                 topic_words = [(feature_names[i], tfidf_matrix[topic_idx, i]) 
-#                              for i in top_indices]
-#                 topics.append(topic_words)
-            
-#             return topics
+4. Processing Flexibility:
+   - Supports both embedding-based and TF-IDF approaches
+   - Specialized Arabic text preprocessing
+   - Better handling of Arabic-specific tokenization
 
-#         except Exception as e:
-#             logger.error(f"Error extracting Arabic topics: {e}")
-#             raise
-
-#     def fit(self, dataset: TMDataset):
-#         """
-#         Fit the model to Arabic text data.
-#         """
-#         assert isinstance(dataset, TMDataset), "Dataset must be TMDataset instance"
-#         check_dataset_steps(dataset, logger, MODEL_NAME)
-
-#         self._status = TrainingStatus.INITIALIZED
-#         try:
-#             logger.info(f"Training {MODEL_NAME}")
-#             self._status = TrainingStatus.RUNNING
-
-#             # Configure TF-IDF for Arabic
-#             vectorizer = TfidfVectorizer(
-#                 max_features=10000,
-#                 lowercase=False,
-#                 strip_accents=None,
-#                 token_pattern=r'[^\s]+',
-#             )
-
-#             # Transform documents
-#             X = vectorizer.fit_transform(dataset.dataframe['text'])
-            
-#             # Perform clustering
-#             self.clustering_model = KMeans(
-#                 n_clusters=self.num_topics,
-#                 random_state=42,
-#                 **self.kmeans_args
-#             )
-            
-#             self.labels = self.clustering_model.fit_predict(X.toarray())
-            
-#             # Extract topics
-#             self.topics = self._extract_topics(
-#                 dataset.dataframe['text'],
-#                 self.labels
-#             )
-            
-#             # Store results
-#             self.dataframe = dataset.dataframe.copy()
-#             self.dataframe['predictions'] = self.labels
-            
-#             # Create topic-document matrix
-#             one_hot_encoder = OneHotEncoder(sparse=False)
-#             self.theta = one_hot_encoder.fit_transform(
-#                 self.dataframe[['predictions']]
-#             )
-
-#             logger.info("Training completed successfully")
-#             self._status = TrainingStatus.SUCCEEDED
-#             return self
-
-#         except Exception as e:
-#             logger.error(f"Training error: {e}")
-#             self._status = TrainingStatus.FAILED
-#             raise
-        
-#         except KeyboardInterrupt:
-#             logger.error("Training interrupted")
-#             self._status = TrainingStatus.INTERRUPTED
-#             raise
-
-#     def get_topics(self, n_words=10):
-#         """
-#         Get the top n words for each topic.
-#         """
-#         if self._status != TrainingStatus.SUCCEEDED:
-#             raise RuntimeError("Model not trained")
-            
-#         return [[word for word, _ in topic[:n_words]] 
-#                 for topic in self.topics]
-
-#     def predict(self, texts):
-#         """
-#         Predict topics for new texts.
-#         """
-#         if self._status != TrainingStatus.SUCCEEDED:
-#             raise RuntimeError("Model not trained")
-
-#         vectorizer = TfidfVectorizer(
-#             max_features=10000,
-#             lowercase=False,
-#             strip_accents=None,
-#             token_pattern=r'[^\s]+',
-#         )
-        
-#         X = vectorizer.fit_transform(texts)
-#         return self.clustering_model.predict(X.toarray())
-    
-
-
-# Create new file: stream_topic/models/arabic_kmeans.py
+This implementation extends the base KmeansTM class with Arabic-specific optimizations
+and should be used specifically for Arabic text corpus analysis.
+"""
 
 import nltk
 from datetime import datetime
@@ -202,7 +58,7 @@ class ArabicKmeansTM(KmeansTM):
     def __init__(
         self, 
         num_topics=10, 
-        embedding_model_name: str = None,  # NEW: Made embeddings optional
+        embedding_model_name: str = None,  # Optional embeddings for flexibility
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -230,7 +86,16 @@ class ArabicKmeansTM(KmeansTM):
         
     # NEW: Enhanced stopwords method
     def _get_enhanced_stopwords(self):
-        """Get comprehensive Arabic stopwords list."""
+        """
+        Get comprehensive Arabic stopwords list.
+        
+        Includes:
+        - Basic NLTK Arabic stopwords
+        - Additional common Arabic words
+        - Various forms of verbs and their conjugations
+        - Prepositions and conjunctions
+        - Character variations (أ, إ, آ)
+        """
         nltk.download('stopwords', quiet=True)
         basic_stops = set(stopwords.words('arabic'))
         
@@ -274,7 +139,15 @@ class ArabicKmeansTM(KmeansTM):
 
     # MODIFIED: Improved topic extraction with better filtering
     def _extract_topics(self, texts, labels):
-        """Extract topics with enhanced filtering for Arabic text."""
+        """
+        Extract topics with enhanced filtering for Arabic text.
+        
+        Features:
+        - Improved TF-IDF configuration for Arabic
+        - Better word filtering criteria
+        - Handles Arabic-specific patterns
+        - Enhanced score thresholds
+        """
         try:
             # Group documents by topic
             docs_by_topic = {}
@@ -338,7 +211,14 @@ class ArabicKmeansTM(KmeansTM):
 
     # MODIFIED: Updated fit method with flexible processing
     def fit(self, dataset: TMDataset):
-        """Fit the model with enhanced Arabic processing."""
+        """
+        Fit the model with enhanced Arabic processing.
+        
+        Supports:
+        - Both embedding and TF-IDF approaches
+        - Arabic-specific text preprocessing
+        - Specialized clustering configuration
+        """
         assert isinstance(dataset, TMDataset), "Dataset must be TMDataset instance"
         check_dataset_steps(dataset, logger, MODEL_NAME)
 
