@@ -56,13 +56,15 @@ class ArabicPreprocessor:
         remove_punctuation: bool = True,
         remove_numbers: bool = True,
         remove_stopwords: bool = True,
-        normalize_arabic: bool = True
+        normalize_arabic: bool = True,
+        verbose: bool = False
     ):
         self.remove_diacritics = remove_diacritics
         self.remove_punctuation = remove_punctuation
         self.remove_numbers = remove_numbers
         self.remove_stopwords = remove_stopwords
         self.normalize_arabic = normalize_arabic
+        self.verbose = verbose
 
         # NEW: Added custom normalize_tah_marbuta function
         def custom_normalize_tah_marbuta(text: str) -> str:
@@ -85,7 +87,8 @@ class ArabicPreprocessor:
             try:
                 self.arabic_stopwords.update(set(stopwords.words('arabic')))
             except:
-                print("Using basic Arabic stopwords")
+                if self.verbose:
+                    print("Using basic Arabic stopwords")
 
     def normalize_arabic_text(self, text: str) -> str:
         """
@@ -136,9 +139,6 @@ class ArabicPreprocessor:
         if not text or not isinstance(text, str):
             return ""
 
-        # Print debugging info
-        print(f"Processing text: {text[:50]}...")
-
         try:
             # Normalize
             if self.normalize_arabic:
@@ -172,15 +172,13 @@ class ArabicPreprocessor:
             return text
 
         except Exception as e:
-            print(f"Error preprocessing text: {e}")
+            if self.verbose:
+                print(f"Error preprocessing text: {e}")
             return text
-
-
 
     def preprocess_documents_in_batches(self, documents: List[str], batch_size: int) -> List[str]:
         """
         Process multiple documents in batches to manage memory usage for large datasets.
-        Provides progress tracking for batch processing.
         """
         processed_docs = []
         total_docs = len(documents)
@@ -190,10 +188,10 @@ class ArabicPreprocessor:
             batch = documents[start:end]
             
             # Process each document in the batch
-            for doc in batch:
-                processed_doc = self.preprocess(doc)
-                processed_docs.append(processed_doc)
+            batch_processed = [self.preprocess(doc) for doc in batch]
+            processed_docs.extend(batch_processed)
             
-            print(f"Processed batch {start // batch_size + 1} of {total_docs // batch_size + 1}")
+            if self.verbose:
+                print(f"Processed batch {start // batch_size + 1} of {total_docs // batch_size + 1}")
         
         return processed_docs

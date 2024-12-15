@@ -428,7 +428,7 @@ class TMDataset(Dataset, DataDownloader):
 
     def preprocess(self, model_type=None, custom_stopwords=None, **preprocessing_steps):
         """
-        Preprocess the dataset.
+        Preprocess the dataset with minimal output.
 
         Parameters
         ----------
@@ -443,14 +443,8 @@ class TMDataset(Dataset, DataDownloader):
         -------
         None
             This method modifies the object's texts and dataframe attributes in place.
-
-        Notes
-        -----
-        This function applies a series of preprocessing steps to the text data stored in
-        the object's `texts` attribute. The preprocessed text is then stored back into the
-        `texts` attribute and updated in the `dataframe["text"]` column.
         """
-        from ..preprocessor import TextPreprocessor , ArabicPreprocessor
+        from ..preprocessor import TextPreprocessor, ArabicPreprocessor
 
         # First ensure we have texts to process
         if self.texts is None and self.dataframe is not None:
@@ -458,8 +452,6 @@ class TMDataset(Dataset, DataDownloader):
 
         if self.texts is None:
             raise ValueError("No texts available for preprocessing. Make sure to load the dataset first.")
-
-        print(f"Found {len(self.texts)} documents to preprocess")
 
         if model_type:
             preprocessing_steps = load_model_preprocessing_steps(model_type)
@@ -482,20 +474,31 @@ class TMDataset(Dataset, DataDownloader):
             filtered_steps["custom_stopwords"] = []
 
         # Only preprocess if there are steps that need to be applied
-
         if filtered_steps:
             try:
                 # Don't pass language if it's already in filtered_steps
                 language = filtered_steps.pop('language', self.language)
 
+                # Show initial status and sample
+                print(f"Found {len(self.texts)} documents to preprocess")
+                print("\nSample of first 3 documents:")
+                for text in self.texts[:3]:
+                    print(f"Processing text: {text[:50]}...")
+                print("...(remaining documents omitted)...")
+                print("\nPreprocessing in progress...")
+
+                # Create appropriate preprocessor
                 if language == "ar":
                     preprocessor = ArabicPreprocessor(
                         remove_diacritics=filtered_steps.get("remove_diacritics", True),
                         remove_punctuation=filtered_steps.get("remove_punctuation", True),
                         remove_numbers=filtered_steps.get("remove_numbers", True),
                         remove_stopwords=filtered_steps.get("remove_stopwords", True),
-                        normalize_arabic=filtered_steps.get("normalize_arabic", True)
+                        normalize_arabic=filtered_steps.get("normalize_arabic", True),
+                        verbose=False
+
                     )
+                    # Silently process all texts
                     self.texts = [preprocessor.preprocess(text) for text in self.texts]
                 else:
                     preprocessor = TextPreprocessor(
@@ -504,11 +507,13 @@ class TMDataset(Dataset, DataDownloader):
                     )
                     self.texts = preprocessor.preprocess_documents(self.texts)
 
+                # Update dataframe
                 self.dataframe["text"] = self.texts
-                self.dataframe["tokens"] = self.dataframe["text"].apply(
-                    lambda x: x.split()
-                )
+                self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
 
+                print("Preprocessing completed successfully!")
+
+                # Update info
                 self.info.update(
                     {
                         "preprocessing_steps": {
@@ -519,8 +524,8 @@ class TMDataset(Dataset, DataDownloader):
                     }
                 )
             except Exception as e:
-                raise RuntimeError(
-                    f"Error in dataset preprocessing: {e}") from e
+                raise RuntimeError(f"Error in dataset preprocessing: {e}") from e
+                
         self.update_preprocessing_steps(**filtered_steps)
 
     def update_preprocessing_steps(self, **preprocessing_steps):
