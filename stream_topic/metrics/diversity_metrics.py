@@ -78,13 +78,14 @@ class Embedding_Topic_Diversity(BaseMetric):
         """
 
         # Check if embedder is a local path or model name and load accordingly
-        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
-        if os.path.exists(metric_embedder_name):
-            print(f"Loading model from local path: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
-        else:
-            print(f"Downloading model: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
+        if not metric_embedder:
+            metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+            if os.path.exists(metric_embedder_name):
+                print(f"Loading model from local path: {metric_embedder_name}")
+                metric_embedder = SentenceTransformer(metric_embedder_name)
+            else:
+                print(f"Downloading model: {metric_embedder_name}")
+                metric_embedder = SentenceTransformer(metric_embedder_name)
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
@@ -273,13 +274,14 @@ class Expressivity(BaseMetric):
         """
 
         # Check if embedder is a local path or model name and load accordingly
-        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
-        if os.path.exists(metric_embedder_name):
-            print(f"Loading model from local path: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
-        else:
-            print(f"Downloading model: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
+        if not metric_embedder:
+            metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+            if os.path.exists(metric_embedder_name):
+                print(f"Loading model from local path: {metric_embedder_name}")
+                metric_embedder = SentenceTransformer(metric_embedder_name)
+            else:
+                print(f"Downloading model: {metric_embedder_name}")
+                metric_embedder = SentenceTransformer(metric_embedder_name)
 
         # Dynamically set NLTK stopwords based on the chosen language
         if custom_stopwords is None:

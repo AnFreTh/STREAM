@@ -97,14 +97,14 @@ class TextPreprocessor:
         self.stopwords_path = kwargs.get("stopwords_path", None)
         
 
-        if self.language == "zh-cn":                 
+        if self.language == "chinese":                 
             self.stoplist = self.load_stopwords()    
         elif self.language != "en" and self.remove_stopwords:          
             self.stop_words = set(stopwords.words(self.language))
         else:                                                        
             self.stop_words = set(stopwords.words("english"))
 
-        if self.language != "zh-cn":
+        if self.language != "chinese":
             self.stop_words.update(self.custom_stopwords)                
 
         if self.lemmatize:                                           
@@ -162,7 +162,7 @@ class TextPreprocessor:
         return re.sub(clean, " ", text)
 
     def _remove_special_characters(self, text, language):                           
-        if language != "zh-cn":
+        if language != "chinese":
             return re.sub(r"[^a-zA-Z0-9\s]", " ", text)
         else:
             return re.sub(r'[^\u4e00-\u9fff\d]+', '', text)
@@ -175,7 +175,7 @@ class TextPreprocessor:
 
     def _clean_text(self, text):
 
-        if self.language != "zh-cn":
+        if self.language != "chinese":
             text = text.strip()                                               
             if self.lowercase:                                                
                 text = text.lower()
@@ -249,7 +249,7 @@ class TextPreprocessor:
             if self.remove_html_tags:
                 text = self._remove_html_tags(text)
             if self.remove_special_chars:
-                text = self._remove_special_characters(text, language="zh-cn")
+                text = self._remove_special_characters(text, language="chinese")
             if self.remove_numbers:
                 text = re.sub(r"\d+", " ", text)
             if self.remove_punctuation:
@@ -304,7 +304,7 @@ class TextPreprocessor:
     def detect_language(self, text):
         # 使用正则表达式匹配中文字符
         if re.search(r'[\u4e00-\u9fff]', text):
-            return "zh-cn"
+            return "chinese"
         else:
             return "en"
     

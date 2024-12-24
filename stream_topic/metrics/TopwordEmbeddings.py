@@ -53,13 +53,15 @@ class TopwordEmbeddings:
         create_new_file : bool, optional
             Whether to create a new file to save the embeddings to (default is True).
         """
-        word_embedding_model_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
-        if os.path.exists(word_embedding_model_name):
-            print(f"Loading model from local path: {word_embedding_model_name}")
-            word_embedding_model = SentenceTransformer(word_embedding_model_name)
-        else:
-            print(f"Downloading model: {word_embedding_model_name}")
-            word_embedding_model = SentenceTransformer(word_embedding_model_name)
+        if not word_embedding_model:
+            word_embedding_model_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+            if os.path.exists(word_embedding_model_name):
+                print(f"Loading model from local path: {word_embedding_model_name}")
+                word_embedding_model = SentenceTransformer(word_embedding_model_name)
+            else:
+                print(f"Downloading model: {word_embedding_model_name}")
+                word_embedding_model = SentenceTransformer(word_embedding_model_name)
+            
 
         self.word_embedding_model = word_embedding_model
         self.cache_to_file = cache_to_file

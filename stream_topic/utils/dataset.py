@@ -254,7 +254,7 @@ class TMDataset(Dataset, DataDownloader):
         logger.info(f"Dataset info saved to {info_path}")
         # return preprocessor
 
-    def preprocess(self, model_type=None, custom_stopwords=None, **preprocessing_steps):
+    def preprocess(self, model_type=None, custom_stopwords=None, min_word_length=None, **preprocessing_steps):
         """
         Preprocess the dataset.
 
@@ -299,7 +299,8 @@ class TMDataset(Dataset, DataDownloader):
             filtered_steps["custom_stopwords"] = []
 
         # Only preprocess if there are steps that need to be applied
-
+        if min_word_length is not None:
+            preprocessing_steps['min_word_length'] = min_word_length
         if filtered_steps:
             try:
                 preprocessor = TextPreprocessor(
@@ -309,7 +310,7 @@ class TMDataset(Dataset, DataDownloader):
                 )
                 self.texts = preprocessor.preprocess_documents(self.texts)
                 self.dataframe["text"] = self.texts
-                if self.language == "zh-cn":        #添加部分
+                if self.language == "chinese":        #添加部分
                     # 使用结巴分词进行分词
                     self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
                 else:
@@ -586,11 +587,14 @@ class TMDataset(Dataset, DataDownloader):
         dict
             Dictionary mapping words to their embeddings.
         """
-
+        if os.path.exists(model_name) and os.path.isdir(model_name):
+            model_path = model_name
+            model_name = os.path.basename(model_name)
         assert model_name in [
             "glove-wiki-gigaword-100",
             "paraphrase-MiniLM-L3-v2",
-        ], f"model name {model_name} not supported. Can be 'glove-wiki-gigaword-100' and 'paraphrase-MiniLM-L3-v2'"
+            "paraphrase-multilingual-mpnet-base-v2"
+        ], f"model name {model_name} not supported. Can be 'glove-wiki-gigaword-100', 'paraphrase-MiniLM-L3-v2' and 'paraphrase-multilingual-mpnet-base-v2'"
 
         if vocab is None:
             vocabulary = self.get_vocabulary()
@@ -608,7 +612,10 @@ class TMDataset(Dataset, DataDownloader):
                           for word in vocabulary if word in model}
 
         if model_name == "paraphrase-MiniLM-L3-v2":
-            model = SentenceTransformer(model_name)
+            if os.path.exists(model_path) and os.path.isdir(model_path):
+                model = SentenceTransformer(model_path)
+            else:
+                model = SentenceTransformer(model_name)           
             vocabulary = list(vocabulary)
             embeddings = model.encode(
                 vocabulary, convert_to_tensor=True, show_progress_bar=True
@@ -620,5 +627,18 @@ class TMDataset(Dataset, DataDownloader):
             assert len(embeddings) == len(
                 vocabulary
             ), "Embeddings and vocabulary length mismatch"
+            
+        if model_name == "paraphrase-multilingual-mpnet-base-v2":
+            model = SentenceTransformer(model_path)
+            vocabulary = list(vocabulary)
+            embeddings = model.encode(
+                vocabulary, convert_to_tensor=True, show_progress_bar=True
+            )
 
+            embeddings = {word: embeddings[i]
+                          for i, word in enumerate(vocabulary)}
+
+            assert len(embeddings) == len(
+                vocabulary
+            ), "Embeddings and vocabulary length mismatch"
         return embeddings
