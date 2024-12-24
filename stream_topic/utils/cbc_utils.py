@@ -3,9 +3,10 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
+import jieba
 
 
-def get_top_tfidf_words_per_document(corpus, n=10):
+def get_top_tfidf_words_per_document(corpus, language="english", stopwords_path=None, n=10):
     """
     Get the top TF-IDF words per document in a corpus.
 
@@ -16,16 +17,33 @@ def get_top_tfidf_words_per_document(corpus, n=10):
     Returns:
         list: A list of lists containing the top TF-IDF words for each document in the corpus.
     """
-    vectorizer = TfidfVectorizer(stop_words="english")
-    X = vectorizer.fit_transform(corpus)
-    feature_names = vectorizer.get_feature_names_out()
+    if language == "chinese": #split for chinese corpus
+        stopwords = pd.read_csv(stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+        stopwords_list = set(stopwords['w'])
+        def chinese_tokenizer(text):
+            words = jieba.cut(text)
+            return [word for word in words if word not in stopwords_list]
+        vectorizer = TfidfVectorizer(tokenizer=chinese_tokenizer)
+        X = vectorizer.fit_transform(corpus)
+        feature_names = vectorizer.get_feature_names_out()
 
-    top_words_per_document = []
-    for row in X:
-        sorted_indices = np.argsort(row.toarray()).flatten()[::-1]
-        top_n_indices = sorted_indices[:n]
-        top_words = [feature_names[i] for i in top_n_indices]
-        top_words_per_document.append(top_words)
+        top_words_per_document = []
+        for row in X:
+            sorted_indices = np.argsort(row.toarray()).flatten()[::-1]
+            top_n_indices = sorted_indices[:n]
+            top_words = [feature_names[i] for i in top_n_indices]
+            top_words_per_document.append(top_words)
+    else:
+        vectorizer = TfidfVectorizer(stop_words="english")
+        X = vectorizer.fit_transform(corpus)
+        feature_names = vectorizer.get_feature_names_out()
+
+        top_words_per_document = []
+        for row in X:
+            sorted_indices = np.argsort(row.toarray()).flatten()[::-1]
+            top_n_indices = sorted_indices[:n]
+            top_words = [feature_names[i] for i in top_n_indices]
+            top_words_per_document.append(top_words)
 
     return top_words_per_document
 

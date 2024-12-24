@@ -62,17 +62,14 @@ class DCTE(BaseModel):
                 "save_embeddings",
             ]
         )
-        self.n_topics = None
-        self.local_model_path = kwargs.get("local_model_path", None)
-        if self.local_model_path is not None:
-            if not os.path.exists(self.local_model_path):
-                raise FileNotFoundError(f"Model path '{self.local_model_path}' does not exist.")
-            else:
-                self.model = SetFitModel.from_pretrained(self.local_model_path)
-                self.embedding_model_name = self.hparams.get("embedding_model_name", os.path.basename(self.local_model_path))
+        if os.path.exists(model) and os.path.isdir(model):
+            # If 'model' is a valid directory path, load the local model
+            self.embedding_model_name = self.hparams.get("embedding_model_name", os.path.basename(model))
+            self.model = SetFitModel.from_pretrained(model)
         else:
+            # If 'model' is not a valid directory, assume it's a model name and load the pretrained model
             self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
-            self.embedding_model_name = self.hparams.get("embedding_model_name", model)
+            self.embedding_model_name = model
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
         self.stopwords_path = kwargs.get("stopwords_path", None)
@@ -202,7 +199,7 @@ class DCTE(BaseModel):
         self._status = TrainingStatus.INITIALIZED
 
         try:
-            logger.info(f"--- Preparing {EMBEDDING_MODEL_NAME} Dataset ---")
+            logger.info(f"--- Preparing {self.embedding_model_name} Dataset ---")
             self._prepare_data(val_split=val_split)
 
             assert hasattr(self, "train_ds") and hasattr(
@@ -281,6 +278,7 @@ class DCTE(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
+        dataset = self.train_dataset
         predict_df = pd.DataFrame({"tokens": dataset.get_corpus()})
         predict_df["text"] = [" ".join(words) for words in predict_df["tokens"]]
 

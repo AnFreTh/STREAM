@@ -10,6 +10,8 @@ from nltk.tokenize import word_tokenize
 from ..commons.check_steps import check_dataset_steps
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
+import jieba
+import re
 
 MODEL_NAME = "LDA"
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -80,12 +82,20 @@ class LDA(BaseModel):
             return isinstance(entry, list) and all(
                 isinstance(token, str) for token in entry
             )
-
+        def is_chinese(text):
+            pattern = re.compile(r'[\u4e00-\u9fff]')
+            # Check if at least one Chinese character exists in the text
+            return bool(pattern.search(text))
+        def tokenize(entry):
+            if not is_tokenized(entry):
+                if isinstance(entry, str):
+                    if is_chinese(entry):  # Check if the text is Chinese
+                        return list(jieba.cut(entry))  # Use jieba for Chinese tokenization
+                    else:
+                        return word_tokenize(entry)  # Use nltk for non-Chinese tokenization
+            return entry
         # Tokenize entries that are not tokenized
-        dataset.dataframe["tokens"] = dataset.dataframe["tokens"].apply(
-            lambda entry: word_tokenize(
-                entry) if not is_tokenized(entry) else entry
-        )
+        dataset.dataframe["tokens"] = dataset.dataframe["tokens"].apply(tokenize)
 
         return dataset
 
@@ -102,16 +112,13 @@ class LDA(BaseModel):
         logger.info(f"--- Preparing the documents for {MODEL_NAME} ---")
 
         dataset = self._assert_and_tokenize(dataset)
-
         if self.id2word is None:
             self.id2word = corpora.Dictionary(dataset.dataframe["tokens"])
-
         if self.id_corpus is None:
             self.id_corpus = [
                 self.id2word.doc2bow(document)
                 for document in dataset.dataframe["tokens"]
             ]
-
     def fit(self, dataset: TMDataset = None, n_topics: int = 20, **lda_params):
         """
         Fit the LDA model to the dataset.
