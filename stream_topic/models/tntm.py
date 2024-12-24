@@ -19,6 +19,7 @@ from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.neural_basemodel import NeuralBaseModel
 from .neural_base_models.tntm_base import TNTMBase
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "TNTM"
@@ -29,7 +30,7 @@ WORD_EMBEDDING_MODEL_NAME = (
 )
 
 
-class TNTM(BaseModel):
+class TNTM(BaseModel, SentenceEncodingMixin):
     def __init__(
         self,
         word_embedding_model_name: str = WORD_EMBEDDING_MODEL_NAME,
@@ -172,9 +173,11 @@ class TNTM(BaseModel):
             n_neighbors=umap_n_neighbors,
             min_dist=umap_min_dist,
         )
+        word_embeding_array = word_embeding_array.cpu().detach().numpy()
         proj_embeddings = umap_model.fit_transform(word_embeding_array)
         proj_embeddings = proj_embeddings
-
+        proj_embeddings = torch.tensor(proj_embeddings)
+        
         gmm_model = GaussianMixture(n_components=n_topics, covariance_type="full")
         gmm_model.fit(proj_embeddings)
 
@@ -228,7 +231,7 @@ class TNTM(BaseModel):
         # model_kwargs["word_embeddings_projected"] = proj_embeddings
 
         # model_kwargs = {key: value for key, value in model_kwargs.items() if key != "dataset"}
-
+        
         self.model = NeuralBaseModel(
             model_class=TNTMBase,
             dataset=self.dataset,
@@ -242,6 +245,7 @@ class TNTM(BaseModel):
                 if k not in ["datamodule_args", "max_epochs", "factor", "model_type"]
             },
         )
+
 
     def _initialize_trainer(
         self,
@@ -436,6 +440,7 @@ class TNTM(BaseModel):
         ), "The dataset must be an instance of TMDataset."
 
         self.n_topics = n_topics
+        self.dataset = dataset
 
         self.hparams.update(
             {
@@ -461,12 +466,11 @@ class TNTM(BaseModel):
         try:
             self._status = TrainingStatus.RUNNING
             if not self.embeddings_prepared:
-                sdataset, embeddings = self.prepare_embeddings(dataset, logger)
+                dataset, embeddings = self.prepare_embeddings(dataset, logger)
                 self.embeddings_prepared = True
 
             self._status = TrainingStatus.INITIALIZED
             self._initialize_datamodule(dataset=dataset)
-
             if not self.word_embeddings_prepared:
                 self._prepare_word_embeddings(self.data_module, dataset, logger)
 

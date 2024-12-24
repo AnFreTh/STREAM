@@ -261,7 +261,7 @@ class DataDownloader:
                 }
             )
             
-            if self.language == "zh-cn":
+            if self.language == "chinese":
                 self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
             else:
                 self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
@@ -413,7 +413,7 @@ class DataDownloader:
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        if self.language == "zh-cn":
+        if self.language == "chinese":
             self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
         else:
             self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())

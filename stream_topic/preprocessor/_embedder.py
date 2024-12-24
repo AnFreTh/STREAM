@@ -174,10 +174,15 @@ class BaseEmbedder:
         return documents
 
     def _clean_docs_(self, text):  #
-        text = re.compile(r"[/(){}\[\]\|@,;]").sub("", text)
-        text = re.compile(r"\\").sub("", text)
-        text = re.compile("'").sub("", text)
-        text = re.compile("  ").sub(" ", text)
+        if re.search(r'[\u4e00-\u9fa5]', text):
+            text = re.compile(r"[^\u4e00-\u9fa5\s]").sub("", text)  # Keep Chinese characters, English letters, numbers, and spaces
+            text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        else:
+            text = re.compile(r"[/(){}\[\]\|@,;]").sub("", text)
+            text = re.compile(r"\\").sub("", text)
+            text = re.compile("'").sub("", text)
+            text = re.compile("  ").sub(" ", text)
+        
 
         return text
 
