@@ -197,3 +197,14 @@ docs/notebooks/checkpoints/*
 stream_topic/data
 stream_topic/data/*
 
+data/arabic_datasets/
+data/arabic_datasets/*
+
+stream_topic/data/
+stream_topic/data/*
+data/arabic_datasets/
+data/arabic_datasets/*
+data/arabic_datasets/arabic_news/
+data/arabic_datasets/arabic_news/*
+data/arabic_datasets/arabic_news/Arabiya/
+data/arabic_datasets/arabic_news/Arabiya/*
