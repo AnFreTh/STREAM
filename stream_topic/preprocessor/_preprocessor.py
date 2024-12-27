@@ -10,6 +10,8 @@ from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
+from .arabic_preprocessing import ArabicPreprocessor
+
 
 
 class TextPreprocessor:
@@ -104,6 +106,17 @@ class TextPreprocessor:
 
         self.contractions_dict = self._load_contractions()
         self.word_freq = Counter()
+
+        if self.language == "ar":
+            self.arabic_preprocessor = ArabicPreprocessor(
+                remove_diacritics=kwargs.get("remove_diacritics", True),
+                remove_punctuation=self.remove_punctuation,
+                remove_numbers=self.remove_numbers,
+                remove_stopwords=self.remove_stopwords,
+                normalize_arabic=kwargs.get("normalize_arabic", True)
+    )
+
+        
 
     def _load_contractions(self):
         # Load a dictionary of contractions and their expansions

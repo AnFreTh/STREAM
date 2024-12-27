@@ -14,6 +14,8 @@ from .ctmneg import CTMNeg
 from .tntm import TNTM
 from .nmf import NMFTM
 from .nstm import NSTM
+from .ArabicKmeansTM import ArabicKmeansTM
+
 
 __all__ = [
     "BERTopicTM",
@@ -32,4 +34,5 @@ __all__ = [
     "TNTM",
     "NMFTM",
     "NSTM",
+    "ArabicKmeansTM",
 ]

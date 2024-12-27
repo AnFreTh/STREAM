@@ -240,30 +240,31 @@ class DataDownloader:
         dataset_path : str
             Path to the dataset folder.
         """
-        parquet_path = os.path.join(dataset_path, f"{self.name}.parquet")
-        if os.path.exists(parquet_path):
-            self.load_dataset_from_parquet(parquet_path)
-        else:
-            documents_path = os.path.join(dataset_path, "corpus.txt")
-            labels_path = os.path.join(dataset_path, "labels.txt")
+        documents_path = os.path.join(dataset_path, "corpus.txt")
+        labels_path = os.path.join(dataset_path, "labels.txt")
 
-            with open(documents_path, encoding="utf-8") as f:
-                documents = f.readlines()
+        if not os.path.exists(documents_path):
+            raise FileNotFoundError(f"Documents file {documents_path} does not exist.")
+        if not os.path.exists(labels_path):
+            raise FileNotFoundError(f"Labels file {labels_path} does not exist.")
 
-            with open(labels_path, encoding="utf-8") as f:
-                labels = f.readlines()
+        with open(documents_path, encoding="utf-8") as f:
+            documents = f.readlines()
 
-            self.dataframe = pd.DataFrame(
-                {
-                    "text": [doc.strip() for doc in documents],
-                    "labels": [label.strip() for label in labels],
-                }
-            )
+        with open(labels_path, encoding="utf-8") as f:
+            labels = f.readlines()
 
-            self.dataframe["tokens"] = self.dataframe["text"].apply(
-                lambda x: x.split())
-            self.texts = self.dataframe["text"].tolist()
-            self.labels = self.dataframe["labels"].tolist()
+        self.dataframe = pd.DataFrame(
+            {
+                "text": [doc.strip() for doc in documents],
+                "labels": [label.strip() for label in labels],
+            }
+        )
+
+        self.dataframe["tokens"] = self.dataframe["text"].apply(
+            lambda x: x.split())
+        self.texts = self.dataframe["text"].tolist()
+        self.labels = self.dataframe["labels"].tolist()
 
     def load_custom_dataset_from_url(
         self, dataset_path=None, embeddings=False, embedding_model_name=None
