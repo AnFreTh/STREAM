@@ -1,42 +1,26 @@
 # basics
-numpy<=1.26.4
+numpy
 pandas
-pyarrow
-scikit-learn==1.1.0
-scipy==1.10.1
+scikit-learn
+nltk
+datasets
 
 # dl
-lightning==2.3.3
-torch==2.4.0
+lightning
+torch
+sentence_transformers
 
 # nlp
-transformers==4.40.2
-setfit==1.0.3
-gensim==4.2.0
-umap-learn==0.5.6
-wordcloud==1.9.3
+transformers
+gensim
+umap-learn
+
 
 community
-networkx==3.3
+networkx
 python_louvain
 langdetect
-hdbscan==0.8.37
-huggingface_hub==0.23.5
-# nltk
-# datasets==2.20.0
-# sentence-transformers==3.0.1
 
-
-# plotting
-dash
-plotly
-matplotlib
 
 # misc
 loguru
-ipywidgets
-ipykernel<6.22.0
-# tqdm
-# pre-commit
-optuna==3.6.1
-optuna-integration==3.6.0

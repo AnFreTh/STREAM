@@ -12,7 +12,7 @@ HOMEPAGE = "https://github.com/AnFreTh/STREAM"
 DOCS = "https://stream.readthedocs.io/en/"
 EMAIL = "anton.thielmann@tu-clausthal.de"
 AUTHOR = "Anton Thielmann"
-REQUIRES_PYTHON = ">=3.6, <=3.11"
+REQUIRES_PYTHON = ">=3.6"
 
 # Load the package's verison file and its content.
 ROOT_DIR = Path(__file__).resolve().parent
@@ -30,6 +30,14 @@ with open(os.path.join(ROOT_DIR, "requirements.txt")) as f:
         if not line.startswith("#") and not line.startswith("git+")
     ]
 
+extras_require = {
+    "plotting": ["dash", "plotly", "matplotlib", "wordcloud"],
+    "hpo": ["optuna", "optuna-integration"],
+    "bertopic": ["hdbscan"],
+    "dcte": ["pyarrow", "setfit"],
+}
+
+
 # get long description from readme file
 with open(os.path.join(ROOT_DIR, "README.md")) as f:
     LONG_DESCRIPTION = f.read()
@@ -45,7 +53,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     install_requires=install_reqs,
-    # extras_require=extras_reqs,
+    extras_require=extras_require,
     license="MIT",  # adapt based on your needs
     packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
     include_package_data=True,
