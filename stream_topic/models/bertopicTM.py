@@ -1,6 +1,4 @@
 from datetime import datetime
-
-import hdbscan
 import numpy as np
 from loguru import logger
 from sklearn.preprocessing import OneHotEncoder
@@ -121,6 +119,10 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         Applies K-Means clustering to the reduced embeddings.
         """
 
+        import importlib
+
+        hdbscan = importlib.import_module("hdbscan")
+
         assert (
             hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
@@ -192,7 +194,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
 
             self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-            one_hot_encoder = OneHotEncoder(sparse=False)
+            one_hot_encoder = OneHotEncoder(sparse_output=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
                 self.dataframe[["predictions"]]
             )

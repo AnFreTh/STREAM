@@ -220,7 +220,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             )
             self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-            one_hot_encoder = OneHotEncoder(sparse=False)
+            one_hot_encoder = OneHotEncoder(sparse_output=False)
             predictions_one_hot = one_hot_encoder.fit_transform(
                 self.dataframe[["predictions"]]
             )

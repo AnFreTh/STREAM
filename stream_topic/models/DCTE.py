@@ -4,12 +4,8 @@ import pandas as pd
 import pyarrow as pa
 from datasets import Dataset
 from loguru import logger
-from sentence_transformers.losses import CosineSimilarityLoss
-from setfit import SetFitModel, TrainingArguments
-from setfit import Trainer as SetfitTrainer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
-
 from ..commons.check_steps import check_dataset_steps
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
@@ -19,6 +15,19 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "DCTE"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 # logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
+
+
+def import_setfit():
+    try:
+        from setfit import SetFitModel, TrainingArguments
+        from setfit import Trainer as SetfitTrainer
+        from sentence_transformers.losses import CosineSimilarityLoss
+
+        return SetFitModel, TrainingArguments, SetfitTrainer, CosineSimilarityLoss
+    except ImportError as e:
+        raise ImportError(
+            "Setfit is not installed. Please install it by running 'pip install setfit'."
+        ) from e
 
 
 class DCTE(BaseModel):
@@ -61,6 +70,9 @@ class DCTE(BaseModel):
             ]
         )
         self.n_topics = None
+
+        # Lazy import SetFit components
+        SetFitModel, _, _, _ = import_setfit()
 
         self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
         self._status = TrainingStatus.NOT_STARTED
@@ -122,7 +134,7 @@ class DCTE(BaseModel):
             n=top_words,
         )
 
-        one_hot_encoder = OneHotEncoder(sparse=False)
+        one_hot_encoder = OneHotEncoder(sparse_output=False)
         predictions_one_hot = one_hot_encoder.fit_transform(predict_df[["predictions"]])
 
         beta = tfidf
@@ -153,6 +165,8 @@ class DCTE(BaseModel):
         Returns:
             dict: A dictionary containing the extracted topics and the topic-word matrix.
         """
+
+        _, TrainingArguments, SetfitTrainer, CosineSimilarityLoss = import_setfit()
 
         assert isinstance(
             dataset, TMDataset

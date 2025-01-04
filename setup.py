@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 from pathlib import Path
-
 from setuptools import find_packages, setup
+from setuptools.command.install import install
 
 # Package meta-data.
 NAME = "stream_topic"
@@ -12,7 +12,27 @@ HOMEPAGE = "https://github.com/AnFreTh/STREAM"
 DOCS = "https://stream.readthedocs.io/en/"
 EMAIL = "anton.thielmann@tu-clausthal.de"
 AUTHOR = "Anton Thielmann"
-REQUIRES_PYTHON = ">=3.6, <=3.11"
+REQUIRES_PYTHON = ">=3.6"
+
+
+class PostInstallCommand(install):
+    """Post-installation for downloading NLTK resources."""
+
+    def run(self):
+        install.run(self)
+        try:
+            import nltk
+
+            nltk.download("stopwords")
+            nltk.download("wordnet")
+            nltk.download("punkt_tab")
+            nltk.download("brown")
+            nltk.download("averaged_perceptron_tagger_eng")
+        except ImportError:
+            print(
+                "NLTK not installed. Ensure it is listed in install_requires or installed separately."
+            )
+
 
 # Load the package's verison file and its content.
 ROOT_DIR = Path(__file__).resolve().parent
@@ -30,6 +50,13 @@ with open(os.path.join(ROOT_DIR, "requirements.txt")) as f:
         if not line.startswith("#") and not line.startswith("git+")
     ]
 
+extras_require = {
+    "plotting": ["dash", "plotly", "matplotlib", "wordcloud"],
+    "bertopic": ["hdbscan"],
+    "dcte": ["pyarrow", "setfit"],
+}
+
+
 # get long description from readme file
 with open(os.path.join(ROOT_DIR, "README.md")) as f:
     LONG_DESCRIPTION = f.read()
@@ -45,7 +72,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     install_requires=install_reqs,
-    # extras_require=extras_reqs,
+    extras_require=extras_require,
     license="MIT",  # adapt based on your needs
     packages=find_packages(exclude=["examples", "examples.*", "tests", "tests.*"]),
     include_package_data=True,
@@ -65,4 +92,7 @@ setup(
     ],
     project_urls={"Documentation": DOCS},
     url=HOMEPAGE,
+    cmdclass={
+        "install": PostInstallCommand,
+    },
 )
