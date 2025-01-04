@@ -355,6 +355,26 @@ class Embedding_Coherence(BaseMetric):
 
         self.n_words = n_words
 
+    def get_info(self):
+        """
+        Get information about the metric.
+
+        Returns
+        -------
+        dict
+            Dictionary containing model information including metric name,
+            number of top words, number of intruders, embedding model name,
+            metric range and metric description.
+        """
+
+        info = {
+            "metric_name": "Embedding Coherence",
+            "n_words": self.n_words,
+            "description": "Embedding Coherence coherence",
+        }
+
+        return info
+
     def score_per_topic(self, topics):
         """
         Calculates coherence scores for each topic individually based on embedding similarities.
@@ -414,16 +434,3 @@ class Embedding_Coherence(BaseMetric):
         """
         res = self.score_per_topic(topics).values()
         return sum(res) / len(res)
-
-
-def _load_default_texts():
-    """
-    Loads default general texts
-
-    Returns
-    -------
-    result : default 20newsgroup texts
-    """
-    dataset = Dataset()
-    dataset.fetch_dataset("20NewsGroup")
-    return dataset.get_corpus()
