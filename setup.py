@@ -50,7 +50,6 @@ with open(os.path.join(ROOT_DIR, "requirements.txt")) as f:
 
 extras_require = {
     "plotting": ["dash", "plotly", "matplotlib", "wordcloud"],
-    "hpo": ["optuna", "optuna-integration"],
     "bertopic": ["hdbscan"],
     "dcte": ["pyarrow", "setfit"],
 }
