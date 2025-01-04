@@ -25,7 +25,7 @@ class PostInstallCommand(install):
 
             nltk.download("stopwords")
             nltk.download("wordnet")
-            nltk.download("punkt")
+            nltk.download("punkt_tab")
         except ImportError:
             print(
                 "NLTK not installed. Ensure it is listed in install_requires or installed separately."

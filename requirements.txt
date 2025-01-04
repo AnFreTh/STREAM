@@ -24,3 +24,5 @@ langdetect
 
 # misc
 loguru
+optuna
+optuna-integration
