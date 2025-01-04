@@ -73,7 +73,7 @@ You can install STREAM directly from PyPI or from the GitHub repository:
 
 1. **PyPI (Recommended)**:
     ```bash
-    pip install stream_topic
+    pip install stream-topic
     ```
 
 2. **GitHub**:
@@ -81,14 +81,20 @@ You can install STREAM directly from PyPI or from the GitHub repository:
     pip install git+https://github.com/AnFreTh/STREAM.git
     ```
 
-3. **Download NLTK Resources**:
-    Ensure you have the necessary NLTK resources installed:
-    ```python
-    import nltk
-    nltk.download('stopwords')
-    nltk.download('punkt')
-    nltk.download('wordnet')
-    nltk.download('averaged_perceptron_tagger')
+3. **Install requirements for add-ons**:
+    To use STREAMS visualizations, simply run:
+    ```bash
+    pip install stream-topic[plotting]
+    ```
+
+    For BERTopic, run:
+    ```bash
+    pip install stream-topic[hdbscan]
+    ```
+
+    For DCTE:
+    ```bash
+    pip install stream-topic[dcte]
     ```
 
 # 📦 Available Models

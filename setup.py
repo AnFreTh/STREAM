@@ -26,6 +26,8 @@ class PostInstallCommand(install):
             nltk.download("stopwords")
             nltk.download("wordnet")
             nltk.download("punkt_tab")
+            nltk.download("brown")
+            nltk.download("averaged_perceptron_tagger_eng")
         except ImportError:
             print(
                 "NLTK not installed. Ensure it is listed in install_requires or installed separately."
