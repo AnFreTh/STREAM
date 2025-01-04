@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 from pathlib import Path
-
 from setuptools import find_packages, setup
+from setuptools.command.install import install
 
 # Package meta-data.
 NAME = "stream_topic"
@@ -13,6 +13,24 @@ DOCS = "https://stream.readthedocs.io/en/"
 EMAIL = "anton.thielmann@tu-clausthal.de"
 AUTHOR = "Anton Thielmann"
 REQUIRES_PYTHON = ">=3.6"
+
+
+class PostInstallCommand(install):
+    """Post-installation for downloading NLTK resources."""
+
+    def run(self):
+        install.run(self)
+        try:
+            import nltk
+
+            nltk.download("stopwords")
+            nltk.download("wordnet")
+            nltk.download("punkt")
+        except ImportError:
+            print(
+                "NLTK not installed. Ensure it is listed in install_requires or installed separately."
+            )
+
 
 # Load the package's verison file and its content.
 ROOT_DIR = Path(__file__).resolve().parent
@@ -73,4 +91,7 @@ setup(
     ],
     project_urls={"Documentation": DOCS},
     url=HOMEPAGE,
+    cmdclass={
+        "install": PostInstallCommand,
+    },
 )

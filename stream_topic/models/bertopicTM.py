@@ -1,6 +1,4 @@
 from datetime import datetime
-
-import hdbscan
 import numpy as np
 from loguru import logger
 from sklearn.preprocessing import OneHotEncoder
@@ -120,6 +118,10 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         """
         Applies K-Means clustering to the reduced embeddings.
         """
+
+        import importlib
+
+        hdbscan = importlib.import_module("hdbscan")
 
         assert (
             hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
