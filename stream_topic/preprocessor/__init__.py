@@ -3,6 +3,7 @@ from ._embedder import BaseEmbedder, GensimBackend
 from ._preprocessor import TextPreprocessor
 from ._tf_idf import c_tf_idf, extract_tfidf_topics, extract_topic_sizes
 from .topic_extraction import TopicExtractor
+from .arabic_preprocessing import ArabicPreprocessor
 
 __all__ = [
     "clean_topics",
@@ -13,4 +14,5 @@ __all__ = [
     "extract_tfidf_topics",
     "extract_topic_sizes",
     "TopicExtractor",
+    "ArabicPreprocessor",
 ]
