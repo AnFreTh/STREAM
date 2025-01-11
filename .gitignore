@@ -191,3 +191,10 @@ docs/notebooks/embeddings
 docs/notebooks/embeddings/*
 docs/notebooks/checkpoints
 docs/notebooks/checkpoints/*
+
+
+stream-backend/*
+stream-website/*
+node_modules/*
+data/*
+stream_topic/stream_topic_data/*

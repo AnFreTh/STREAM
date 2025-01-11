@@ -21,11 +21,9 @@ class NeuralBaseModel(pl.LightningModule):
         super().__init__()
 
         # Separate dataset from other kwargs
-        model_kwargs = {key: value for key,
-                        value in kwargs.items() if key != "dataset"}
+        model_kwargs = {key: value for key, value in kwargs.items() if key != "dataset"}
 
-        self.model = model_class(
-            dataset=dataset, n_topics=n_topics, **model_kwargs)
+        self.model = model_class(dataset=dataset, n_topics=n_topics, **model_kwargs)
         self.lr = lr
         self.lr_patience = lr_patience
         self.patience = patience

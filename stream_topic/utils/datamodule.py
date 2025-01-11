@@ -111,6 +111,20 @@ class TMDataModule(pl.LightningDataModule):
             **self.dataloader_kwargs,
         )
 
+    def predict_dataloader(self):
+        """
+        Returns the predict dataloader for the complete training dataset.
+
+        Returns:
+            DataLoader: DataLoader instance for the training dataset.
+        """
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            **self.dataloader_kwargs,
+        )
+
     def val_dataloader(self):
         """
         Returns the validation dataloader.
