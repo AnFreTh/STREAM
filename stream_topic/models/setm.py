@@ -542,37 +542,61 @@ class StructuralETM(BaseModel):
 
     def plot(self):
         """
-        Visualize predictions (mu and var) for each feature.
+        Visualize predictions (mu and var) for each feature and output class.
 
-        This method generates a plot for each feature, showing the predicted mean (mu)
-        and variance (var).
+        This method generates plots for each feature, showing the predicted mean (mu)
+        and variance (var) across all output classes.
 
         Returns
         -------
         None
         """
-        # Get predictions from the trainer
-        mu, var = self.model.model.plotting_preds(self.data_module)
+        # Get predictions from the model
+        mu, var, feature_vals = self.model.model.plotting_preds(self.data_module)
 
-        # Iterate over features to create plots
-        num_features = mu.shape[1]  # Assuming shape (n_samples, n_features)
+        num_features = len(mu)  # Number of features
+        num_classes = mu[0].shape[1]  # Number of output classes (assuming shape (N, K))
+
         for feature_idx in range(num_features):
-            plt.figure(figsize=(8, 6))
-            plt.title(f"Feature {feature_idx + 1} Predictions")
-            plt.xlabel("Sample Index")
-            plt.ylabel("Value")
-
-            # Plot mu and var for the feature
-            plt.plot(mu[:, feature_idx], label="Mu (Mean)", color="blue")
-            plt.fill_between(
-                range(len(mu[:, feature_idx])),
-                mu[:, feature_idx] - var[:, feature_idx],
-                mu[:, feature_idx] + var[:, feature_idx],
-                color="blue",
-                alpha=0.3,
-                label="Variance (Confidence Interval)",
+            feature_name = (
+                f"Feature {feature_idx + 1}"  # Customize if feature names are available
             )
+            feature_values = feature_vals[feature_idx]  # Feature input values (N, 1)
 
-            # Add legend and show plot
-            plt.legend()
-            plt.show()
+            for class_idx in range(num_classes):
+                plt.figure(figsize=(10, 6))
+                plt.title(f"{feature_name} Effect on Output Class {class_idx + 1}")
+                plt.xlabel("Feature Value")
+                plt.ylabel("Prediction")
+
+                # Extract mu and var for the current feature and class
+                mu_values = mu[feature_idx][:, class_idx]  # Mean predictions (N,)
+                var_values = var[feature_idx][:, class_idx]  # Variance predictions (N,)
+
+                # Sort by feature values for better visualization
+                sorted_indices = feature_values[:, 0].argsort()
+                sorted_feature_values = feature_values[sorted_indices]
+                sorted_mu_values = mu_values[sorted_indices]
+                sorted_var_values = var_values[sorted_indices]
+
+                # Plot mu and variance as a confidence interval
+                plt.plot(
+                    sorted_feature_values,
+                    sorted_mu_values,
+                    label="Mean Prediction (Mu)",
+                    color="blue",
+                    linewidth=2,
+                )
+                plt.fill_between(
+                    sorted_feature_values.squeeze(),
+                    sorted_mu_values - sorted_var_values,
+                    sorted_mu_values + sorted_var_values,
+                    color="blue",
+                    alpha=0.2,
+                    label="Variance (Confidence Interval)",
+                )
+
+                # Add legend, grid, and show plot
+                plt.legend()
+                plt.grid(True, linestyle="--", alpha=0.7)
+                plt.show()

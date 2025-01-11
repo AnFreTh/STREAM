@@ -248,15 +248,16 @@ class StructuralETMBase(nn.Module):
 
         Parameters
         ----------
-        model : LightningModule
-            The PyTorch Lightning model.
         datamodule : LightningDataModule
             The PyTorch Lightning datamodule.
 
         Returns
         -------
-        tuple of np.ndarray
-            All predictions (mu, var) for the dataset.
+        tuple of lists of np.ndarray
+            Three lists:
+            - Feature outputs for mu
+            - Feature outputs for var
+            - Corresponding feature values from the input batch
         """
         # Prepare the datamodule (if required)
         datamodule.setup(stage="predict")
@@ -267,24 +268,48 @@ class StructuralETMBase(nn.Module):
         # Put the model in evaluation mode
         self.eval()
 
-        all_mu = []
-        all_var = []
+        all_mu = []  # List to store mu predictions for each feature
+        all_var = []  # List to store var predictions for each feature
+        all_features = []  # List to store corresponding feature values for each feature
 
         with torch.no_grad():
             for batch in dataloader:
                 # Pass the batch through the model's prediction method
                 features = batch["features"]
-                preds = self.nam(features).squeeze()
-                half = int(preds.shape[1] / 2)
-                mu = preds[:, 0:half]
-                var = preds[:, half:]
+                feature_mu = []  # Temporary list for this batch's mu outputs
+                feature_var = []  # Temporary list for this batch's var outputs
+                batch_features = []  # Temporary list for this batch's feature inputs
 
-                # Collect predictions
-                all_mu.append(mu)
-                all_var.append(var)
+                for i, nn in enumerate(self.nam.feature_nns):
+                    feature_input = features[:, i : i + 1]  # Input for this feature_nn
+                    feature_output = nn(feature_input)  # Output of shape (N, K)
+                    half = feature_output.shape[1] // 2
+                    mu = feature_output[:, :half]  # Split for mu
+                    var = feature_output[:, half:]  # Split for var
 
-        # Concatenate all predictions into single tensors
-        all_mu = torch.cat(all_mu, dim=0).cpu().numpy()
-        all_var = torch.cat(all_var, dim=0).cpu().numpy()
+                    feature_mu.append(mu)
+                    feature_var.append(var)
+                    batch_features.append(feature_input)
 
-        return all_mu, all_var
+                # Append this batch's predictions and inputs to the main lists
+                all_mu.append(feature_mu)
+                all_var.append(feature_var)
+                all_features.append(batch_features)
+
+        # Combine all batches into three lists of outputs for mu, var, and features
+        feature_mu_outputs = [
+            torch.cat([batch_mu[i] for batch_mu in all_mu], dim=0).cpu().numpy()
+            for i in range(len(self.nam.feature_nns))
+        ]
+        feature_var_outputs = [
+            torch.cat([batch_var[i] for batch_var in all_var], dim=0).cpu().numpy()
+            for i in range(len(self.nam.feature_nns))
+        ]
+        feature_values = [
+            torch.cat([batch_features[i] for batch_features in all_features], dim=0)
+            .cpu()
+            .numpy()
+            for i in range(len(self.nam.feature_nns))
+        ]
+
+        return feature_mu_outputs, feature_var_outputs, feature_values

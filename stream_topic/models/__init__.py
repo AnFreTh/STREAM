@@ -14,6 +14,8 @@ from .ctmneg import CTMNeg
 from .tntm import TNTM
 from .nmf import NMFTM
 from .nstm import NSTM
+from .setm import StructuralETM
+from .sctm import StructuralCTM
 
 __all__ = [
     "BERTopicTM",
@@ -32,4 +34,6 @@ __all__ = [
     "TNTM",
     "NMFTM",
     "NSTM",
+    "StructuralETM",
+    "StructuralCTM",
 ]
