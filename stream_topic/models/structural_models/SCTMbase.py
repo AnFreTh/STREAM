@@ -9,7 +9,7 @@ from typing import List
 
 class StructuralCTMBase(nn.Module):
     """
-    StructuralCTMBase is a neural network-based topic modeling class that supports both ProdLDA and LDA models.
+    StructuralCTMBase is a neural network-based topic modeling class that supports both ProdLDA and LDA models and uses a NAM to model theta.
 
     Parameters
     ----------
@@ -92,7 +92,9 @@ class StructuralCTMBase(nn.Module):
         hidden_dropout: float = 0.1,
         hidden_units: List[int] = [128, 128, 64],
         rescale_loss=False,
-        rescale_factor=1e-2,
+        rescale_factor: float = 1e-2,
+        beta_dependence_on_covariates: bool = False,
+        dirichlet_alpha: float = 0.1,
     ):
         super().__init__()
 
@@ -150,8 +152,11 @@ class StructuralCTMBase(nn.Module):
 
         self.theta_drop = nn.Dropout(dropout)
 
-        self.beta = nn.Parameter(torch.empty(n_topics, self.vocab_size))
-        nn.init.xavier_uniform_(self.beta)
+        # Dirichlet initialization for beta
+        dirichlet_samples = torch.distributions.Dirichlet(
+            torch.ones(self.vocab_size) * dirichlet_alpha
+        ).sample((n_topics,))
+        self.beta = nn.Parameter(dirichlet_samples)
 
         self.nam = NeuralAdditiveModel(
             input_size=dataset.features.shape[1],
@@ -163,16 +168,45 @@ class StructuralCTMBase(nn.Module):
             out_activation=None,
         )
 
-    def get_beta(self):
+        if beta_dependence_on_covariates:
+            self.beta_nam = NeuralAdditiveModel(
+                input_size=dataset.features.shape[1],
+                output_size=n_topics * self.vocab_size,
+                hidden_units=hidden_units,
+                feature_dropout=feature_dropout,
+                hidden_dropout=hidden_dropout,
+                activation="ReLU",
+                out_activation=None,
+            )
+            self.beta_dependence_on_covariates = True
+        else:
+            self.beta_dependence_on_covariates = False
+
+    def get_beta(self, covariates=None):
         """
-        Returns the beta parameter.
+        Returns the beta parameter. If covariate dependence is enabled,
+        computes beta based on covariates.
+
+        Parameters
+        ----------
+        covariates : torch.Tensor, optional
+            Covariates to condition beta on, by default None.
 
         Returns
         -------
         torch.Tensor
             The beta parameter.
         """
-        return self.beta  # .weight.T
+        if self.beta_dependence_on_covariates and covariates is not None:
+            # Compute covariate-dependent beta using NAM
+            beta_adjustments = self.beta_nam(covariates).view(
+                self.n_topics, self.vocab_size
+            )
+            beta = self.beta + beta_adjustments
+        else:
+            beta = self.beta
+
+        return F.softmax(self.beta_batchnorm(beta), dim=1)
 
     def get_theta(self, x, only_theta=False):
         """
@@ -247,15 +281,15 @@ class StructuralCTMBase(nn.Module):
 
         theta, mu, logvar = self.get_theta(x)
 
+        if self.beta_dependence_on_covariates:
+            beta = self.get_beta(covariates=x["features"])
+        else:
+            beta = self.get_beta()
+
         # prodLDA vs LDA
         if self.model_type == "ProdLDA":
-            # in: batch_size x input_size x n_components
-            word_dist = F.softmax(
-                self.beta_batchnorm(torch.matmul(theta, self.beta)), dim=1
-            )
+            word_dist = F.softmax(torch.matmul(theta, beta), dim=1)
         elif self.model_type == "LDA":
-            # simplex constrain on Beta
-            beta = F.softmax(self.beta_batchnorm(self.beta), dim=1)
             word_dist = torch.matmul(theta, beta)
 
         return word_dist, mu, logvar
