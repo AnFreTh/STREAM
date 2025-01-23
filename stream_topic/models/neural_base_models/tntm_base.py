@@ -10,54 +10,58 @@ from .ctm_base import CTMBase
 
 class TNTMBase(CTMBase):
 
-    #@override
+    # @override
     def __init__(
-            self,
-            dataset,
-            mus_init : torch.Tensor,
-            L_lower_init: torch.Tensor,
-            log_diag_init: torch.Tensor,
-            word_embeddings_projected: torch.Tensor,
-            n_topics: int = 50,
-            encoder_dim: int = 128,
-            inference_type="zeroshot",
-            dropout: float = 0.1,
-            inference_activation = nn.Softplus(),
-            n_layers_inference_network: int = 1,
+        self,
+        dataset,
+        mus_init: torch.Tensor,
+        L_lower_init: torch.Tensor,
+        log_diag_init: torch.Tensor,
+        word_embeddings_projected: torch.Tensor,
+        n_topics: int = 50,
+        encoder_dim: int = 128,
+        inference_type="zeroshot",
+        dropout: float = 0.1,
+        inference_activation=nn.Softplus(),
+        n_layers_inference_network: int = 1,
     ):
         """
-            Initialize the topic model parameters.
+        Initialize the topic model parameters.
 
-            Parameters
-            ----------
-            dataset : object
-                The dataset containing bag-of-words (BoW) and embeddings.
-            mus_init : torch.Tensor
-                Initial value for the topic means. Shape: (n_topics, vocab_size).
-            L_lower_init : torch.Tensor
-                Initial value for the lower triangular matrix. Shape: (n_topics, vocab_size, vocab_size).
-            log_diag_init : torch.Tensor
-                Initial value for the diagonal of the covariance matrix (log of the diagonal). Shape: (n_topics, vocab_size).
-            word_embeddings_projected : torch.Tensor
-                Projected word embeddings. Shape: (vocab_size, encoder_dim).
-            n_topics : int, optional
-                Number of topics, by default 50.
-            encoder_dim : int, optional
-                Dimension of the encoder, by default 200.
-            inference_type : str, optional
-                Type of inference, either "combined", "zeroshot", or "avitm". By default "zeroshot".
-            dropout : float, optional
-                Dropout rate, by default 0.1.
-            inference_activation : nn.Module, optional
-                Activation function for inference, by default nn.Softplus().
-            n_layers_inference_network : int, optional
-                Number of layers in the inference network, by default 3.
+        Parameters
+        ----------
+        dataset : object
+            The dataset containing bag-of-words (BoW) and embeddings.
+        mus_init : torch.Tensor
+            Initial value for the topic means. Shape: (n_topics, vocab_size).
+        L_lower_init : torch.Tensor
+            Initial value for the lower triangular matrix. Shape: (n_topics, vocab_size, vocab_size).
+        log_diag_init : torch.Tensor
+            Initial value for the diagonal of the covariance matrix (log of the diagonal). Shape: (n_topics, vocab_size).
+        word_embeddings_projected : torch.Tensor
+            Projected word embeddings. Shape: (vocab_size, encoder_dim).
+        n_topics : int, optional
+            Number of topics, by default 50.
+        encoder_dim : int, optional
+            Dimension of the encoder, by default 200.
+        inference_type : str, optional
+            Type of inference, either "combined", "zeroshot", or "avitm". By default "zeroshot".
+        dropout : float, optional
+            Dropout rate, by default 0.1.
+        inference_activation : nn.Module, optional
+            Activation function for inference, by default nn.Softplus().
+        n_layers_inference_network : int, optional
+            Number of layers in the inference network, by default 3.
         """
-        super().__init__(dataset = dataset, n_topics = n_topics, encoder_dim = encoder_dim, dropout = dropout)
+        super().__init__(
+            dataset=dataset, n_topics=n_topics, encoder_dim=encoder_dim, dropout=dropout
+        )
 
-        self.mus = nn.Parameter(mus_init)   #create topic means as learnable paramter
-        self.L_lower = nn.Parameter(L_lower_init)   # factor of covariance per topic
-        self.log_diag = nn.Parameter(log_diag_init)  # summand for diagonal of covariance
+        self.mus = nn.Parameter(mus_init)  # create topic means as learnable paramter
+        self.L_lower = nn.Parameter(L_lower_init)  # factor of covariance per topic
+        self.log_diag = nn.Parameter(
+            log_diag_init
+        )  # summand for diagonal of covariance
         self.word_embeddings_projected = torch.tensor(word_embeddings_projected)
 
         emb_dim = word_embeddings_projected.shape[1]
@@ -69,10 +73,23 @@ class TNTMBase(CTMBase):
         self.inference_type = inference_type
         self.dropout = dropout
 
-        assert self.mus.shape == (n_topics, emb_dim), f"Shape of mus is {self.mus.shape} but expected {(n_topics, emb_dim)}"
-        assert self.L_lower.shape == (n_topics, emb_dim, emb_dim), f"Shape of L_lower is {self.L_lower.shape} but expected {(n_topics, emb_dim, emb_dim)}"
-        assert self.log_diag.shape == (n_topics, emb_dim), f"Shape of log_diag is {self.log_diag.shape} but expected {(n_topics, emb_dim)}"
-        assert word_embeddings_projected.shape == (self.vocab_size, emb_dim), f"Shape of word_embeddings_projected is {word_embeddings_projected.shape} but expected {(self.vocab_size, emb_dim)}"
+        assert self.mus.shape == (
+            n_topics,
+            emb_dim,
+        ), f"Shape of mus is {self.mus.shape} but expected {(n_topics, emb_dim)}"
+        assert self.L_lower.shape == (
+            n_topics,
+            emb_dim,
+            emb_dim,
+        ), f"Shape of L_lower is {self.L_lower.shape} but expected {(n_topics, emb_dim, emb_dim)}"
+        assert self.log_diag.shape == (
+            n_topics,
+            emb_dim,
+        ), f"Shape of log_diag is {self.log_diag.shape} but expected {(n_topics, emb_dim)}"
+        assert word_embeddings_projected.shape == (
+            self.vocab_size,
+            emb_dim,
+        ), f"Shape of word_embeddings_projected is {word_embeddings_projected.shape} but expected {(self.vocab_size, emb_dim)}"
 
         contextual_embed_size = dataset.embeddings.shape[1]
 
@@ -92,7 +109,7 @@ class TNTMBase(CTMBase):
             input_size=self.vocab_size,
             bert_size=contextual_embed_size,
             output_size=n_topics,
-            hidden_sizes=[encoder_dim]*n_layers_inference_network,
+            hidden_sizes=[encoder_dim] * n_layers_inference_network,
             activation=inference_activation,
             dropout=dropout,
             inference_type=inference_type,
@@ -105,7 +122,10 @@ class TNTMBase(CTMBase):
 
         diag = torch.exp(self.log_diag)
 
-        normal_dis_lis = [LowRankMultivariateNormal(mu, cov_factor= lower, cov_diag = D) for mu, lower, D in zip(self.mus, self.L_lower, diag)]
+        normal_dis_lis = [
+            LowRankMultivariateNormal(mu, cov_factor=lower, cov_diag=D)
+            for mu, lower, D in zip(self.mus, self.L_lower, diag)
+        ]
         log_probs = torch.zeros(self.n_topics, self.vocab_size)
 
         for i, dis in enumerate(normal_dis_lis):
@@ -119,7 +139,8 @@ class TNTMBase(CTMBase):
 
         log_beta = self.calc_log_beta()
         return torch.exp(log_beta)
-    #@override
+
+    # @override
     def forward(self, x):
         """
         Forward pass through the network.
@@ -142,16 +163,17 @@ class TNTMBase(CTMBase):
 
         log_beta = self.calc_log_beta()
 
-
-
         # prodLDA vs LDA
         # use numerical trick to compute log(beta @ theta )
-        log_theta = torch.nn.LogSoftmax(dim=-1)(theta)        #calculate log theta = log_softmax(theta_hat)
-        A = log_beta + log_theta.unsqueeze(-1)               #calculate (log (beta @ theta))[i] = (log (exp(log_beta) @ exp(log_theta)))[i] = log(\sum_k exp (log_beta[i,k] + log_theta[k]))
-        log_recon = torch.logsumexp(A, dim = 1)
+        log_theta = torch.nn.LogSoftmax(dim=-1)(
+            theta
+        )  # calculate log theta = log_softmax(theta_hat)
+        A = log_beta + log_theta.unsqueeze(
+            -1
+        )  # calculate (log (beta @ theta))[i] = (log (exp(log_beta) @ exp(log_theta)))[i] = log(\sum_k exp (log_beta[i,k] + log_theta[k]))
+        log_recon = torch.logsumexp(A, dim=1)
 
         return log_recon, posterior_mean, posterior_logvar
-
 
     def loss_function(self, x_bow, log_recon, posterior_mean, posterior_logvar):
         """
@@ -173,13 +195,13 @@ class TNTMBase(CTMBase):
         torch.Tensor
             The computed loss.
         """
-         #Negative log-likelihood:  - (u^d)^T @ log(beta @ \theta^d)
+        # Negative log-likelihood:  - (u^d)^T @ log(beta @ \theta^d)
         NL = -(x_bow * log_recon).sum(1)
 
         prior_mean = self.mu2
         prior_var = self.var2
 
-        #KLD between variational posterior p(\theta|d) and prior p(\theta)
+        # KLD between variational posterior p(\theta|d) and prior p(\theta)
         posterior_var = posterior_logvar.exp()
         prior_mean = prior_mean.expand_as(posterior_mean)
         prior_var = prior_var.expand_as(posterior_mean)
@@ -188,11 +210,12 @@ class TNTMBase(CTMBase):
         var_division = posterior_var / prior_var
 
         diff = posterior_mean - prior_mean
-        diff_term = diff*diff / prior_var
+        diff_term = diff * diff / prior_var
         logvar_division = prior_logvar - posterior_logvar
 
-
-        KLD = 0.5 * ( (var_division + diff_term + logvar_division).sum(1) - self.n_topics)
+        KLD = 0.5 * (
+            (var_division + diff_term + logvar_division).sum(1) - self.n_topics
+        )
 
         loss = (NL + KLD).mean()
         return loss
@@ -211,14 +234,7 @@ class TNTMBase(CTMBase):
         torch.Tensor
             The computed loss.
         """
-        x_bow = x['bow']
+        x_bow = x["bow"]
         log_recon, posterior_mean, posterior_logvar = self.forward(x)
         loss = self.loss_function(x_bow, log_recon, posterior_mean, posterior_logvar)
         return loss
-
-
-
-
-
-
-
