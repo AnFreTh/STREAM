@@ -54,6 +54,7 @@ extras_require = {
     "plotting": ["dash", "plotly", "matplotlib", "wordcloud"],
     "bertopic": ["hdbscan"],
     "dcte": ["pyarrow", "setfit"],
+    "experimental": ["openai"],
 }
 
 
