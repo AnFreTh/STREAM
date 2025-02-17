@@ -621,7 +621,9 @@ class TMDataset(Dataset, DataDownloader):
         """
         self.features = self.dataframe
         # Drop the columns "text" and "tokens" if they exist
-        self.features = self.features.drop(columns=["text", "tokens"], errors="ignore")
+        self.features = self.features.drop(
+            columns=["text", "tokens", "labels"], errors="ignore"
+        )
 
         # Separate numeric and categorical columns
         numeric_columns = self.features.select_dtypes(
