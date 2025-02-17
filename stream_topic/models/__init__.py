@@ -16,6 +16,7 @@ from .nmf import NMFTM
 from .nstm import NSTM
 from .setm import StructuralETM
 from .sctm import StructuralCTM
+from .snlda import StructuralNLDA
 
 __all__ = [
     "BERTopicTM",
@@ -36,4 +37,5 @@ __all__ = [
     "NSTM",
     "StructuralETM",
     "StructuralCTM",
+    "StructuralNLDA",
 ]

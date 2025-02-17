@@ -8,6 +8,7 @@ from torch.distributions import Normal, Dirichlet
 
 
 class StructuralNeuralLDABase(nn.Module):
+
     def __init__(
         self,
         dataset,
@@ -47,7 +48,7 @@ class StructuralNeuralLDABase(nn.Module):
 
         if theta_dependence_on_covariates:
             self.theta_nam = NeuralAdditiveModel(
-                input_size=dataset.featurs.shape[1],
+                input_size=dataset.features.shape[1],
                 output_size=2 * n_topics,
                 hidden_units=hidden_units_theta,
                 feature_dropout=dropout,

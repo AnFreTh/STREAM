@@ -1,55 +1,42 @@
-from .structural_models.SCTMbase import StructuralCTMBase
-import numpy as np
-from loguru import logger
 from datetime import datetime
+
+import lightning as pl
+import numpy as np
+import torch
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
+from optuna.integration import PyTorchLightningPruningCallback
+import torch.nn as nn
+from loguru import logger
+
+from ..commons.check_steps import check_dataset_steps
+from ..utils.datamodule import TMDataModule
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.structural_neural_basemodel import (
     StructuralNeuralBaseModel,
 )
-import lightning as pl
-import torch
-from ..utils.datamodule import TMDataModule
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
-import torch.nn as nn
-from optuna.integration import PyTorchLightningPruningCallback
-from ..commons.check_steps import check_dataset_steps
-from .abstract_helper_models.mixins import SentenceEncodingMixin
-import matplotlib.pyplot as plt
+from .structural_models.SNLDAbase import StructuralNeuralLDABase
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-MODEL_NAME = "StructuralCTM"
+MODEL_NAME = "SNLDA"
 # logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
-EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 
 
-class StructuralCTM(BaseModel, SentenceEncodingMixin):
+class StructuralNLDA(BaseModel):
     """
-    CTM (Combined Topic Model) class.
+    NeuralLDA model class.
 
-    This class initializes and configures the CTM model with the specified
+    This class initializes and configures the NeuralLDA model with the specified
     hyperparameters and dataset. It inherits from the `BaseModel` class.
 
     Parameters
     ----------
-    embedding_model_name : str, optional
-        Name of the embedding model, by default EMBEDDING_MODEL_NAME.
-    embeddings_folder_path : str, optional
-        Path to the folder containing embeddings, by default None.
-    embeddings_file_path : str, optional
-        Path to the file containing embeddings, by default None.
-    save_embeddings : bool, optional
-        Whether to save embeddings after training, by default False.
     encoder_dim : int, optional
         Dimensionality of the encoder layer, by default 128.
     dropout : float, optional
         Dropout rate for the layers, by default 0.1.
-    inference_type : str, optional
-        Type of inference to use, by default "combined".
     inference_activation : callable, optional
         Activation function for the inference, by default `nn.Softplus()`.
-    model_type : str, optional
-        Type of the model, by default "ProdLDA".
     rescale_loss : bool, optional
         Whether to rescale the loss, by default False.
     rescale_factor : float, optional
@@ -62,78 +49,44 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         Whether to shuffle the dataset before splitting, by default True.
     random_state : int, optional
         Random seed for shuffling and splitting the dataset, by default 42.
+    **kwargs : dict
+        Additional keyword arguments to pass to the parent class constructor.
 
     Attributes
     ----------
-    embedding_model_name : str
-        Name of the embedding model used.
-    embeddings_path : str or None
-        Path to the folder containing embeddings.
-    embeddings_file_path : str or None
-        Path to the file containing embeddings.
-    save_embeddings : bool
-        Flag indicating whether to save embeddings after training.
-    n_topics : int or None
-        Number of topics in the model, by default None.
     _status : TrainingStatus
         Current training status of the model, by default `TrainingStatus.NOT_STARTED`.
     hparams : dict
         Hyperparameters for the data module, including batch size, validation size,
         shuffling, and random state.
-    embeddings_prepared : bool
-        Flag indicating whether embeddings have been prepared, by default False.
     optimize : bool
         Flag indicating whether to optimize the model, by default False.
+    n_topics : int
+        Number of topics to extract.
 
-    Examples
-    --------
-    >>> ctm = CTM(embedding_model_name='bert', encoder_dim=200, dropout=0.2, batch_size=32)
-    >>> print(ctm.hparams)
-    {'datamodule_args': {'batch_size': 32, 'val_size': 0.2, 'shuffle': True, 'random_state': 42,
-                         'embeddings': True, 'bow': True, 'tf_idf': False, 'word_embeddings': False}}
     """
 
     def __init__(
         self,
-        embedding_model_name: str = EMBEDDING_MODEL_NAME,
-        embeddings_folder_path: str = None,
-        embeddings_file_path: str = None,
-        save_embeddings: bool = False,
-        encoder_dim=64,
+        encoder_dim=128,
         dropout=0.1,
-        inference_type="combined",
         inference_activation=nn.Softplus(),
-        model_type="ProdLDA",
-        rescale_loss=False,
-        rescale_factor=1e-2,
         batch_size=64,
         val_size=0.2,
         shuffle=True,
         random_state=42,
     ):
         """
-        Initialize the CTM model.
+        Initialize the NeuralLDA model.
 
         Parameters
         ----------
-        embedding_model_name : str, optional
-            Name of the embedding model, by default EMBEDDING_MODEL_NAME.
-        embeddings_folder_path : str, optional
-            Path to the folder containing embeddings, by default None.
-        embeddings_file_path : str, optional
-            Path to the file containing embeddings, by default None.
-        save_embeddings : bool, optional
-            Whether to save embeddings after training, by default False.
         encoder_dim : int, optional
             Dimensionality of the encoder layer, by default 128.
         dropout : float, optional
             Dropout rate for the layers, by default 0.1.
-        inference_type : str, optional
-            Type of inference to use, by default "combined".
         inference_activation : callable, optional
             Activation function for the inference, by default `nn.Softplus()`.
-        model_type : str, optional
-            Type of the model, by default "ProdLDA".
         rescale_loss : bool, optional
             Whether to rescale the loss, by default False.
         rescale_factor : float, optional
@@ -146,34 +99,21 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
             Whether to shuffle the dataset before splitting, by default True.
         random_state : int, optional
             Random seed for shuffling and splitting the dataset, by default 42.
+        **kwargs : dict
+            Additional keyword arguments to pass to the parent class constructor.
         """
+
         super().__init__(
             use_pretrained_embeddings=False,
             dropout=dropout,
-            inference_type=inference_type,
             encoder_dim=encoder_dim,
             inference_activation=inference_activation,
-            model_type=model_type,
-            rescale_loss=rescale_loss,
-            rescale_factor=rescale_factor,
         )
         self.save_hyperparameters(
             ignore=[
-                "embeddings_file_path",
-                "embeddings_folder_path",
                 "random_state",
-                "save_embeddings",
             ]
         )
-
-        self.embedding_model_name = self.hparams.get(
-            "embedding_model_name", embedding_model_name
-        )
-
-        self.embeddings_path = embeddings_folder_path
-        self.embeddings_file_path = embeddings_file_path
-        self.save_embeddings = save_embeddings
-        self.n_topics = None
 
         self._status = TrainingStatus.NOT_STARTED
 
@@ -182,15 +122,14 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
             "val_size": val_size,
             "shuffle": shuffle,
             "random_state": random_state,
-            "embeddings": True,
+            "embeddings": False,
             "bow": True,
             "tf_idf": False,
             "word_embeddings": False,
-            "embedding_model_name": self.embedding_model_name,
         }
 
-        self.embeddings_prepared = False
         self.optimize = False
+        self.n_topics = None
 
     def get_info(self):
         """
@@ -231,7 +170,7 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         """
 
         self.model = StructuralNeuralBaseModel(
-            model_class=StructuralCTMBase,
+            model_class=StructuralNeuralLDABase,
             dataset=self.dataset,
             **{
                 k: v
@@ -313,7 +252,6 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         """
 
         logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
-        dataset.preprocess_features()
         self.data_module = TMDataModule(
             batch_size=self.hparams["datamodule_args"]["batch_size"],
             shuffle=self.hparams["datamodule_args"]["shuffle"],
@@ -354,7 +292,7 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         **kwargs,
     ):
         """
-        Fits the CTM (Combined TM) topic model to the given dataset.
+        Fits the NeuralLDA topic model to the given dataset.
 
         Parameters
         ----------
@@ -402,7 +340,7 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
 
         Examples
         --------
-        >>> model = CTM()
+        >>> model = NeuralLDA()
         >>> dataset = TMDataset(...)
         >>> model.fit(dataset, n_topics=20, val_size=0.2, lr=1e-04)
         """
@@ -413,9 +351,9 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         ), "The dataset must be an instance of TMDataset."
 
         check_dataset_steps(dataset, logger, MODEL_NAME)
+        self.dataset = dataset
 
         self.n_topics = n_topics
-        self.dataset = dataset
 
         self.hparams.update(
             {
@@ -439,12 +377,8 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         )
 
         try:
+
             self._status = TrainingStatus.INITIALIZED
-
-            if not self.embeddings_prepared:
-                dataset, embeddings = self.prepare_embeddings(dataset, logger)
-                self.embeddings_prepared = True
-
             self._initialize_datamodule(dataset=dataset)
 
             self._initialize_model()
@@ -475,13 +409,13 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         if self.n_topics <= 0:
             raise ValueError("Number of topics must be greater than 0.")
 
+        self._status = TrainingStatus.INITIALIZED
+
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
         data = {
-            "embedding": torch.tensor(dataset.embeddings),
             "bow": torch.tensor(dataset.bow),
-            "features": torch.tensor(dataset.features),
         }
 
         self.theta = (
@@ -524,10 +458,10 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
 
     def suggest_hyperparameters(self, trial, max_topics=100):
         """
-        Suggests hyperparameters for the model using an Optuna trial.
+        Suggests hyperparameters for the model using Optuna trial.
 
-        This method uses an Optuna trial object to suggest a set of hyperparameters for the model.
-        The suggested hyperparameters are stored in the `hparams` dictionary of the model.
+        This method suggests a set of hyperparameters for the model using the Optuna trial object.
+        The suggested hyperparameters are then stored in the `hparams` dictionary of the model.
 
         Parameters
         ----------
@@ -543,26 +477,19 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
             - `n_topics`: Number of topics.
             - `encoder_dim`: Dimensionality of the encoder.
             - `dropout`: Dropout rate.
-            - `inference_type`: Type of inference to use.
             - `inference_activation`: Activation function for inference.
-            - `model_type`: Type of the model.
             - `datamodule_args.batch_size`: Batch size for training.
-        """
 
+        """
         self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)
         self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
         self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
-        self.hparams["inference_type"] = trial.suggest_categorical(
-            "inference_type", ["combined", "zeroshot"]
-        )
-        self.hparams["lr"] = trial.suggest_float("lr", 1e-5, 1e-2)
-        self.hparams["weight_decay"] = trial.suggest_float("weight_decay", 1e-7, 1e-3)
+
         self.hparams["inference_activation"] = trial.suggest_categorical(
             "inference_activation", ["Softplus", "ReLU", "LeakyReLU", "Tanh"]
         )
-        self.hparams["model_type"] = trial.suggest_categorical(
-            "model_type", ["ProdLDA", "LDA"]
-        )
+        self.hparams["lr"] = trial.suggest_float("lr", 1e-5, 1e-2)
+        self.hparams["weight_decay"] = trial.suggest_float("weight_decay", 1e-7, 1e-3)
 
         # Map string to actual PyTorch activation function
         activation_mapping = {
@@ -621,65 +548,3 @@ class StructuralCTM(BaseModel, SentenceEncodingMixin):
         )
 
         return best_params
-
-    def plot(self):
-        """
-        Visualize predictions (mu and var) for each feature and output class.
-
-        This method generates plots for each feature, showing the predicted mean (mu)
-        and variance (var) across all output classes.
-
-        Returns
-        -------
-        None
-        """
-        # Get predictions from the model
-        mu, var, feature_vals = self.model.model.plotting_preds(self.data_module)
-        print(len(mu))
-
-        num_features = len(mu)  # Number of features
-        num_classes = mu[0].shape[1]  # Number of output classes (assuming shape (N, K))
-
-        for feature_idx in range(num_features):
-            feature_name = (
-                f"Feature {feature_idx + 1}"  # Customize if feature names are available
-            )
-            feature_values = feature_vals[feature_idx]  # Feature input values (N, 1)
-
-            for class_idx in range(num_classes):
-                plt.figure(figsize=(10, 6))
-                plt.title(f"{feature_name} Effect on Output Class {class_idx + 1}")
-                plt.xlabel("Feature Value")
-                plt.ylabel("Prediction")
-
-                # Extract mu and var for the current feature and class
-                mu_values = mu[feature_idx][:, class_idx]  # Mean predictions (N,)
-                var_values = var[feature_idx][:, class_idx]  # Variance predictions (N,)
-
-                # Sort by feature values for better visualization
-                sorted_indices = feature_values[:, 0].argsort()
-                sorted_feature_values = feature_values[sorted_indices]
-                sorted_mu_values = mu_values[sorted_indices]
-                sorted_var_values = var_values[sorted_indices]
-
-                # Plot mu and variance as a confidence interval
-                plt.plot(
-                    sorted_feature_values,
-                    sorted_mu_values,
-                    label="Mean Prediction (Mu)",
-                    color="blue",
-                    linewidth=2,
-                )
-                plt.fill_between(
-                    sorted_feature_values.squeeze(),
-                    sorted_mu_values - sorted_var_values,
-                    sorted_mu_values + sorted_var_values,
-                    color="blue",
-                    alpha=0.2,
-                    label="Variance (Confidence Interval)",
-                )
-
-                # Add legend, grid, and show plot
-                plt.legend()
-                plt.grid(True, linestyle="--", alpha=0.7)
-                plt.show()

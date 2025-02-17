@@ -94,7 +94,7 @@ class StructuralCTMBase(nn.Module):
         rescale_loss=False,
         rescale_factor: float = 1e-2,
         beta_dependence_on_covariates: bool = False,
-        dirichlet_alpha: float = 0.1,
+        nam_model_variance: bool = False,
     ):
         super().__init__()
 
@@ -152,15 +152,18 @@ class StructuralCTMBase(nn.Module):
 
         self.theta_drop = nn.Dropout(dropout)
 
-        # Dirichlet initialization for beta
-        dirichlet_samples = torch.distributions.Dirichlet(
-            torch.ones(self.vocab_size) * dirichlet_alpha
-        ).sample((n_topics,))
-        self.beta = nn.Parameter(dirichlet_samples)
+        self.beta = nn.Parameter(torch.empty(n_topics, self.vocab_size))
+        nn.init.xavier_uniform_(self.beta)
+
+        self.nam_model_variance = nam_model_variance
+        if self.nam_model_variance:
+            output_size = 2 * n_topics
+        else:
+            output_size = n_topics
 
         self.nam = NeuralAdditiveModel(
             input_size=dataset.features.shape[1],
-            output_size=2 * n_topics,
+            output_size=output_size,
             hidden_units=hidden_units,
             feature_dropout=feature_dropout,
             hidden_dropout=hidden_dropout,
@@ -206,7 +209,7 @@ class StructuralCTMBase(nn.Module):
         else:
             beta = self.beta
 
-        return F.softmax(self.beta_batchnorm(beta), dim=1)
+        return beta
 
     def get_theta(self, x, only_theta=False):
         """
@@ -227,11 +230,14 @@ class StructuralCTMBase(nn.Module):
         features = x["features"]
         mu, sigma = self.inference_network(x)
         feature_preds = self.nam(features).squeeze()
-        half = int(mu.shape[1])
-        feature_mu = feature_preds[:, 0:half]
-        feature_var = feature_preds[:, half:]
-        mu += feature_mu
-        sigma += feature_var
+        if self.nam_model_variance:
+            half = int(mu.shape[1])
+            feature_mu = feature_preds[:, 0:half]
+            feature_var = feature_preds[:, half:]
+            mu += feature_mu
+            sigma += feature_var
+        else:
+            mu += feature_preds
         theta = F.softmax(self.reparameterize(mu, sigma), dim=1)
 
         theta = self.theta_drop(theta)
@@ -288,8 +294,13 @@ class StructuralCTMBase(nn.Module):
 
         # prodLDA vs LDA
         if self.model_type == "ProdLDA":
-            word_dist = F.softmax(torch.matmul(theta, beta), dim=1)
+            # in: batch_size x input_size x n_components
+            word_dist = F.softmax(
+                self.beta_batchnorm(torch.matmul(theta, self.beta)), dim=1
+            )
         elif self.model_type == "LDA":
+            # simplex constrain on Beta
+            beta = F.softmax(self.beta_batchnorm(self.beta), dim=1)
             word_dist = torch.matmul(theta, beta)
 
         return word_dist, mu, logvar
@@ -359,9 +370,9 @@ class StructuralCTMBase(nn.Module):
         Returns
         -------
         tuple of lists of np.ndarray
-            Three lists:
+            Two or three lists:
             - Feature outputs for mu
-            - Feature outputs for var
+            - (Optional) Feature outputs for var if self.nam_model_variance is True
             - Corresponding feature values from the input batch
         """
         # Prepare the datamodule (if required)
@@ -374,40 +385,44 @@ class StructuralCTMBase(nn.Module):
         self.eval()
 
         all_mu = []  # List to store mu predictions for each feature
-        all_var = []  # List to store var predictions for each feature
+        all_var = (
+            [] if self.nam_model_variance else None
+        )  # Store var predictions only if enabled
         all_features = []  # List to store corresponding feature values for each feature
 
         with torch.no_grad():
             for batch in dataloader:
-                # Pass the batch through the model's prediction method
                 features = batch["features"]
                 feature_mu = []  # Temporary list for this batch's mu outputs
-                feature_var = []  # Temporary list for this batch's var outputs
-                batch_features = []  # Temporary list for this batch's feature inputs
+                feature_var = (
+                    [] if self.nam_model_variance else None
+                )  # Temporary list for var outputs
+                batch_features = []  # Temporary list for feature inputs
 
                 for i, nn in enumerate(self.nam.feature_nns):
-                    feature_input = features[:, i : i + 1]  # Input for this feature_nn
-                    feature_output = nn(feature_input)  # Output of shape (N, K)
-                    half = feature_output.shape[1] // 2
-                    mu = feature_output[:, :half]  # Split for mu
-                    var = feature_output[:, half:]  # Split for var
+                    feature_input = features[:, i : i + 1]  # Extract single feature
+                    feature_output = nn(feature_input)  # Forward pass
 
-                    feature_mu.append(mu)
-                    feature_var.append(var)
+                    if self.nam_model_variance:
+                        half = feature_output.shape[1] // 2
+                        mu = feature_output[:, :half]  # First half for mu
+                        var = feature_output[:, half:]  # Second half for var
+
+                        feature_mu.append(mu)
+                        feature_var.append(var)
+                    else:
+                        feature_mu.append(feature_output)  # Only store mu
+
                     batch_features.append(feature_input)
 
-                # Append this batch's predictions and inputs to the main lists
                 all_mu.append(feature_mu)
-                all_var.append(feature_var)
+                if self.nam_model_variance:
+                    all_var.append(feature_var)
                 all_features.append(batch_features)
 
-        # Combine all batches into three lists of outputs for mu, var, and features
+        # Combine all batches into numpy arrays
         feature_mu_outputs = [
             torch.cat([batch_mu[i] for batch_mu in all_mu], dim=0).cpu().numpy()
-            for i in range(len(self.nam.feature_nns))
-        ]
-        feature_var_outputs = [
-            torch.cat([batch_var[i] for batch_var in all_var], dim=0).cpu().numpy()
             for i in range(len(self.nam.feature_nns))
         ]
         feature_values = [
@@ -417,4 +432,11 @@ class StructuralCTMBase(nn.Module):
             for i in range(len(self.nam.feature_nns))
         ]
 
-        return feature_mu_outputs, feature_var_outputs, feature_values
+        if self.nam_model_variance:
+            feature_var_outputs = [
+                torch.cat([batch_var[i] for batch_var in all_var], dim=0).cpu().numpy()
+                for i in range(len(self.nam.feature_nns))
+            ]
+            return feature_mu_outputs, feature_var_outputs, feature_values
+
+        return feature_mu_outputs, feature_values
