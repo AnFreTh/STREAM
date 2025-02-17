@@ -81,6 +81,35 @@ You can install STREAM directly from PyPI or from the GitHub repository:
     pip install git+https://github.com/AnFreTh/STREAM.git
     ```
 
+3. **Download necessary NLTK resources**:
+
+   To download all necessary NLTK resources required for some models, simply run:
+
+   ```python
+   import nltk
+
+   def ensure_nltk_resources():
+       resources = [
+           "stopwords",
+           "wordnet",
+           "punkt_tab",
+           "brown",
+           "averaged_perceptron_tagger"
+       ]
+       for resource in resources:
+           try:
+               nltk.data.find(resource)
+           except LookupError:
+               try:
+                   print(f"Downloading NLTK resource: {resource}")
+                   nltk.download(resource)
+               except Exception as e:
+                   print(f"Failed to download {resource}: {e}")
+
+   ensure_nltk_resources()
+   ```
+
+
 3. **Install requirements for add-ons**:
     To use STREAMS visualizations, simply run:
     ```bash
