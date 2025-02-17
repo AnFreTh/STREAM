@@ -42,6 +42,7 @@
   - [🔍 Hyperparameter optimization](#-hyperparameter-optimization)
   - [🖼️ Visualization](#️-visualization)
   - [📈 Downstream Tasks](#-downstream-tasks)
+  - [🧪 Experimental 🧪](#-experimental-)
   - [🤝 Contributing and Testing New Models](#-contributing-and-testing-new-models)
 - [📜 Citation](#-citation)
 - [📝 License](#-license)
@@ -124,6 +125,11 @@ You can install STREAM directly from PyPI or from the GitHub repository:
     For DCTE:
     ```bash
     pip install stream-topic[dcte]
+    ```
+
+    For the experimental features:
+    ```bash
+    pip install stream-topic[experimental]
     ```
 
 # 📦 Available Models
@@ -482,7 +488,46 @@ from stream_topic.visuals import plot_downstream_model
 plot_downstream_model(downstream_model)
 ```
 
+# 🧪 Experimental 🧪
+stream-topic.experimental includes several experimental topic representations as well as new stuff we want to try out.
 
+This includes, e.g. topic summarization:
+
+```python
+from stream_topic.experimental import stopic_summaries
+
+summaries = topic_summaries(topics, openai_key)
+for summary in summaries:
+    print(f"{summary} \n")
+
+```
+
+But also the possibility to generate a story from the created topics:
+
+```python
+from stream_topic.experimental import story_topic
+
+story = story_topic(topics[1], openai_key)
+print(story)
+
+```
+
+Lastly, it offers the possibility to visualize your topic in a way, a movie poster could be designed:
+
+```python
+from stream_topic.experimental import movie_poster
+
+topic = ["tiger", "lion", "cougar", "cat", "hippo", "chair", "apple", "meat", "poachers", "hyeena"]
+
+movie_poster(topic, openai_key, return_style="plot")
+
+```
+This is just one of many possible visualization, but we found that to be rather coherent in terms of truly visualizing the created topics.
+Feel free to contribute or rais issues fo further experimental ideas.
+
+<p align="center">
+    <img src="assets/movie_poster_topic1.png" alt="Figure Description" width="600"/>
+</p>
 
 ## 🤝 Contributing and Testing New Models
 
