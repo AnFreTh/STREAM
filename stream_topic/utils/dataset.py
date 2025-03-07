@@ -2,7 +2,8 @@ import os
 import pickle
 import re
 import jieba
-
+from pyhanlp import *
+import jieba.posseg as pseg
 import gensim.downloader as api
 import numpy as np
 import pandas as pd
@@ -245,8 +246,10 @@ class TMDataset(Dataset, DataDownloader):
             "preprocessing_steps": {
                 k: v
                 for k, v in preprocessor.__dict__.items()
-                if k not in ["stop_words", "language", "contractions_dict"]
+                if k not in ["stop_words", "language", "contractions_dict","cc"]
+                
             },
+            "opencc_config": 't2s.json',
         }
         info_path = os.path.join(save_dir, f"{dataset_name}_info.pkl")
         with open(info_path, "wb") as info_file:
@@ -254,7 +257,7 @@ class TMDataset(Dataset, DataDownloader):
         logger.info(f"Dataset info saved to {info_path}")
         # return preprocessor
 
-    def preprocess(self, model_type=None, custom_stopwords=None, min_word_length=None, **preprocessing_steps):
+    def preprocess(self, model_type=None, custom_stopwords=None, min_word_length=None, min_word_freq=None, **preprocessing_steps):
         """
         Preprocess the dataset.
 
@@ -298,9 +301,16 @@ class TMDataset(Dataset, DataDownloader):
         else:
             filtered_steps["custom_stopwords"] = []
 
+        def segment_hanlp(text):
+            seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
+            seg_result = seg.seg(text)
+            words = [term.word for term in seg_result]
+            return words
         # Only preprocess if there are steps that need to be applied
         if min_word_length is not None:
             preprocessing_steps['min_word_length'] = min_word_length
+        if min_word_freq is not None:
+            preprocessing_steps['min_word_freq'] = min_word_freq
         if filtered_steps:
             try:
                 preprocessor = TextPreprocessor(
@@ -312,7 +322,10 @@ class TMDataset(Dataset, DataDownloader):
                 self.dataframe["text"] = self.texts
                 if self.language == "chinese":        #添加部分
                     # 使用结巴分词进行分词
-                    self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+                    self.dataframe["tokens"]  = self.dataframe["text"].apply(lambda  x: [word for word, pos in pseg.cut(x)]) 
+                    # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+                    # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: segment_hanlp(x))
+                    # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: [char for word in x for char in word if char.strip()])
                 else:
                     self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
 

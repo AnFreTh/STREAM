@@ -4,6 +4,7 @@ from .intruder_metrics import INT, ISH, ISIM
 
 __all__ = [
     "NPMI",
+    "PMI",
     "Embedding_Coherence",
     "Embedding_Topic_Diversity",
     "Expressivity",

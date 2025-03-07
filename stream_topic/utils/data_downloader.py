@@ -7,7 +7,8 @@ import pandas as pd
 import requests
 from loguru import logger
 import jieba
-
+from pyhanlp import *
+import jieba.posseg as pseg
 PACKAGE_NAME = "stream_topic"
 
 
@@ -231,7 +232,12 @@ class DataDownloader:
         )
 
         return embedding_path
-
+    def segment_hanlp(self, text):
+        seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
+        seg_result = seg.seg(text)
+        words = [term.word for term in seg_result]
+        return words
+    
     def load_custom_dataset_from_folder(self, dataset_path):
         """
         Load a custom dataset from a folder.
@@ -262,7 +268,10 @@ class DataDownloader:
             )
             
             if self.language == "chinese":
-                self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+                self.dataframe["tokens"]  = self.dataframe["text"].apply(lambda  x: [word for word, pos in pseg.cut(x)]) 
+                # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+                # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: self.segment_hanlp(x))
+                # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: [char for word in x for char in word if char.strip()])
             else:
                 self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
@@ -415,6 +424,8 @@ class DataDownloader:
         self.dataframe = pd.read_parquet(load_path)
         if self.language == "chinese":
             self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+            # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: self.segment_hanlp(x))
+            # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: [char for word in x for char in word if char.strip()])
         else:
             self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()

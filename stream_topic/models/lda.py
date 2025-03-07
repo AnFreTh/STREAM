@@ -96,6 +96,8 @@ class LDA(BaseModel):
             return entry
         # Tokenize entries that are not tokenized
         dataset.dataframe["tokens"] = dataset.dataframe["tokens"].apply(tokenize)
+        # delete space after re-split
+        dataset.dataframe["tokens"] = dataset.dataframe["tokens"].apply(lambda tokens: [word for word in tokens if word != ' '])
 
         return dataset
 

@@ -11,8 +11,13 @@ from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
 import jieba
+import thulac
+import spacy_pkuseg as pkuseg
+from pyhanlp import *
 import pandas as pd
+import opencc
 
+import jieba.posseg as pseg
 
 class TextPreprocessor:
     """
@@ -99,6 +104,7 @@ class TextPreprocessor:
 
         if self.language == "chinese":                 
             self.stoplist = self.load_stopwords()    
+            self.cc = opencc.OpenCC('t2s.json')
         elif self.language != "en" and self.remove_stopwords:          
             self.stop_words = set(stopwords.words(self.language))
         else:                                                        
@@ -123,9 +129,27 @@ class TextPreprocessor:
     
     def segment_text(self, text):
         # tokenize and remove stopwords for Chinese text
-        words = list(jieba.cut(text))
-        filtered_words = [w for w in words if w not in self.stoplist['w'].tolist()]
+        # words = list(jieba.cut(text))
+        words_with_pos = pseg.cut(text)
+        words = [(word, pos) for word, pos in words_with_pos]
+        # words = list(jieba.cut_for_search(text))
+        # thu = thulac.thulac(seg_only=True)
+        # words = thu.cut(text, text=True).split()
+        # seg = pkuseg.pkuseg()
+        # words = seg.cut(text)
+        # seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
+        # seg_result = seg.seg(text)
+        # words = [term.word for term in seg_result]
+        stop_pos = {'r', 'c', 'u', 'y'}
+        filtered_words = [
+            word for word, pos in words
+            if pos not in stop_pos and word not in self.stoplist['w'].tolist() and word != ' '
+        ]
         return filtered_words
+    # def segment_text(self, text):
+    #     segmented_text = [char for word in text for char in word if char.strip()]
+    #     filtered_text = [char for char in segmented_text if char not in self.stoplist['w'].tolist()]
+    #     return filtered_text
     
     def _load_contractions(self):
         # Load a dictionary of contractions and their expansions
@@ -167,6 +191,9 @@ class TextPreprocessor:
         else:
             return re.sub(r'[^\u4e00-\u9fff\d]+', '', text)
 
+    def _is_traditional(self, text):
+            """ Simple check if the text contains traditional characters using regex"""
+            return bool(re.search(r'[\u4e00-\u9fff\u3400-\u4DBF\u20000-\u2A6DF\u2A700-\u2B73F]', text))
 
     def _remove_accents(self, text):                                      
         text = unicodedata.normalize("NFD", text)
@@ -246,6 +273,9 @@ class TextPreprocessor:
         else:
             text = text.strip()  
             
+            if self._is_traditional(text):
+                text = self.cc.convert(text)
+                
             if self.remove_html_tags:
                 text = self._remove_html_tags(text)
             if self.remove_special_chars:
@@ -323,12 +353,12 @@ class TextPreprocessor:
             Preprocessed text document.
 
         """
-        try:
-            language = self.detect_language(text)
-            if language != self.language:
-                return text
-        except LangDetectException:
-            pass
+        # try:
+        #     language = self.detect_language(text)
+        #     if language != self.language:
+        #         return text
+        # except LangDetectException:
+        #     pass
         return self._clean_text(text)                                   
 
     def preprocess_dataframe(self, df, text_column):

@@ -166,7 +166,8 @@ docs/_build/*
 examples/lightning_logs/
 *.ckpt
 # *.yaml
-
+STREAM/lightning_logs/
+/STREAM/lightning_logs/
 # Additional files and directories to ignore
 __pycache__/
 *.pyc

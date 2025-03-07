@@ -2,12 +2,37 @@ import numpy as np
 from loguru import logger
 from sklearn.feature_extraction.text import CountVectorizer
 import jieba
+import thulac
+import spacy_pkuseg as pkuseg
+from pyhanlp import *
+import jieba.posseg as pseg
 
 # 自定义的分词和去停用词函数
 def preprocess_text(text, stop_words): 
-    words = list(jieba.cut(text))
-    processed = [word for word in words if word not in stop_words]
+    if not text:
+        return "Empty text provided."
+    # words = list(jieba.cut(text))
+    words_with_pos = pseg.cut(text)
+    words = [(word, pos) for word, pos in words_with_pos]
+    # words = list(jieba.cut_for_search(text))
+    # thu = thulac.thulac(seg_only=True)
+    # words = thu.cut(text, text=True).split()
+    # seg = pkuseg.pkuseg()
+    # words = seg.cut(text)s
+    # seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
+    # seg_result = seg.seg(text)
+    # words = [term.word for term in seg_result]
+    stop_pos = {'r', 'c', 'u', 'y'}
+    processed = [
+            word for word, pos in words
+            if pos not in stop_pos and word not in stop_words 
+        ]
+    # processed = [word for word in words if word not in stop_words]
     return ' '.join(processed) if processed else "Documentation missing valid words."
+# def preprocess_text(text, stop_words):
+#     segmented_text = [char for word in text for char in word if char.strip()]
+#     processed = [char for char in segmented_text if char not in stop_words]
+#     return ' '.join(processed) if processed else "Documentation missing valid words."
 
 
 def c_tf_idf(documents, m, ngram_range=(1, 1), stop_words="english"):
@@ -25,6 +50,7 @@ def c_tf_idf(documents, m, ngram_range=(1, 1), stop_words="english"):
         # 预处理文档
         processed_documents = [preprocess_text(doc, stop_words) for doc in documents]
         count = CountVectorizer(ngram_range=ngram_range)
+        # count = CountVectorizer(ngram_range=ngram_range,tokenizer=lambda x: x.split(), lowercase=False)
         t = count.fit_transform(processed_documents).toarray()
         w = t.sum(axis=1)
     else:
