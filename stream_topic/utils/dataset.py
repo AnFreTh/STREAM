@@ -2,8 +2,6 @@ import os
 import pickle
 import re
 import jieba
-from pyhanlp import *
-import jieba.posseg as pseg
 import gensim.downloader as api
 import numpy as np
 import pandas as pd
@@ -224,7 +222,7 @@ class TMDataset(Dataset, DataDownloader):
 
         # Add additional columns from kwargs to the DataFrame
         additional_columns = {
-            key: value for key, value in kwargs.items() if key != "preprocessor"
+            key: value for key, value in kwargs.items() if key not in ["preprocessor", "remove_pos"]
         }
         additional_columns.update({"text": self.texts, "labels": self.labels})
         self.dataframe = pd.DataFrame(additional_columns)
@@ -246,7 +244,7 @@ class TMDataset(Dataset, DataDownloader):
             "preprocessing_steps": {
                 k: v
                 for k, v in preprocessor.__dict__.items()
-                if k not in ["stop_words", "language", "contractions_dict","cc"]
+                if k not in ["stop_words", "language", "contractions_dict","cc",'thu']
                 
             },
             "opencc_config": 't2s.json',
@@ -257,7 +255,8 @@ class TMDataset(Dataset, DataDownloader):
         logger.info(f"Dataset info saved to {info_path}")
         # return preprocessor
 
-    def preprocess(self, model_type=None, custom_stopwords=None, min_word_length=None, min_word_freq=None, **preprocessing_steps):
+    def preprocess(self, model_type=None, custom_stopwords=None, min_word_length=None, min_word_freq=None, 
+                   tool='jieba', custom_dict=None, remove_pos=None,**preprocessing_steps):
         """
         Preprocess the dataset.
 
@@ -282,7 +281,7 @@ class TMDataset(Dataset, DataDownloader):
         `texts` attribute and updated in the `dataframe["text"]` column.
         """
         if model_type:
-            preprocessing_steps = load_model_preprocessing_steps(model_type)
+            preprocessing_steps = load_model_preprocessing_steps(model_type, language=self.language)
         previous_steps = self.preprocessing_steps
 
         # Filter out steps that have already been applied
@@ -301,16 +300,18 @@ class TMDataset(Dataset, DataDownloader):
         else:
             filtered_steps["custom_stopwords"] = []
 
-        def segment_hanlp(text):
-            seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
-            seg_result = seg.seg(text)
-            words = [term.word for term in seg_result]
-            return words
         # Only preprocess if there are steps that need to be applied
         if min_word_length is not None:
             preprocessing_steps['min_word_length'] = min_word_length
         if min_word_freq is not None:
             preprocessing_steps['min_word_freq'] = min_word_freq
+        if tool is not None:
+            preprocessing_steps['segmentation_tool'] = tool
+        if tool is not None:
+            preprocessing_steps['segmentation_dict'] = custom_dict
+        if tool is not None:
+            preprocessing_steps['remove_pos'] = remove_pos
+            
         if filtered_steps:
             try:
                 preprocessor = TextPreprocessor(
@@ -320,14 +321,10 @@ class TMDataset(Dataset, DataDownloader):
                 )
                 self.texts = preprocessor.preprocess_documents(self.texts)
                 self.dataframe["text"] = self.texts
-                if self.language == "chinese":        #添加部分
-                    # 使用结巴分词进行分词
-                    self.dataframe["tokens"]  = self.dataframe["text"].apply(lambda  x: [word for word, pos in pseg.cut(x)]) 
-                    # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
-                    # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: segment_hanlp(x))
-                    # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: [char for word in x for char in word if char.strip()])
-                else:
-                    self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+                # if self.language == "chinese": 
+                #     self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
+                # else:
+                self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
 
                 self.info.update(
                     {
@@ -603,11 +600,12 @@ class TMDataset(Dataset, DataDownloader):
         if os.path.exists(model_name) and os.path.isdir(model_name):
             model_path = model_name
             model_name = os.path.basename(model_name)
+            print(model_name)
         assert model_name in [
             "glove-wiki-gigaword-100",
             "paraphrase-MiniLM-L3-v2",
-            "paraphrase-multilingual-mpnet-base-v2"
-        ], f"model name {model_name} not supported. Can be 'glove-wiki-gigaword-100', 'paraphrase-MiniLM-L3-v2' and 'paraphrase-multilingual-mpnet-base-v2'"
+            "Conan-embedding-v1"
+        ], f"model name {model_name} not supported. Can be 'glove-wiki-gigaword-100', 'paraphrase-MiniLM-L3-v2' and 'Conan-embedding-v1'"
 
         if vocab is None:
             vocabulary = self.get_vocabulary()
@@ -641,7 +639,7 @@ class TMDataset(Dataset, DataDownloader):
                 vocabulary
             ), "Embeddings and vocabulary length mismatch"
             
-        if model_name == "paraphrase-multilingual-mpnet-base-v2":
+        if model_name == "Conan-embedding-v1":
             model = SentenceTransformer(model_path)
             vocabulary = list(vocabulary)
             embeddings = model.encode(

@@ -12,7 +12,7 @@ from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
 import pandas as pd
-
+from joblib import parallel_backend
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "KmeansTM"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
@@ -116,6 +116,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self.n_topics = None
 
         self._status = TrainingStatus.NOT_STARTED
+        #only for Chinese
         self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
@@ -195,7 +196,10 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if self.stopwords_path is not None:
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
 
         self.n_topics = n_topics
@@ -206,7 +210,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self._status = TrainingStatus.INITIALIZED
         
         if self.stopwords_path is not None:
-            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
             stopwords_list = set(stopwords['w'])#.dropna()
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")

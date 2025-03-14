@@ -18,11 +18,13 @@ def get_top_tfidf_words_per_document(corpus, language="english", stopwords_path=
         list: A list of lists containing the top TF-IDF words for each document in the corpus.
     """
     if language == "chinese": #split for chinese corpus
-        stopwords = pd.read_csv(stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+        with open(stopwords_path, 'r', encoding='UTF-8') as f:
+            stop_words = [line.strip() for line in f]
+            stopwords = pd.DataFrame({'w': stop_words})
         stopwords_list = set(stopwords['w'])
         def chinese_tokenizer(text):
             words = jieba.cut(text)
-            return [word for word in words if word not in stopwords_list]
+            return [word for word in words if word not in stopwords_list and word != ' ']
         vectorizer = TfidfVectorizer(tokenizer=chinese_tokenizer)
         X = vectorizer.fit_transform(corpus)
         feature_names = vectorizer.get_feature_names_out()

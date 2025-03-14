@@ -11,23 +11,8 @@ import jieba.posseg as pseg
 def preprocess_text(text, stop_words): 
     if not text:
         return "Empty text provided."
-    # words = list(jieba.cut(text))
-    words_with_pos = pseg.cut(text)
-    words = [(word, pos) for word, pos in words_with_pos]
-    # words = list(jieba.cut_for_search(text))
-    # thu = thulac.thulac(seg_only=True)
-    # words = thu.cut(text, text=True).split()
-    # seg = pkuseg.pkuseg()
-    # words = seg.cut(text)s
-    # seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
-    # seg_result = seg.seg(text)
-    # words = [term.word for term in seg_result]
-    stop_pos = {'r', 'c', 'u', 'y'}
-    processed = [
-            word for word, pos in words
-            if pos not in stop_pos and word not in stop_words 
-        ]
-    # processed = [word for word in words if word not in stop_words]
+    words = list(jieba.cut(text))
+    processed = [word for word in words if word not in stop_words and word != ' ']
     return ' '.join(processed) if processed else "Documentation missing valid words."
 # def preprocess_text(text, stop_words):
 #     segmented_text = [char for word in text for char in word if char.strip()]

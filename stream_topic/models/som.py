@@ -327,7 +327,9 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
 
         self._status = TrainingStatus.INITIALIZED
         if self.stopwords_path is not None:
-            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
             stopwords_list = set(stopwords['w'])
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")

@@ -7,8 +7,7 @@ import pandas as pd
 import requests
 from loguru import logger
 import jieba
-from pyhanlp import *
-import jieba.posseg as pseg
+
 PACKAGE_NAME = "stream_topic"
 
 
@@ -28,20 +27,33 @@ class DataDownloader:
         self.preprocessing_steps = self.default_preprocessing_steps()
 
     def default_preprocessing_steps(self):
-        return {
-            "remove_stopwords": False,
-            "lowercase": True,
-            "remove_punctuation": False,
-            "remove_numbers": False,
-            "lemmatize": False,
-            "stem": False,
-            "expand_contractions": True,
-            "remove_html_tags": True,
-            "remove_special_chars": True,
-            "remove_accents": False,
-            "custom_stopwords": set(),
-            "detokenize": False,
-        }
+        if self.language == 'en':
+            return {
+                "remove_stopwords": False,
+                "lowercase": True,
+                "remove_punctuation": False,
+                "remove_numbers": False,
+                "lemmatize": False,
+                "stem": False,
+                "expand_contractions": True,
+                "remove_html_tags": True,
+                "remove_special_chars": True,
+                "remove_accents": False,
+                "custom_stopwords": set(),
+                "detokenize": False,
+            }
+        else:
+            return {
+                "remove_stopwords": False,
+                "remove_punctuation": False,
+                "remove_numbers": False,
+                "remove_html_tags": True,
+                "remove_special_chars": True,
+                "custom_stopwords": set(),
+                "remove_english": True,
+                "traditional_simple_convert": False,
+                "detokenize": False,
+            }
 
     def get_package_dataset_path(self, name):
         """
@@ -232,11 +244,6 @@ class DataDownloader:
         )
 
         return embedding_path
-    def segment_hanlp(self, text):
-        seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
-        seg_result = seg.seg(text)
-        words = [term.word for term in seg_result]
-        return words
     
     def load_custom_dataset_from_folder(self, dataset_path):
         """
@@ -267,13 +274,7 @@ class DataDownloader:
                 }
             )
             
-            if self.language == "chinese":
-                self.dataframe["tokens"]  = self.dataframe["text"].apply(lambda  x: [word for word, pos in pseg.cut(x)]) 
-                # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
-                # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: self.segment_hanlp(x))
-                # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: [char for word in x for char in word if char.strip()])
-            else:
-                self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -422,12 +423,7 @@ class DataDownloader:
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        if self.language == "chinese":
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: list(jieba.cut(x)))
-            # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: self.segment_hanlp(x))
-            # self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: [char for word in x for char in word if char.strip()])
-        else:
-            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
