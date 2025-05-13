@@ -10,15 +10,15 @@ from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
+import pandas as pd
 import jieba
 import thulac
-import spacy_pkuseg as pkuseg
-from pyhanlp import *
+import pkuseg
 import hanlp
-import pandas as pd
 import opencc
 from snownlp import SnowNLP 
 import jieba.posseg as pseg
+# from .Chinese_config import ChineseConfig
 
 class TextPreprocessor:
     """
@@ -90,6 +90,7 @@ class TextPreprocessor:
         self.segmentation_tool = kwargs.get("segmentation_tool", 'jieba')
         self.segmentation_dict = kwargs.get("segmentation_dict", None)
         self.remove_pos = kwargs.get("remove_pos", None)
+        self.domain = kwargs.get("domain", "default")
         self.custom_stopwords = (
             set(kwargs.get("custom_stopwords", []))
             if kwargs.get("custom_stopwords")
@@ -151,7 +152,7 @@ class TextPreprocessor:
         return pd.DataFrame({'w': stopwords})
             
     
-    def segment_text(self, text, tool='jieba', custom_dict=None, remove_pos=None):
+    def segment_text(self, text, tool='jieba', custom_dict=None, remove_pos=None, domain="default"):
         if remove_pos is None:
             if custom_dict is None:
                 custom_words = None
@@ -173,9 +174,9 @@ class TextPreprocessor:
                 words = tok(text)
             elif tool == 'pkuseg':
                 if isinstance(custom_dict, str):
-                    seg = pkuseg.pkuseg(user_dict=custom_dict)  
+                    seg = pkuseg.pkuseg(model_name = domain, user_dict=custom_dict)  
                 else:
-                    seg = pkuseg.pkuseg()
+                    seg = pkuseg.pkuseg(model_name = domain)
                 words = seg.cut(text)
             elif tool == 'thulac':
                 thu = self.thu
@@ -202,6 +203,18 @@ class TextPreprocessor:
                     "u":["u","ud","uj","ul","uv","uz"],#auxiliary word
                     "v": ["v", "vd","vg","vi", "vn","vq"]#verb    
                     },
+                "pkuseg": {
+                    "a": ["a", "ad","an"], #adjective
+                    "c":["c"], #conjunction
+                    "d":["d"], #adverb
+                    "e":["e"], #interjection
+                    "mq":["m","q"],#numerals and quantifiers
+                    "n": ["n", "nr","nx", "ns", "nt", "nz"], #noun
+                    "p":["p"],#preposition
+                    "r":["r"],#pronoun
+                    "u":["u"],#auxiliary word
+                    "v": ["v", "vd","vn","vx"]#verb    
+                    },
                 "thulac": {
                     "a": ["a"], #adjective
                     "c":["c"], #conjunction
@@ -227,8 +240,8 @@ class TextPreprocessor:
                     "v": ["VC","VE","VV"],#verb
                     }
                 }
-            if tool not in ["jieba","hanlp","thulac"]:
-                raise ValueError(f"Unsupported tokenizer: {tool}. Please choose from ['jieba', 'hanlp', 'thulac']")
+            if tool not in ["jieba", "pkuseg", "hanlp", "thulac"]:
+                raise ValueError(f"Unsupported tokenizer: {tool}. Please choose from ['jieba', 'pkuseg', 'hanlp', 'thulac']")
             else:
                 if remove_pos is None:
                     remove_pos = []
@@ -252,6 +265,12 @@ class TextPreprocessor:
                         jieba.load_userdict(custom_dict)
                     words_with_pos = pseg.cut(text)
                     words_pos = [(word, pos) for word, pos in words_with_pos]
+                elif tool == 'pkuseg':
+                    if isinstance(custom_dict, str):
+                        seg = pkuseg.pkuseg(model_name = domain, user_dict=custom_dict, postag=True)
+                    else:
+                        seg = pkuseg.pkuseg(model_name = domain, postag=True) 
+                    words_pos = seg.cut(text)    
                 elif tool == 'hanlp':
                     tok = self.tok
                     pos = self.pos
@@ -269,82 +288,6 @@ class TextPreprocessor:
                         words_pos.append((word,  pos))
             filtered_words = [word for word, pos in words_pos if pos not in remove_tags and word not in self.stoplist['w'].tolist() and word != ' ']
         return filtered_words
-    
-    def segment_test_pos(self, text, tool='jieba',remove_pos=None):
-        pos_mapping = {
-            "jieba": {
-                "a": ["a", "ad", "ag","an"], #adjective
-                "c":["c"], #conjunction
-                "d":["d","df","dg"], #adverb
-                "e":["e"], #interjection
-                "mq":["m","mg","mq","q"],#numerals and quantifiers
-                "n": ["n", "nr","nrfg","nrt", "ns", "nt", "nz"], #noun
-                "p":["p"],#preposition
-                "r":["r"],#pronoun
-                "u":["u","ud","uj","ul","uv","uz"],#auxiliary word
-                "v": ["v", "vd","vg","vi", "vn","vq"]#verb    
-                },
-            "thulac": {
-                "a": ["a"], #adjective
-                "c":["c"], #conjunction
-                "d":["d"], #adverb
-                "e":["e"], #interjection
-                "mq":["m","mq","q"],#numerals and quantifiers
-                "n": ["n", "np", "ns", "ni", "nz"],#noun
-                "p":["p"],#preposition
-                "r":["r"],#pronoun
-                "u":["u"],#auxiliary word
-                "v": ["v"],#verb
-                },
-            "hanlp": {  
-                "a": ["JJ","VA"], #adjective
-                "c":["CC","CS",], #conjunction
-                "d":["AD"], #adverb
-                "e":["IJ"], #interjection
-                "mq":["CD","M","q"],#numerals and quantifiers
-                "n": ["NN", "NR", "NT"],#noun
-                "p":["P"],#preposition
-                "r":["PN"],#pronoun
-                "u":["AS","SP"],#auxiliary word
-                "v": ["VC","VE","VV"],#verb
-                }
-            }
-        if remove_pos is None:
-            remove_pos = []
-        pos_map = pos_mapping[tool]
-        remove_tags = set() 
-        for pos in remove_pos:
-            if pos in pos_map:
-                remove_tags.update(pos_map[pos])
-        if tool == 'jieba':
-            words_with_pos = pseg.cut(text)
-            words_pos = [(word, pos) for word, pos in words_with_pos]
-        elif tool == 'hanlp':
-            # seg = HanLP.newSegment().enableCustomDictionary(False).enablePlaceRecognize(True)
-            # seg_result = seg.seg(text) 
-            # words = [(term.word,  term.nature.toString())  for term in seg_result]
-            tok = self.tok
-            pos = self.pos
-            words = tok(text)
-            pos_tags = pos(words)
-            words_pos = list(zip(words, pos_tags))
-        elif tool == 'thulac':
-            thu = thulac.thulac(seg_only=False)
-            result = thu.cut(text,  text=True)
-            words_pos = []
-            for item in result.split(): 
-                word, pos = item.split('_') 
-                words_pos.append((word,  pos))
-        else:
-            raise ValueError(f"Unsupported tokenizer: {tool}. Please choose from ['jieba', 'hanlp', 'thulac']")
-        filtered_words = [word for word, pos in words_pos if pos not in remove_tags and word not in self.stoplist['w'].tolist() and word != ' ']
-        return filtered_words  
-        
-        
-    # def segment_text(self, text):
-    #     segmented_text = [char for word in text for char in word if char.strip()]
-    #     filtered_text = [char for char in segmented_text if char not in self.stoplist['w'].tolist()]
-    #     return filtered_text
     
     def _load_contractions(self):
         # Load a dictionary of contractions and their expansions
@@ -484,7 +427,13 @@ class TextPreprocessor:
             if self.remove_english:
                 text = re.sub(r"[a-zA-Z]+", " ", text)
 
-            words = self.segment_text(text, tool=self.segmentation_tool, custom_dict=self.segmentation_dict, remove_pos=self.remove_pos)
+            if self.domain in ["default", "web", "news", "medicine", "tourism"]:
+                words = self.segment_text(text, tool=self.segmentation_tool, 
+                                          custom_dict=self.segmentation_dict, 
+                                          remove_pos=self.remove_pos,
+                                          domain = self.domain)
+            else:
+                raise ValueError(f"Please domain choose from ['default', 'web', 'news', 'medicine', 'tourism']")
 
             # Update word frequency counter
             self.word_freq.update(words)  
@@ -528,12 +477,11 @@ class TextPreprocessor:
 
         return text
     
-    def detect_language(self, text):
-        # 使用正则表达式匹配中文字符
-        if re.search(r'[\u4e00-\u9fff]', text):
-            return "chinese"
-        else:
-            return "en"
+    # def detect_language(self, text):
+    #     if re.search(r'[\u4e00-\u9fff]', text):
+    #         return "chinese"
+    #     else:
+    #         return "en"
     
     def preprocess_text(self, text):
         """

@@ -8,7 +8,7 @@ from nltk import pos_tag
 from nltk.corpus import brown as nltk_words
 from nltk.corpus import words as eng_dict
 from numpy.linalg import norm
-
+import hanlp
 
 from ._embedder import BaseEmbedder
 
@@ -95,11 +95,11 @@ class TopicExtractor:
             word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         elif corpus == "chinese":
             data = TMDataset()
-            data.fetch_dataset(name = "THUCNews_corpus", dataset_path = corpus_path, source = 'local')
+            data.fetch_dataset(name = "THUCNews", dataset_path = corpus_path, source = 'local')
             word_list = data.get_vocabulary()
             word_list += self.dataset.get_vocabulary()
 
-            word_list = [word.strip() for word in word_list]  # 去除前后空格
+            word_list = [word.strip() for word in word_list] 
             word_list = [re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]", "", word) for word in word_list]
         else:
             raise ValueError(
@@ -107,7 +107,12 @@ class TopicExtractor:
             )
 
         if only_nouns:
-            word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
+            if corpus == 'chinese':
+                pos = hanlp.load(hanlp.pretrained.pos.CTB9_POS_ELECTRA_SMALL)
+                pos_tags = pos(word_list)
+                word_list = [word for (word, pos) in list(zip(word_list, pos_tags)) if is_noun(pos)]
+            else: 
+                word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
         else:
             word_list = [word for (word, pos) in pos_tag(word_list)]
 

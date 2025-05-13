@@ -154,6 +154,7 @@ class DCTE(BaseModel):
         self,
         dataset,
         val_split: float = 0.2,
+        language: str = 'en',
         **training_args,
     ):
         """
@@ -178,7 +179,10 @@ class DCTE(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if  language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         # Set default training arguments
         default_args = {

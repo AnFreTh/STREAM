@@ -225,7 +225,11 @@ class TMDataset(Dataset, DataDownloader):
             key: value for key, value in kwargs.items() if key not in ["preprocessor", "remove_pos"]
         }
         additional_columns.update({"text": self.texts, "labels": self.labels})
-        self.dataframe = pd.DataFrame(additional_columns)
+        # delete empty ['text'] line
+        df = pd.DataFrame(additional_columns)
+        new_df = df[df['text'] != '']
+        new_df = new_df.reset_index(drop=True) 
+        self.dataframe = new_df
 
         # Save the dataset to Parquet format
         if not os.path.exists(save_dir):
@@ -256,7 +260,7 @@ class TMDataset(Dataset, DataDownloader):
         # return preprocessor
 
     def preprocess(self, model_type=None, custom_stopwords=None, min_word_length=None, min_word_freq=None, 
-                   tool='jieba', custom_dict=None, remove_pos=None,**preprocessing_steps):
+                   tool='jieba', custom_dict=None, remove_pos=None, domain=None,**preprocessing_steps):
         """
         Preprocess the dataset.
 
@@ -307,10 +311,12 @@ class TMDataset(Dataset, DataDownloader):
             preprocessing_steps['min_word_freq'] = min_word_freq
         if tool is not None:
             preprocessing_steps['segmentation_tool'] = tool
-        if tool is not None:
+        if custom_dict is not None:
             preprocessing_steps['segmentation_dict'] = custom_dict
-        if tool is not None:
+        if remove_pos is not None:
             preprocessing_steps['remove_pos'] = remove_pos
+        if domain is not None:
+            preprocessing_steps['domain'] = domain
             
         if filtered_steps:
             try:

@@ -35,9 +35,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
         self.stopwords_path = kwargs.get("stopwords_path", None)
-        self.language = kwargs.get("language", None)
         self.threshold = kwargs.get("threshold", 0)
-        # self.embedding_model_name = kwargs.get("embedding_model_name", None)
 
     def get_info(self):
         """
@@ -126,6 +124,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
     def prepare_data(
         self,
         dataset,
+        language,
     ):
         """
         Prepares the dataset for clustering.
@@ -138,7 +137,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
 
         self.dataframe = dataset.dataframe
         self.dataframe["tfidf_top_words"] = get_top_tfidf_words_per_document(
-            self.dataframe["text"], language = self.language, stopwords_path = self.stopwords_path
+            self.dataframe["text"], language = language, stopwords_path = self.stopwords_path
         )
 
     def fit(
@@ -146,6 +145,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
         dataset: TMDataset = None,
         max_topics: int = 20,
         max_iterations: int = 20,
+        language: str = 'en',
     ):
         """
         Clusters documents based on coherence scores until the number of clusters is
@@ -170,11 +170,14 @@ class CBC(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
 
         self.prepare_data(
-            dataset,
+            dataset, language = language
         )
 
         iteration = 0
@@ -328,7 +331,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
                 tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(
-            sparse=False
+            sparse_output=False
         )  # Use sparse=False to get a dense array
         predictions_one_hot = one_hot_encoder.fit_transform(
             self.dataframe[["predictions"]]

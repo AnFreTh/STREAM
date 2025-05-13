@@ -283,6 +283,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         lr: float = None,
         sigma: float = None,
         use_softmax: bool = True,
+        language: str = 'en',
     ):
         """
         Fit the SOMTM model to the dataset.
@@ -323,7 +324,10 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self._status = TrainingStatus.INITIALIZED
         if self.stopwords_path is not None:

@@ -121,8 +121,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
     def _clustering(self):
         """
         Applies K-Means clustering to the reduced embeddings.
-        """
-
+        """  
         assert (
             hasattr(self, "reduced_embeddings") and self.reduced_embeddings is not None
         ), "Reduced embeddings must be generated before clustering."
@@ -154,7 +153,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             # Store the mean embedding in the dictionary
             self.topic_centroids.append(mean_embedding)
 
-    def fit(self, dataset, n_topics=None):
+    def fit(self, dataset, language = 'en'):
         """
         Trains the BERTOPIC topic model on the provided dataset.
 
@@ -171,14 +170,17 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         assert isinstance(
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self._status = TrainingStatus.INITIALIZED
 
         if self.stopwords_path is not None:
             with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
                 stop_words = [line.strip() for line in f]
                 stopwords = pd.DataFrame({'w': stop_words})
-            stopwords_list = set(stopwords['w'])#.dropna()
+            stopwords_list = set(stopwords['w'])
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
                 self._status = TrainingStatus.RUNNING
@@ -199,7 +201,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
 
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse=False)
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
                     self.dataframe[["predictions"]]
                 )
@@ -235,7 +237,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
 
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse=False)
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
                     self.dataframe[["predictions"]]
                 )

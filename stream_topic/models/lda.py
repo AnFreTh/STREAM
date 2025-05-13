@@ -121,7 +121,7 @@ class LDA(BaseModel):
                 self.id2word.doc2bow(document)
                 for document in dataset.dataframe["tokens"]
             ]
-    def fit(self, dataset: TMDataset = None, n_topics: int = 20, **lda_params):
+    def fit(self, dataset: TMDataset = None, n_topics: int = 20, language: str = 'en',  **lda_params):
         """
         Fit the LDA model to the dataset.
 
@@ -145,7 +145,10 @@ class LDA(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
 
         self.n_topics = n_topics

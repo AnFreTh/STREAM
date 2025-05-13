@@ -12,7 +12,7 @@ from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
 import pandas as pd
-from joblib import parallel_backend
+
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "KmeansTM"
 EMBEDDING_MODEL_NAME = "paraphrase-MiniLM-L3-v2"
@@ -175,6 +175,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self,
         dataset: TMDataset = None,
         n_topics: int = 20,
+        language = 'en',
     ):
         """
         Trains the K-Means topic model on the provided dataset.
@@ -196,7 +197,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        if self.stopwords_path is not None:
+        if language == 'chinese':
             check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
         else:
             check_dataset_steps(dataset, logger, MODEL_NAME)
@@ -232,7 +233,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 )
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse=False)
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
                     self.dataframe[["predictions"]]
                 )
@@ -267,7 +268,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 )
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse=False)
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
                     self.dataframe[["predictions"]]
                 )

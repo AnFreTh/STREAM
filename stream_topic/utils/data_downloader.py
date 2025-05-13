@@ -6,7 +6,6 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 from loguru import logger
-import jieba
 
 PACKAGE_NAME = "stream_topic"
 
