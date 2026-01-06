@@ -2,19 +2,18 @@ from stream_topic.models import KmeansTM,BERTopicTM,CBC,DCTE,NMFTM,SOMTM,CEDC,ET
 from stream_topic.utils import TMDataset
 #本段落用时9min
 dataset = TMDataset(language="chinese", stopwords_path = '/hongyi/stream/stopwords/common_stopwords.txt')# 
-dataset.fetch_dataset(name = "THUCNews_imbalanced", dataset_path = "/hongyi/stream/dataset/paper_data", source = 'local')
+dataset.fetch_dataset(name = "Toutiao_imbalanced", dataset_path = "/hongyi/stream/dataset/paper_data", source = 'local')#
 dataset.preprocess(model_type="CTM", min_word_length = 1)
-from stream_topic.metrics import ISIM, INT, ISH, Expressivity, NPMI, Embedding_Coherence, Embedding_Topic_Diversity
-# from sentence_transformers import SentenceTransformer
+from stream_topic.metrics import ISIM, INT, ISH,Expressivity, NPMI, Embedding_Coherence, Embedding_Topic_Diversity
+from sentence_transformers import SentenceTransformer
 from stream_topic.metrics.metrics_config import MetricsConfig
-import numpy as np
 MetricsConfig.set_PARAPHRASE_embedder("/hongyi/stream/sentence-transformers/Conan-embedding-v1/")#paraphrase-multilingual-mpnet-base-v2
 MetricsConfig.set_SENTENCE_embedder("/hongyi/stream/sentence-transformers/Conan-embedding-v1/")#all-mpnet-base-v2
 best_params={'best_params': {
-  'lr': 0.002336073549906503,
-  'weight_decay': 0.0009882221982261323
-}}
+  'lr': 0.008298001572518747,
+  'weight_decay': 0.0004044088999371794}}
 import pandas as pd
+import numpy as np
 total_topics, NPMI_topics = [], []
 ISIM1, INT1, ISH1, WESS1, EXPRS1, NPMI1, COH1 = [], [], [], [], [], [], []
 for i in range(1):
@@ -23,7 +22,7 @@ for i in range(1):
     model.hparams.update(best_params['best_params'])
     n=14
     # model.fit(dataset,n_topics=n)#, language = "chinese"
-    model.fit(dataset,n_topics=n, language = "chinese",**best_params['best_params'])#
+    model.fit(dataset,n_topics=n, language = "chinese",**best_params)#
     
     topics = model.get_topics()
     total_topics.append(topics)
@@ -68,8 +67,8 @@ for i in range(1):
 
 metrics = {'ISIM':ISIM1, 'INT':INT1, 'ISH':ISH1, 'WESS':WESS1, 'EXPRS':EXPRS1, 'NPMI':NPMI1, 'COH':COH1}
 df = pd.DataFrame(metrics).transpose()
-df.to_csv('/hongyi/STREAM/result/benchmark/THUC/CTM_metrics_imb.csv')
+df.to_csv('/hongyi/STREAM/result/benchmark/Toutiao/CTM_metrics_imb.csv')
 df2 = pd.DataFrame(total_topics) 
-df2.to_csv('/hongyi/STREAM/result/benchmark/THUC/CTM_topics_imb.csv')
+df2.to_csv('/hongyi/STREAM/result/benchmark/Toutiao/CTM_topics_imb.csv')
 df3 = pd.DataFrame(NPMI_topics) 
-df3.to_csv('/hongyi/STREAM/result/benchmark/THUC/CTM_NPMI_imb.csv')
+df3.to_csv('/hongyi/STREAM/result/benchmark/Toutiao/CTM_NPMI_imb.csv')

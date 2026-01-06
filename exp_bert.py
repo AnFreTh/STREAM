@@ -2,26 +2,32 @@ from stream_topic.models import KmeansTM,BERTopicTM,CBC,DCTE,NMFTM,SOMTM,CEDC,ET
 from stream_topic.utils import TMDataset
 #本段落用时9min
 dataset = TMDataset(language="chinese", stopwords_path = '/hongyi/stream/stopwords/common_stopwords.txt')# 
-dataset.fetch_dataset(name = "THUCNews_imbalanced", dataset_path = "/hongyi/stream/dataset/paper_data", source = 'local')
+dataset.fetch_dataset(name = "CMtMedQA_imbalanced", dataset_path = "/hongyi/stream/dataset/paper_data", source = 'local')
 dataset.preprocess(model_type="CTM", min_word_length = 1)
 from stream_topic.metrics import ISIM, INT, ISH, Expressivity, NPMI, Embedding_Coherence, Embedding_Topic_Diversity
 # from sentence_transformers import SentenceTransformer
 from stream_topic.metrics.metrics_config import MetricsConfig
 import numpy as np
+import pandas as pd
 MetricsConfig.set_PARAPHRASE_embedder("/hongyi/stream/sentence-transformers/Conan-embedding-v1/")#paraphrase-multilingual-mpnet-base-v2
 MetricsConfig.set_SENTENCE_embedder("/hongyi/stream/sentence-transformers/Conan-embedding-v1/")#all-mpnet-base-v2
 best_params={'best_params': {
-  'lr': 0.002336073549906503,
-  'weight_decay': 0.0009882221982261323
-}}
-import pandas as pd
+  'lr': 0.005134157442587015,
+  'weight_decay': 0.000766244960309927}}
+
 total_topics, NPMI_topics = [], []
 ISIM1, INT1, ISH1, WESS1, EXPRS1, NPMI1, COH1 = [], [], [], [], [], [], []
 for i in range(1):
+    # model = BERTopicTM(embedding_model_name="/hongyi/stream/sentence-transformers/Conan-embedding-v1/", stopwords_path = '/hongyi/stream/stopwords/common_stopwords.txt', **best_params)
+    # model.fit(dataset, language = "chinese")
+    
+    # topics1 = model.get_topics()
+    # total_topics.append(topics1)
+    # topics = topics1[:10]
     model = CTM(embedding_model_name="/hongyi/stream/sentence-transformers/Conan-embedding-v1/")
     # model = NMFTM(stopwords_path = '/hongyi/stream/stopwords/common_stopwords.txt',hparams=best_params)
     model.hparams.update(best_params['best_params'])
-    n=14
+    n=10
     # model.fit(dataset,n_topics=n)#, language = "chinese"
     model.fit(dataset,n_topics=n, language = "chinese",**best_params['best_params'])#
     
@@ -46,7 +52,7 @@ for i in range(1):
         scores = metric.score(topics) #值越小越好
         score_list.append(scores)
     ISH1.append(np.mean(score_list))
-    beta = np.random.rand(n, 384)
+    beta = np.random.rand(10, 384)
     diversity_metric = Embedding_Topic_Diversity()
     scores = diversity_metric.score(topics, beta)  #值越小越好
     WESS1.append(scores)
@@ -68,8 +74,8 @@ for i in range(1):
 
 metrics = {'ISIM':ISIM1, 'INT':INT1, 'ISH':ISH1, 'WESS':WESS1, 'EXPRS':EXPRS1, 'NPMI':NPMI1, 'COH':COH1}
 df = pd.DataFrame(metrics).transpose()
-df.to_csv('/hongyi/STREAM/result/benchmark/THUC/CTM_metrics_imb.csv')
+df.to_csv('/hongyi/STREAM/result/benchmark/CMt/CTM_metrics_imb.csv')
 df2 = pd.DataFrame(total_topics) 
-df2.to_csv('/hongyi/STREAM/result/benchmark/THUC/CTM_topics_imb.csv')
+df2.to_csv('/hongyi/STREAM/result/benchmark/CMt/CTM_topics_imb.csv')
 df3 = pd.DataFrame(NPMI_topics) 
-df3.to_csv('/hongyi/STREAM/result/benchmark/THUC/CTM_NPMI_imb.csv')
+df3.to_csv('/hongyi/STREAM/result/benchmark/CMt/CTM_NPMI_imb.csv')

@@ -294,7 +294,8 @@ class Expressivity(BaseMetric):
                 self.language = NLTK_STOPWORD_LANGUAGE
             self.custom_stopwords = list(set(list(nltk_stopwords) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS)))
         else:
-            self.custom_stopwords = custom_stopwords
+            with open(custom_stopwords, 'r', encoding='UTF-8') as f:
+                self.custom_stopwords= [line.strip() for line in f]
 
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
