@@ -116,6 +116,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self.n_topics = None
 
         self._status = TrainingStatus.NOT_STARTED
+        #only for Chinese
         self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
@@ -174,6 +175,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self,
         dataset: TMDataset = None,
         n_topics: int = 20,
+        language = 'en',
     ):
         """
         Trains the K-Means topic model on the provided dataset.
@@ -195,7 +197,10 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
 
         self.n_topics = n_topics
@@ -206,7 +211,9 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self._status = TrainingStatus.INITIALIZED
         
         if self.stopwords_path is not None:
-            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
             stopwords_list = set(stopwords['w'])#.dropna()
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
@@ -226,7 +233,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 )
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse=False)
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
                     self.dataframe[["predictions"]]
                 )
@@ -261,7 +268,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 )
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse=False)
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
                     self.dataframe[["predictions"]]
                 )

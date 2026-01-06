@@ -1,6 +1,7 @@
 from datetime import datetime
 
-import community as community_louvain
+# import community as community_louvain
+import community.community_louvain as community_louvain
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -13,6 +14,7 @@ from ..utils.cbc_utils import (DocumentCoherence,
                                get_top_tfidf_words_per_document)
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 import pandas as pd
 
 MODEL_NAME = "CBC"
@@ -20,7 +22,7 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 # logger.add(f"{MODEL_NAME}_{time}.log", backtrace=True, diagnose=True)
 
 
-class CBC(BaseModel):
+class CBC(BaseModel, SentenceEncodingMixin):
     def __init__(
         self, 
         **kwargs):
@@ -33,6 +35,7 @@ class CBC(BaseModel):
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
         self.stopwords_path = kwargs.get("stopwords_path", None)
+        self.threshold = kwargs.get("threshold", 0)
 
     def get_info(self):
         """
@@ -64,7 +67,7 @@ class CBC(BaseModel):
             for j in self.coherence_scores.columns:
                 # Add an edge if coherence score is above a certain threshold
                 # Threshold can be adjusted
-                if self.coherence_scores.at[i, j] > 0:
+                if self.coherence_scores.at[i, j] > self.threshold:
                     G.add_edge(i, j, weight=self.coherence_scores.at[i, j])
         return G
 
@@ -121,6 +124,7 @@ class CBC(BaseModel):
     def prepare_data(
         self,
         dataset,
+        language,
     ):
         """
         Prepares the dataset for clustering.
@@ -133,7 +137,7 @@ class CBC(BaseModel):
 
         self.dataframe = dataset.dataframe
         self.dataframe["tfidf_top_words"] = get_top_tfidf_words_per_document(
-            self.dataframe["text"]
+            self.dataframe["text"], language = language, stopwords_path = self.stopwords_path
         )
 
     def fit(
@@ -141,6 +145,7 @@ class CBC(BaseModel):
         dataset: TMDataset = None,
         max_topics: int = 20,
         max_iterations: int = 20,
+        language: str = 'en',
     ):
         """
         Clusters documents based on coherence scores until the number of clusters is
@@ -165,11 +170,14 @@ class CBC(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
 
         self.prepare_data(
-            dataset,
+            dataset, language = language
         )
 
         iteration = 0
@@ -184,45 +192,89 @@ class CBC(BaseModel):
             while True:
                 print(f"Iteration: {iteration}")
                 # Calculate coherence scores for the current set of documents
-                coherence_scores = DocumentCoherence(
-                    current_documents, column="tfidf_top_words"
-                ).calculate_document_coherence()
+                if self.stopwords_path is not None:
+                    with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                        stop_words = [line.strip() for line in f]
+                        stopwords = pd.DataFrame({'w': stop_words})
+                    coherence_scores = DocumentCoherence(
+                        current_documents, column="tfidf_top_words", stopwords=set(stopwords['w'])
+                    ).calculate_document_coherence()
 
-                # Cluster the documents based on the current coherence scores
-                self.coherence_scores = coherence_scores
-                clusters = self.cluster_documents()
+                    # Cluster the documents based on the current coherence scores
+                    self.coherence_scores = coherence_scores
+                    clusters = self.cluster_documents()
 
-                num_clusters = len(clusters)
-                print(
-                    f"Iteration {iteration}: {num_clusters} clusters formed.")
-
-                # Prepare for the next iteration
-                combined_documents = self.combine_documents(
-                    current_documents, clusters)
-                current_documents = combined_documents
-                iteration += 1
-
-                # Update document indices to reflect their new combined form
-                new_document_indices = []
-                for cluster_ids in clusters.values():
-                    new_document_indices.append(
-                        [document_indices[idx] for idx in cluster_ids]
-                    )
-                document_indices = new_document_indices
-
-                # Check if the number of clusters is within the threshold
-                if 2 <= num_clusters <= self.max_topics:
-                    break
-                elif num_clusters < 2:
+                    num_clusters = len(clusters)
                     print(
-                        "Too few clusters formed. Consider changing parameters or input data."
-                    )
-                    break
+                        f"Iteration {iteration}: {num_clusters} clusters formed.")
 
-                # Stop if too many iterations to prevent infinite loop
-                if iteration > max_iterations:  # You can adjust this limit
-                    print("Maximum iterations reached. Stopping clustering process.")
-                    break
+                    # Prepare for the next iteration
+                    combined_documents = self.combine_documents(
+                        current_documents, clusters)
+                    current_documents = combined_documents
+                    iteration += 1
+
+                    # Update document indices to reflect their new combined form
+                    new_document_indices = []
+                    for cluster_ids in clusters.values():
+                        new_document_indices.append(
+                            [document_indices[idx] for idx in cluster_ids]
+                        )
+                    document_indices = new_document_indices
+
+                    # Check if the number of clusters is within the threshold
+                    if 2 <= num_clusters <= self.max_topics:
+                        break
+                    elif num_clusters < 2:
+                        print(
+                            "Too few clusters formed. Consider changing parameters or input data."
+                        )
+                        break
+
+                    # Stop if too many iterations to prevent infinite loop
+                    if iteration > max_iterations:  # You can adjust this limit
+                        print("Maximum iterations reached. Stopping clustering process.")
+                        break
+                else:
+                    coherence_scores = DocumentCoherence(
+                        current_documents, column="tfidf_top_words"
+                    ).calculate_document_coherence()
+
+                    # Cluster the documents based on the current coherence scores
+                    self.coherence_scores = coherence_scores
+                    clusters = self.cluster_documents()
+
+                    num_clusters = len(clusters)
+                    print(
+                        f"Iteration {iteration}: {num_clusters} clusters formed.")
+
+                    # Prepare for the next iteration
+                    combined_documents = self.combine_documents(
+                        current_documents, clusters)
+                    current_documents = combined_documents
+                    iteration += 1
+
+                    # Update document indices to reflect their new combined form
+                    new_document_indices = []
+                    for cluster_ids in clusters.values():
+                        new_document_indices.append(
+                            [document_indices[idx] for idx in cluster_ids]
+                        )
+                    document_indices = new_document_indices
+
+                    # Check if the number of clusters is within the threshold
+                    if 2 <= num_clusters <= self.max_topics:
+                        break
+                    elif num_clusters < 2:
+                        print(
+                            "Too few clusters formed. Consider changing parameters or input data."
+                        )
+                        break
+
+                    # Stop if too many iterations to prevent infinite loop
+                    if iteration > max_iterations:  # You can adjust this limit
+                        print("Maximum iterations reached. Stopping clustering process.")
+                        break
 
         except Exception as e:
             logger.error(f"Error in training: {e}")
@@ -264,7 +316,9 @@ class CBC(BaseModel):
         )
         logger.info("--- Extract topics ---")
         if self.stopwords_path is not None:
-            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
             stopwords_list = set(stopwords['w'])
             tfidf, count = c_tf_idf(
             docs_per_topic["text"].values, m=len(self.dataframe),stop_words=stopwords_list)
@@ -277,7 +331,7 @@ class CBC(BaseModel):
                 tfidf, count, docs_per_topic, n=10)
 
         one_hot_encoder = OneHotEncoder(
-            sparse=False
+            sparse_output=False
         )  # Use sparse=False to get a dense array
         predictions_one_hot = one_hot_encoder.fit_transform(
             self.dataframe[["predictions"]]

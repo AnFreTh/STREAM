@@ -15,9 +15,13 @@ from .TopwordEmbeddings import TopwordEmbeddings
 import os
 from .metrics_config import MetricsConfig
 import jieba
+from collections import defaultdict 
 
 GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
-
+NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
+STOPWORDS = list(
+    set(list(NLTK_STOPWORDS) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS))
+)
 
 class NPMI(BaseMetric):
     """
@@ -52,7 +56,7 @@ class NPMI(BaseMetric):
         self,
         dataset,
         language: str = None,
-        custom_stopwords: list = None,
+        stopwords: list = None,
     ):
         """
         Initializes the NPMI object with a dataset, stopwords, and a specified number of topics.
@@ -64,19 +68,15 @@ class NPMI(BaseMetric):
         stopwords : list, optional
             A list of stopwords to exclude from analysis. Default includes GenSim, NLTK, and Scikit-learn stopwords.
         """
-        # Dynamically set NLTK stopwords based on the chosen language
-        if custom_stopwords is None:
-            try:
-                nltk_stopwords = stopwords.words(language)
-                self.language = language
-            except OSError:
-                print(f"Language '{language}' not supported in NLTK. Defaulting to English.")
-                nltk_stopwords = stopwords.words(NLTK_STOPWORD_LANGUAGE)
-                self.language = NLTK_STOPWORD_LANGUAGE
-            self.custom_stopwords = list(set(list(nltk_stopwords) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS)))
+        if stopwords is None:
+            if language != "chinese":
+                self.stopwords = STOPWORDS
+            else:
+                raise ValueError(f"Please provide Chinese stopwords list!")
         else:
-            self.custom_stopwords = custom_stopwords
-            self.language = language
+            with open(stopwords, 'r', encoding='UTF-8') as f:
+                self.stopwords = [line.strip() for line in f]
+        self.language = language
         self.dataset = dataset
 
         files = self.dataset.get_corpus()
@@ -140,7 +140,7 @@ class NPMI(BaseMetric):
                 proc_file = []
 
                 for word in words:
-                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
+                    if word in self.stopwords or word == "dlrs" or word == "revs":
                         continue
                     if word in word_to_file:
                         word_to_file[word].add(file_num)
@@ -153,44 +153,18 @@ class NPMI(BaseMetric):
                         word_to_file_mult[word].append(file_num)
 
                 process_files.append(proc_file)
-        elif self.language == "zh-cn":
+        elif self.language == "chinese":
             for file_num in range(0, len(data)):
                 words = data[file_num]
                 words = words.strip()
                 words = re.sub(r"[^\u4e00-\u9fff\d]+", " ", words)
                 words = re.sub(" +", " ", words)
-                # .translate(strip_punct).translate(strip_digit)
-                words = list(jieba.cut(words))
-                # words = [w.strip() for w in words]
-                proc_file = []
-
-                for word in words:
-                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
-                        continue
-                    if word in word_to_file:
-                        word_to_file[word].add(file_num)
-                        word_to_file_mult[word].append(file_num)
-                    else:
-                        word_to_file[word] = set()
-                        word_to_file_mult[word] = []
-
-                        word_to_file[word].add(file_num)
-                        word_to_file_mult[word].append(file_num)
-
-                process_files.append(proc_file)
-        else:
-            for file_num in range(0, len(data)):
-                words = data[file_num]
-                words = words.strip()
-                words = re.sub(r"[^\u4e00-\u9fff\d]+", " ", words)
-                words = re.sub(" +", " ", words)
-                # .translate(strip_punct).translate(strip_digit)
+                # words = list(jieba.cut(words))
                 words = words.split()
-                # words = [w.strip() for w in words]
                 proc_file = []
 
                 for word in words:
-                    if word in self.custom_stopwords or word == "dlrs" or word == "revs":
+                    if word in self.stopwords or word == "dlrs" or word == "revs":
                         continue
                     if word in word_to_file:
                         word_to_file[word].add(file_num)
@@ -204,8 +178,7 @@ class NPMI(BaseMetric):
 
                 process_files.append(proc_file)
 
-
-        if self.language == "zh-cn":
+        if self.language == "chinese":
             for word in list(word_to_file):
                 if len(word_to_file[word]) <= preprocess or len(word) <= 1:
                     word_to_file.pop(word, None)
@@ -288,7 +261,6 @@ class NPMI(BaseMetric):
                     )
                     w1_dc = len(word_doc_counts.get(w1, set()))
                     w2_dc = len(word_doc_counts.get(w2, set()))
-
                     # Correct eps:
                     pmi_w1w2 = np.log(
                         (w1w2_dc * nfiles) / ((w1_dc * w2_dc) + eps) + eps
@@ -370,7 +342,6 @@ class NPMI(BaseMetric):
 
         return results
 
-
 class Embedding_Coherence(BaseMetric):
     """
     A metric class to calculate the coherence of topics based on word embeddings. It computes
@@ -416,14 +387,14 @@ class Embedding_Coherence(BaseMetric):
         """
 
         # Check if embedder is a local path or model name and load accordingly
-        metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
-        if os.path.exists(metric_embedder_name):
-            print(f"Loading model from local path: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
-        else:
-            print(f"Downloading model: {metric_embedder_name}")
-            metric_embedder = SentenceTransformer(metric_embedder_name)
-        print(1)
+        if not metric_embedder:
+            metric_embedder_name = MetricsConfig.PARAPHRASE_embedder or PARAPHRASE_TRANSFORMER_MODEL
+            if os.path.exists(metric_embedder_name):
+                print(f"Loading model from local path: {metric_embedder_name}")
+                metric_embedder = SentenceTransformer(metric_embedder_name)
+            else:
+                print(f"Downloading model: {metric_embedder_name}")
+                metric_embedder = SentenceTransformer(metric_embedder_name)
         self.topword_embeddings = TopwordEmbeddings(
             word_embedding_model=metric_embedder,
             emb_filename=emb_filename,
@@ -445,9 +416,9 @@ class Embedding_Coherence(BaseMetric):
         """
 
         info = {
-            "metric_name": "Embedding_Coherence",
+            "metric_name": "Embedding Coherence",
             "n_words": self.n_words,
-            "description": "Embedding_Coherence",
+            "description": "Embedding Coherence coherence",
         }
 
         return info
@@ -511,16 +482,3 @@ class Embedding_Coherence(BaseMetric):
         """
         res = self.score_per_topic(topics).values()
         return sum(res) / len(res)
-
-
-def _load_default_texts():
-    """
-    Loads default general texts
-
-    Returns
-    -------
-    result : default 20newsgroup texts
-    """
-    dataset = Dataset()
-    dataset.fetch_dataset("20NewsGroup")
-    return dataset.get_corpus()

@@ -3,12 +3,12 @@ from loguru import logger
 from sklearn.feature_extraction.text import CountVectorizer
 import jieba
 
-# 自定义的分词和去停用词函数
 def preprocess_text(text, stop_words): 
-    words = list(jieba.cut(text))
-    processed = [word for word in words if word not in stop_words]
+    if not text:
+        return "Empty text provided."
+    words = text.split()
+    processed = [word for word in words if word not in stop_words and word != ' ']
     return ' '.join(processed) if processed else "Documentation missing valid words."
-
 
 def c_tf_idf(documents, m, ngram_range=(1, 1), stop_words="english"):
     """class based tf_idf retrieval from cluster of documents
@@ -22,7 +22,6 @@ def c_tf_idf(documents, m, ngram_range=(1, 1), stop_words="english"):
         _type_: _description_
     """
     if stop_words != "english":
-        # 预处理文档
         processed_documents = [preprocess_text(doc, stop_words) for doc in documents]
         count = CountVectorizer(ngram_range=ngram_range)
         t = count.fit_transform(processed_documents).toarray()

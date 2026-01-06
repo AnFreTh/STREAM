@@ -22,13 +22,14 @@ def embed_corpus(dataset,
     Returns the embedding dict
     """
     # Check if embedder is a local path or model name and load accordingly
-    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
-    if os.path.exists(embedder_name):
-        print(f"Loading model from local path: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
-    else:
-        print(f"Downloading model: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
+    if not embedder:
+        embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+        if os.path.exists(embedder_name):
+            print(f"Loading model from local path: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
+        else:
+            print(f"Downloading model: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
 
     if emb_filename is None:
         emb_filename = str(dataset)
@@ -65,13 +66,14 @@ def update_corpus_dic_list(
     """
 
     # Check if embedder is a local path or model name and load accordingly
-    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
-    if os.path.exists(embedder_name):
-        print(f"Loading model from local path: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
-    else:
-        print(f"Downloading model: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
+    if not embedder:
+        embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+        if os.path.exists(embedder_name):
+            print(f"Loading model from local path: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
+        else:
+            print(f"Downloading model: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
 
     try:
         emb_dic = pickle.load(open(f"{emb_path}{emb_filename}.pickle", "rb"))
@@ -102,13 +104,14 @@ def embed_topic(
     if possible, else use the embedder.
     """
     # Check if embedder is a local path or model name and load accordingly
-    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
-    if os.path.exists(embedder_name):
-        print(f"Loading model from local path: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
-    else:
-        print(f"Downloading model: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
+    if not embedder:
+        embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+        if os.path.exists(embedder_name):
+            print(f"Loading model from local path: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
+        else:
+            print(f"Downloading model: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
 
     topic_embeddings = []
     for topic in tqdm(topics_tw):
@@ -137,13 +140,14 @@ def embed_stopwords(
     """
 
     # Check if embedder is a local path or model name and load accordingly
-    embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
-    if os.path.exists(embedder_name):
-        print(f"Loading model from local path: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
-    else:
-        print(f"Downloading model: {embedder_name}")
-        embedder = SentenceTransformer(embedder_name)
+    if not embedder:
+        embedder_name = MetricsConfig.SENTENCE_embedder or SENTENCE_TRANSFORMER_MODEL
+        if os.path.exists(embedder_name):
+            print(f"Loading model from local path: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
+        else:
+            print(f"Downloading model: {embedder_name}")
+            embedder = SentenceTransformer(embedder_name)
 
     sw_dic = {}  # first create dictionary with embedding of every unique word
     stopwords_set = set(stopwords)

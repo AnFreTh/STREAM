@@ -283,6 +283,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         lr: float = None,
         sigma: float = None,
         use_softmax: bool = True,
+        language: str = 'en',
     ):
         """
         Fit the SOMTM model to the dataset.
@@ -323,11 +324,16 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self._status = TrainingStatus.INITIALIZED
         if self.stopwords_path is not None:
-            stopwords = pd.read_csv(self.stopwords_path, names=['w'], sep='\t', encoding='UTF-8')
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
             stopwords_list = set(stopwords['w'])
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
@@ -346,11 +352,10 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
                 ).agg({"text": " ".join})
 
                 tfidf, count = c_tf_idf(
-                    docs_per_topic["text"].values, m=len(self.dataframe),stop_words=stopwords_list
+                    docs_per_topic["text"].values, m=len(self.dataframe), stop_words=stopwords_list
                 )
                 self.topic_dict = extract_tfidf_topics(
                     tfidf, count, docs_per_topic, n=100)
-                print(1)
 
                 one_hot_encoder = OneHotEncoder(sparse=False)
                 predictions_one_hot = one_hot_encoder.fit_transform(
@@ -370,8 +375,8 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
                 self._status = TrainingStatus.RUNNING
-                self.dataframe, self.embeddings = self.prepare_embeddings(
-                    dataset, logger)
+                self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+                self.dataframe = self.dataset.dataframe
 
                 if self.reduce_dim:
                     self.reduced_embeddings = self.dim_reduction(logger)
