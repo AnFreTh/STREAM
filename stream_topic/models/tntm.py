@@ -11,7 +11,7 @@ import umap
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 from loguru import logger
 from optuna.integration import PyTorchLightningPruningCallback
-from sentence_transformers import SentenceTransformer
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 from sklearn.mixture import GaussianMixture
 
 from ..utils.datamodule import TMDataModule

@@ -10,8 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 from ..commons.check_steps import check_dataset_steps
 from ..preprocessor import c_tf_idf, extract_tfidf_topics
-from ..utils.cbc_utils import (DocumentCoherence,
-                               get_top_tfidf_words_per_document)
+from ..utils.cbc_utils import DocumentCoherence, get_top_tfidf_words_per_document
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
@@ -303,8 +302,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
             self.labels += 1
 
             # Update the 'predictions' column in the dataframe with -1 where NaN was present
-            self.dataframe["predictions"] = self.dataframe["predictions"].fillna(
-                -1)
+            self.dataframe["predictions"] = self.dataframe["predictions"].fillna(-1)
             self.dataframe["predictions"] += 1
             print("--- replaced NaN values with 0 in topics ---")
             print(
@@ -321,7 +319,7 @@ class CBC(BaseModel, SentenceEncodingMixin):
                 stopwords = pd.DataFrame({'w': stop_words})
             stopwords_list = set(stopwords['w'])
             tfidf, count = c_tf_idf(
-            docs_per_topic["text"].values, m=len(self.dataframe),stop_words=stopwords_list)
+            docs_per_topic["text"].values, m=len(self.dataframe), stop_words=stopwords_list)
             self.topic_dict = extract_tfidf_topics(
             tfidf, count, docs_per_topic, n=10)
         else:

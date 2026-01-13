@@ -42,6 +42,7 @@
   - [🔍 Hyperparameter optimization](#-hyperparameter-optimization)
   - [🖼️ Visualization](#️-visualization)
   - [📈 Downstream Tasks](#-downstream-tasks)
+  - [🧪 Experimental 🧪](#-experimental-)
   - [🤝 Contributing and Testing New Models](#-contributing-and-testing-new-models)
 - [📜 Citation](#-citation)
 - [📝 License](#-license)
@@ -73,7 +74,7 @@ You can install STREAM directly from PyPI or from the GitHub repository:
 
 1. **PyPI (Recommended)**:
     ```bash
-    pip install stream_topic
+    pip install stream-topic
     ```
 
 2. **GitHub**:
@@ -81,14 +82,54 @@ You can install STREAM directly from PyPI or from the GitHub repository:
     pip install git+https://github.com/AnFreTh/STREAM.git
     ```
 
-3. **Download NLTK Resources**:
-    Ensure you have the necessary NLTK resources installed:
-    ```python
-    import nltk
-    nltk.download('stopwords')
-    nltk.download('punkt')
-    nltk.download('wordnet')
-    nltk.download('averaged_perceptron_tagger')
+3. **Download necessary NLTK resources**:
+
+   To download all necessary NLTK resources required for some models, simply run:
+
+   ```python
+   import nltk
+
+   def ensure_nltk_resources():
+       resources = [
+           "stopwords",
+           "wordnet",
+           "punkt_tab",
+           "brown",
+           "averaged_perceptron_tagger"
+       ]
+       for resource in resources:
+           try:
+               nltk.data.find(resource)
+           except LookupError:
+               try:
+                   print(f"Downloading NLTK resource: {resource}")
+                   nltk.download(resource)
+               except Exception as e:
+                   print(f"Failed to download {resource}: {e}")
+
+   ensure_nltk_resources()
+   ```
+
+
+3. **Install requirements for add-ons**:
+    To use STREAMS visualizations, simply run:
+    ```bash
+    pip install stream-topic[plotting]
+    ```
+
+    For BERTopic, run:
+    ```bash
+    pip install stream-topic[hdbscan]
+    ```
+
+    For DCTE:
+    ```bash
+    pip install stream-topic[dcte]
+    ```
+
+    For the experimental features:
+    ```bash
+    pip install stream-topic[experimental]
     ```
 
 # 📦 Available Models
@@ -447,7 +488,46 @@ from stream_topic.visuals import plot_downstream_model
 plot_downstream_model(downstream_model)
 ```
 
+# 🧪 Experimental 🧪
+stream-topic.experimental includes several experimental topic representations as well as new stuff we want to try out.
 
+This includes, e.g. topic summarization:
+
+```python
+from stream_topic.experimental import stopic_summaries
+
+summaries = topic_summaries(topics, openai_key)
+for summary in summaries:
+    print(f"{summary} \n")
+
+```
+
+But also the possibility to generate a story from the created topics:
+
+```python
+from stream_topic.experimental import story_topic
+
+story = story_topic(topics[1], openai_key)
+print(story)
+
+```
+
+Lastly, it offers the possibility to visualize your topic in a way, a movie poster could be designed:
+
+```python
+from stream_topic.experimental import movie_poster
+
+topic = ["tiger", "lion", "cougar", "cat", "hippo", "chair", "apple", "meat", "poachers", "hyeena"]
+
+movie_poster(topic, openai_key, return_style="plot")
+
+```
+This is just one of many possible visualization, but we found that to be rather coherent in terms of truly visualizing the created topics.
+Feel free to contribute or rais issues fo further experimental ideas.
+
+<p align="center">
+    <img src="assets/movie_poster_topic1.png" alt="Figure Description" width="600"/>
+</p>
 
 ## 🤝 Contributing and Testing New Models
 

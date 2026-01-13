@@ -214,7 +214,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
                 stop_words = [line.strip() for line in f]
                 stopwords = pd.DataFrame({'w': stop_words})
-            stopwords_list = set(stopwords['w'])#.dropna()
+            stopwords_list = set(stopwords['w'])
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
                 self._status = TrainingStatus.RUNNING
@@ -229,7 +229,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
                 ).agg({"text": " ".join})
 
                 tfidf, count = c_tf_idf(
-                    docs_per_topic["text"].values, m=len(self.dataframe),stop_words=stopwords_list
+                    docs_per_topic["text"].values, m=len(self.dataframe), stop_words=stopwords_list
                 )
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 

@@ -3,12 +3,9 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from enum import Enum
-
-import optuna
 import torch.nn as nn
 import umap.umap_ as umap
 from loguru import logger
-from optuna.integration import PyTorchLightningPruningCallback
 
 
 class BaseModel(ABC):
@@ -340,6 +337,10 @@ class BaseModel(ABC):
         dict
             Dictionary containing the best parameters and the optimal number of topics.
         """
+        import importlib
+
+        optuna = importlib.import_module("optuna")
+
         assert criterion in [
             "aic",
             "bic",
