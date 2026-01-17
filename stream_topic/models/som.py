@@ -12,6 +12,7 @@ from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
+import pandas as pd
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "SOMTM"
@@ -109,6 +110,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
 
         self.save_embeddings = save_embeddings
         self._status = TrainingStatus.NOT_STARTED
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
         """
@@ -281,6 +283,7 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
         lr: float = None,
         sigma: float = None,
         use_softmax: bool = True,
+        language: str = 'en',
     ):
         """
         Fit the SOMTM model to the dataset.
@@ -321,45 +324,90 @@ class SOMTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self._status = TrainingStatus.INITIALIZED
-        try:
-            logger.info(f"--- Training {MODEL_NAME} topic model ---")
-            self._status = TrainingStatus.RUNNING
-            self.dataframe, self.embeddings = self.prepare_embeddings(
-                dataset, logger)
+        if self.stopwords_path is not None:
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
+            stopwords_list = set(stopwords['w'])
+            try:
+                logger.info(f"--- Training {MODEL_NAME} topic model ---")
+                self._status = TrainingStatus.RUNNING
+                self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+                self.dataframe = self.dataset.dataframe
 
-            if self.reduce_dim:
-                self.reduced_embeddings = self.dim_reduction(logger)
-                self._train_batch(self.reduced_embeddings, self.batch_size)
-            else:
-                self._train_batch(self.embeddings, self.batch_size)
-            self.dataframe["predictions"] = self.labels
-            docs_per_topic = self.dataframe.groupby(
-                ["predictions"], as_index=False
-            ).agg({"text": " ".join})
+                if self.reduce_dim:
+                    self.reduced_embeddings = self.dim_reduction(logger)
+                    self._train_batch(self.reduced_embeddings, self.batch_size)
+                else:
+                    self._train_batch(self.embeddings, self.batch_size)
+                self.dataframe["predictions"] = self.labels
+                docs_per_topic = self.dataframe.groupby(
+                    ["predictions"], as_index=False
+                ).agg({"text": " ".join})
 
-            tfidf, count = c_tf_idf(
-                docs_per_topic["text"].values, m=len(self.dataframe)
-            )
-            self.topic_dict = extract_tfidf_topics(
-                tfidf, count, docs_per_topic, n=100)
+                tfidf, count = c_tf_idf(
+                    docs_per_topic["text"].values, m=len(self.dataframe), stop_words=stopwords_list
+                )
+                self.topic_dict = extract_tfidf_topics(
+                    tfidf, count, docs_per_topic, n=100)
 
-            one_hot_encoder = OneHotEncoder(sparse=False)
-            predictions_one_hot = one_hot_encoder.fit_transform(
-                self.dataframe[["predictions"]]
-            )
-            self.beta = tfidf.T
-            self.theta = predictions_one_hot.T
-        except Exception as e:
-            logger.error(f"Error in training: {e}")
-            self._status = TrainingStatus.FAILED
-            raise
-        except KeyboardInterrupt:
-            logger.error("Training interrupted.")
-            self._status = TrainingStatus.INTERRUPTED
-            raise
+                one_hot_encoder = OneHotEncoder(sparse=False)
+                predictions_one_hot = one_hot_encoder.fit_transform(
+                    self.dataframe[["predictions"]]
+                )
+                self.beta = tfidf.T
+                self.theta = predictions_one_hot.T
+            except Exception as e:
+                logger.error(f"Error in training: {e}")
+                self._status = TrainingStatus.FAILED
+                raise
+            except KeyboardInterrupt:
+                logger.error("Training interrupted.")
+                self._status = TrainingStatus.INTERRUPTED
+                raise
+        else:
+            try:
+                logger.info(f"--- Training {MODEL_NAME} topic model ---")
+                self._status = TrainingStatus.RUNNING
+                self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+                self.dataframe = self.dataset.dataframe
+
+                if self.reduce_dim:
+                    self.reduced_embeddings = self.dim_reduction(logger)
+                    self._train_batch(self.reduced_embeddings, self.batch_size)
+                else:
+                    self._train_batch(self.embeddings, self.batch_size)
+                self.dataframe["predictions"] = self.labels
+                docs_per_topic = self.dataframe.groupby(
+                    ["predictions"], as_index=False
+                ).agg({"text": " ".join})
+
+                tfidf, count = c_tf_idf(
+                    docs_per_topic["text"].values, m=len(self.dataframe)
+                )
+                self.topic_dict = extract_tfidf_topics(
+                    tfidf, count, docs_per_topic, n=100)
+
+                one_hot_encoder = OneHotEncoder(sparse=False)
+                predictions_one_hot = one_hot_encoder.fit_transform(
+                    self.dataframe[["predictions"]]
+                )
+                self.beta = tfidf.T
+                self.theta = predictions_one_hot.T
+            except Exception as e:
+                logger.error(f"Error in training: {e}")
+                self._status = TrainingStatus.FAILED
+                raise
+            except KeyboardInterrupt:
+                logger.error("Training interrupted.")
+                self._status = TrainingStatus.INTERRUPTED
+                raise
 
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED

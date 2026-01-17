@@ -10,6 +10,8 @@ from ..commons.check_steps import check_dataset_steps
 from ..preprocessor._tf_idf import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
+import pandas as pd
+import os
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "DCTE"
@@ -77,7 +79,7 @@ class DCTE(BaseModel):
         self.model = SetFitModel.from_pretrained(f"sentence-transformers/{model}")
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
-        self.embedding_model_name = self.hparams.get("embedding_model_name", model)
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
         """
@@ -126,13 +128,26 @@ class DCTE(BaseModel):
         docs_per_topic = predict_df.groupby(["predictions"], as_index=False).agg(
             {"text": " ".join}
         )
-        tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
-        topic_dict = extract_tfidf_topics(
+        if self.stopwords_path is not None:
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
+            stopwords_list = set(stopwords['w'])
+            tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df),stop_words=stopwords_list)
+            topic_dict = extract_tfidf_topics(
             tfidf,
             count,
             docs_per_topic,
             n=top_words,
-        )
+            )
+        else:
+            tfidf, count = c_tf_idf(docs_per_topic["text"].values, m=len(predict_df))
+            topic_dict = extract_tfidf_topics(
+                tfidf,
+                count,
+                docs_per_topic,
+                n=top_words,
+            )
 
         one_hot_encoder = OneHotEncoder(sparse_output=False)
         predictions_one_hot = one_hot_encoder.fit_transform(predict_df[["predictions"]])
@@ -146,6 +161,7 @@ class DCTE(BaseModel):
         self,
         dataset,
         val_split: float = 0.2,
+        language: str = 'en',
         **training_args,
     ):
         """
@@ -172,7 +188,10 @@ class DCTE(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if  language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         # Set default training arguments
         default_args = {
@@ -195,7 +214,7 @@ class DCTE(BaseModel):
         self._status = TrainingStatus.INITIALIZED
 
         try:
-            logger.info(f"--- Preparing {EMBEDDING_MODEL_NAME} Dataset ---")
+            logger.info(f"--- Preparing {self.embedding_model_name} Dataset ---")
             self._prepare_data(val_split=val_split)
 
             assert hasattr(self, "train_ds") and hasattr(
@@ -274,6 +293,7 @@ class DCTE(BaseModel):
         ValueError
             If the model has not been trained yet.
         """
+        dataset = self.train_dataset
         predict_df = pd.DataFrame({"tokens": dataset.get_corpus()})
         predict_df["text"] = [" ".join(words) for words in predict_df["tokens"]]
 

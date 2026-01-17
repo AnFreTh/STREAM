@@ -26,20 +26,33 @@ class DataDownloader:
         self.preprocessing_steps = self.default_preprocessing_steps()
 
     def default_preprocessing_steps(self):
-        return {
-            "remove_stopwords": False,
-            "lowercase": True,
-            "remove_punctuation": False,
-            "remove_numbers": False,
-            "lemmatize": False,
-            "stem": False,
-            "expand_contractions": True,
-            "remove_html_tags": True,
-            "remove_special_chars": True,
-            "remove_accents": False,
-            "custom_stopwords": set(),
-            "detokenize": False,
-        }
+        if self.language == 'en':
+            return {
+                "remove_stopwords": False,
+                "lowercase": True,
+                "remove_punctuation": False,
+                "remove_numbers": False,
+                "lemmatize": False,
+                "stem": False,
+                "expand_contractions": True,
+                "remove_html_tags": True,
+                "remove_special_chars": True,
+                "remove_accents": False,
+                "custom_stopwords": set(),
+                "detokenize": False,
+            }
+        else:
+            return {
+                "remove_stopwords": False,
+                "remove_punctuation": False,
+                "remove_numbers": False,
+                "remove_html_tags": True,
+                "remove_special_chars": True,
+                "custom_stopwords": set(),
+                "remove_english": True,
+                "traditional_simple_convert": False,
+                "detokenize": False,
+            }
 
     def get_package_dataset_path(self, name):
         """
@@ -230,7 +243,7 @@ class DataDownloader:
         )
 
         return embedding_path
-
+    
     def load_custom_dataset_from_folder(self, dataset_path):
         """
         Load a custom dataset from a folder.
@@ -259,9 +272,8 @@ class DataDownloader:
                     "labels": [label.strip() for label in labels],
                 }
             )
-
-            self.dataframe["tokens"] = self.dataframe["text"].apply(
-                lambda x: x.split())
+            
+            self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
             self.texts = self.dataframe["text"].tolist()
             self.labels = self.dataframe["labels"].tolist()
 
@@ -410,8 +422,7 @@ class DataDownloader:
         if not os.path.exists(load_path):
             raise FileNotFoundError(f"File {load_path} does not exist.")
         self.dataframe = pd.read_parquet(load_path)
-        self.dataframe["tokens"] = self.dataframe["text"].apply(
-            lambda x: x.split())
+        self.dataframe["tokens"] = self.dataframe["text"].apply(lambda x: x.split())
         self.texts = self.dataframe["text"].tolist()
         self.labels = self.dataframe["labels"].tolist()
 
