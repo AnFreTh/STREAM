@@ -2,7 +2,7 @@ import json
 import os
 
 
-def load_model_preprocessing_steps(model_type, filepath=None):
+def load_model_preprocessing_steps(model_type, filepath=None, language=None):
     """
     Load the default preprocessing steps from a JSON file.
 
@@ -21,10 +21,16 @@ def load_model_preprocessing_steps(model_type, filepath=None):
     if filepath is None:
         # Determine the absolute path based on the current file's location
         current_dir = os.path.dirname(__file__)
-        filepath = os.path.join(
-            current_dir, "..", "preprocessor", "config", "default_preprocessing_steps.json"
-        )
-        filepath = os.path.abspath(filepath)
+        if language == 'chinese':
+            filepath = os.path.join(
+            current_dir, "..", "preprocessor", "config", "default_preprocessing_steps_chinese.json"
+            )
+            filepath = os.path.abspath(filepath)
+        else:
+            filepath = os.path.join(
+                current_dir, "..", "preprocessor", "config", "default_preprocessing_steps.json"
+            )
+            filepath = os.path.abspath(filepath)
 
     with open(filepath, "r") as file:
         all_steps = json.load(file)

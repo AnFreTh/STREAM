@@ -303,6 +303,7 @@ class ETM(BaseModel):
         mode: str = "min",
         trial=None,
         optimize=False,
+        language = 'en',
         **kwargs,
     ):
         """
@@ -362,7 +363,10 @@ class ETM(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self.n_topics = n_topics
 

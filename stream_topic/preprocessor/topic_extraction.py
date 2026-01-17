@@ -8,7 +8,7 @@ from nltk import pos_tag
 from nltk.corpus import brown as nltk_words
 from nltk.corpus import words as eng_dict
 from numpy.linalg import norm
-from ..utils.dataset import TMDataset
+import hanlp
 
 from ._embedder import BaseEmbedder
 
@@ -37,7 +37,7 @@ class TopicExtractor:
         self.embedder = BaseEmbedder(embedding_model)
         self.n_topics = n_topics
 
-    def _noun_extractor_haystack(self, embeddings, n, corpus="brown", only_nouns=True):
+    def _noun_extractor_haystack(self, embeddings, n, corpus="brown", corpus_path=None, only_nouns=True):
         """
         Extracts the topics most probable words, which are the words nearest to the topics centroid.
         We extract all nouns from the corpus and the brown corpus. Afterwards we compute the cosine similarity between every word and every centroid.
@@ -57,6 +57,7 @@ class TopicExtractor:
             dict: extracted topics
         """
 
+        from ..utils.dataset import TMDataset   # to avoid circular import issue
         # define whether word is a noun
         def is_noun(pos):
             return pos[:2] == "NN"
@@ -92,13 +93,26 @@ class TopicExtractor:
 
             word_list = [word.lower().strip() for word in word_list]
             word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
+        elif corpus == "chinese":
+            data = TMDataset()
+            data.fetch_dataset(name = "THUCNews", dataset_path = corpus_path, source = 'local')
+            word_list = data.get_vocabulary()
+            word_list += self.dataset.get_vocabulary()
+
+            word_list = [word.strip() for word in word_list] 
+            word_list = [re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]", "", word) for word in word_list]
         else:
             raise ValueError(
                 "There are no words to be extracted for the Topics: Please specify a corpus"
             )
 
         if only_nouns:
-            word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
+            if corpus == 'chinese':
+                pos = hanlp.load(hanlp.pretrained.pos.CTB9_POS_ELECTRA_SMALL)
+                pos_tags = pos(word_list)
+                word_list = [word for (word, pos) in list(zip(word_list, pos_tags)) if is_noun(pos)]
+            else: 
+                word_list = [word for (word, pos) in pos_tag(word_list) if is_noun(pos)]
         else:
             word_list = [word for (word, pos) in pos_tag(word_list)]
 

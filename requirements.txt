@@ -24,5 +24,18 @@ langdetect
 
 # misc
 loguru
+ipywidgets
+ipykernel<6.22.0
+# tqdm
+# pre-commit
+optuna==3.6.1
+optuna-integration==3.6.0
+
+# Chinese requirement
+hanlp==2.1.1
+jieba==0.42.1
+OpenCC==1.1.9
+snownlp=0.12.3
+thulac=0.2.2
 optuna
 optuna-integration

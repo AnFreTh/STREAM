@@ -192,6 +192,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         clean: bool = False,
         clean_threshold: float = 0.85,
         expansion_corpus: str = "brown",
+        corpus_path: str = None,
         n_words: int = 20,
     ):
         """
@@ -261,6 +262,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
                 self.embeddings,
                 n=n_words + 20,
                 corpus=expansion_corpus,
+                corpus_path=corpus_path,
                 only_nouns=only_nouns,
             )
 
@@ -275,6 +277,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
 
         if clean:
             logger.info("--- Cleaning topics ---")
+            self.embedding_model = SentenceTransformer(self.embedding_model_name)
             cleaned_topics, cleaned_centroids = clean_topics(
                 topics, similarity=clean_threshold, embedding_model=self.embedding_model
             )
