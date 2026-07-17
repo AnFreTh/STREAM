@@ -222,6 +222,7 @@ class WordCluTM(BaseModel):
         workers: int = 4,
         n_words=10,
         word2vec_epochs=100,
+        language = 'en',
     ):
 
         self.vector_size = vector_size
@@ -230,7 +231,10 @@ class WordCluTM(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self.n_topics = n_topics
         if self.n_topics <= 0:

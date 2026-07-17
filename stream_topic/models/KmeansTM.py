@@ -11,6 +11,7 @@ from ..preprocessor import c_tf_idf, extract_tfidf_topics
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.mixins import SentenceEncodingMixin
+import pandas as pd
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_NAME = "KmeansTM"
@@ -28,7 +29,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
     Parameters
     ----------
     embedding_model_name : str
-        Name of the sentence embedding model to use.
+        Name of the sentence embedding model to use. It can also be the local path of the sentence embedding model to use.
     umap_args : dict
         Arguments for UMAP dimensionality reduction.
     kmeans_args : dict
@@ -115,6 +116,8 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self.n_topics = None
 
         self._status = TrainingStatus.NOT_STARTED
+        #only for Chinese
+        self.stopwords_path = kwargs.get("stopwords_path", None)
 
     def get_info(self):
         """
@@ -172,6 +175,7 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self,
         dataset: TMDataset = None,
         n_topics: int = 20,
+        language = 'en',
     ):
         """
         Trains the K-Means topic model on the provided dataset.
@@ -193,7 +197,10 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == 'chinese':
+            check_dataset_steps(dataset, logger, MODEL_NAME, language='chinese')
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
 
         self.n_topics = n_topics
@@ -202,40 +209,81 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             raise ValueError("Number of topics must be greater than 0.")
 
         self._status = TrainingStatus.INITIALIZED
-        try:
-            logger.info(f"--- Training {MODEL_NAME} topic model ---")
-            self._status = TrainingStatus.RUNNING
-            self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
-            self.dataframe = self.dataset.dataframe
-            self.reduced_embeddings = self.dim_reduction(logger)
-            self._clustering()
+        
+        if self.stopwords_path is not None:
+            with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
+                stop_words = [line.strip() for line in f]
+                stopwords = pd.DataFrame({'w': stop_words})
+            stopwords_list = set(stopwords['w'])
+            try:
+                logger.info(f"--- Training {MODEL_NAME} topic model ---")
+                self._status = TrainingStatus.RUNNING
+                self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+                self.dataframe = self.dataset.dataframe
+                self.reduced_embeddings = self.dim_reduction(logger)
+                self._clustering()
 
-            self.dataframe["predictions"] = self.labels
-            docs_per_topic = self.dataframe.groupby(
-                ["predictions"], as_index=False
-            ).agg({"text": " ".join})
+                self.dataframe["predictions"] = self.labels
+                docs_per_topic = self.dataframe.groupby(
+                    ["predictions"], as_index=False
+                ).agg({"text": " ".join})
 
-            tfidf, count = c_tf_idf(
-                docs_per_topic["text"].values, m=len(self.dataframe)
-            )
-            self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+                tfidf, count = c_tf_idf(
+                    docs_per_topic["text"].values, m=len(self.dataframe), stop_words=stopwords_list
+                )
+                self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-            one_hot_encoder = OneHotEncoder(sparse_output=False)
-            predictions_one_hot = one_hot_encoder.fit_transform(
-                self.dataframe[["predictions"]]
-            )
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
+                predictions_one_hot = one_hot_encoder.fit_transform(
+                    self.dataframe[["predictions"]]
+                )
 
-            self.beta = tfidf
-            self.theta = predictions_one_hot
+                self.beta = tfidf
+                self.theta = predictions_one_hot
 
-        except Exception as e:
-            logger.error(f"Error in training: {e}")
-            self._status = TrainingStatus.FAILED
-            raise
-        except KeyboardInterrupt:
-            logger.error("Training interrupted.")
-            self._status = TrainingStatus.INTERRUPTED
-            raise
+            except Exception as e:
+                logger.error(f"Error in training: {e}")
+                self._status = TrainingStatus.FAILED
+                raise
+            except KeyboardInterrupt:
+                logger.error("Training interrupted.")
+                self._status = TrainingStatus.INTERRUPTED
+                raise
+        else:
+            try:
+                logger.info(f"--- Training {MODEL_NAME} topic model ---")
+                self._status = TrainingStatus.RUNNING
+                self.dataset, self.embeddings = self.prepare_embeddings(dataset, logger)
+                self.dataframe = self.dataset.dataframe
+                self.reduced_embeddings = self.dim_reduction(logger)
+                self._clustering()
+
+                self.dataframe["predictions"] = self.labels
+                docs_per_topic = self.dataframe.groupby(
+                    ["predictions"], as_index=False
+                ).agg({"text": " ".join})
+
+                tfidf, count = c_tf_idf(
+                    docs_per_topic["text"].values, m=len(self.dataframe)
+                )
+                self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
+
+                one_hot_encoder = OneHotEncoder(sparse_output=False)
+                predictions_one_hot = one_hot_encoder.fit_transform(
+                    self.dataframe[["predictions"]]
+                )
+
+                self.beta = tfidf
+                self.theta = predictions_one_hot
+
+            except Exception as e:
+                logger.error(f"Error in training: {e}")
+                self._status = TrainingStatus.FAILED
+                raise
+            except KeyboardInterrupt:
+                logger.error("Training interrupted.")
+                self._status = TrainingStatus.INTERRUPTED
+                raise
 
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED

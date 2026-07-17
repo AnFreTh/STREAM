@@ -1,9 +1,16 @@
 import numpy as np
 from loguru import logger
 from sklearn.feature_extraction.text import CountVectorizer
+import jieba
 
+def preprocess_text(text, stop_words): 
+    if not text:
+        return "Empty text provided."
+    words = text.split()
+    processed = [word for word in words if word not in stop_words and word != ' ']
+    return ' '.join(processed) if processed else "Documentation missing valid words."
 
-def c_tf_idf(documents, m, ngram_range=(1, 1)):
+def c_tf_idf(documents, m, ngram_range=(1, 1), stop_words="english"):
     """class based tf_idf retrieval from cluster of documents
 
     Args:
@@ -14,12 +21,17 @@ def c_tf_idf(documents, m, ngram_range=(1, 1)):
     Returns:
         _type_: _description_
     """
-    count = CountVectorizer(ngram_range=ngram_range, stop_words="english").fit(
+    if stop_words != "english":
+        processed_documents = [preprocess_text(doc, stop_words) for doc in documents]
+        count = CountVectorizer(ngram_range=ngram_range)
+        t = count.fit_transform(processed_documents).toarray()
+        w = t.sum(axis=1)
+    else:
+        count = CountVectorizer(ngram_range=ngram_range, stop_words="english").fit(
         documents
-    )
-    t = count.transform(documents).toarray()
-    w = t.sum(axis=1)
-
+        )
+        t = count.transform(documents).toarray()
+        w = t.sum(axis=1)
     # Suppress divide by zero warning
     with np.errstate(divide="ignore", invalid="ignore"):
         tf = np.divide(t.T, w)

@@ -4,7 +4,7 @@ import os
 from .load_steps import load_model_preprocessing_steps
 
 
-def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None):
+def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None, language=None):
     """
     Check if the dataset has been preprocessed according to the required steps for the model.
 
@@ -25,7 +25,10 @@ def check_dataset_steps(dataset, logger, model_type, preprocessing_steps=None):
         True if the dataset has been preprocessed according to the required steps, False otherwise.
     """
     if preprocessing_steps is None:
-        preprocessing_steps = load_model_preprocessing_steps(model_type)
+        if language == 'chinese':
+            preprocessing_steps = load_model_preprocessing_steps(model_type,language=language)
+        else:
+            preprocessing_steps = load_model_preprocessing_steps(model_type)
 
     missing_steps = []
 

@@ -59,12 +59,14 @@ extras_require = {
         "gensim",
         "hdbscan",
     ],
+    "experimental": ["openai"],
     "all": [
         "dash", "plotly", "matplotlib", "wordcloud",
         "hdbscan",
         "pyarrow", "setfit",
         "boto3",
         "gensim",
+        "openai",
     ],
 }
 

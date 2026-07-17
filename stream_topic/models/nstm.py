@@ -302,6 +302,7 @@ class NSTM(BaseModel):
         checkpoint_path: str = "checkpoints",
         monitor: str = "val_loss",
         mode: str = "min",
+        language: str = "en",
         trial=None,
         optimize=False,
         **kwargs,
@@ -363,7 +364,10 @@ class NSTM(BaseModel):
             dataset, TMDataset
         ), "The dataset must be an instance of TMDataset."
 
-        check_dataset_steps(dataset, logger, MODEL_NAME)
+        if language == "chinese":
+            check_dataset_steps(dataset, logger, MODEL_NAME, language="chinese")
+        else:
+            check_dataset_steps(dataset, logger, MODEL_NAME)
 
         self.n_topics = n_topics
 
