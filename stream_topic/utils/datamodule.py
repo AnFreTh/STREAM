@@ -72,6 +72,7 @@ class TMDataModule(pl.LightningDataModule):
         bow=False,
         tf_idf=False,
         word_embeddings=False,
+        tokens=False,
         random_state=101,
         embedding_model_name=None,
         **kwargs,
@@ -86,15 +87,55 @@ class TMDataModule(pl.LightningDataModule):
             dataset.embeddings = embs
 
         if bow:
-            b, self.vocab = dataset.get_bow(**kwargs)
+            if dataset.bow is None:
+                # Only create BOW if it doesn't exist yet
+                b, self.vocab = dataset.get_bow(**kwargs)
+            else:
+                # Use existing preprocessed BOW
+                if hasattr(dataset, "_bow_vocab"):
+                    self.vocab = dataset._bow_vocab
+                else:
+                    # Fallback: get vocab from existing BOW
+                    _, self.vocab = dataset.get_bow()
         if tf_idf:
-            tfidf, self.vocab = dataset.get_tfidf(**kwargs)
+            if dataset.tfidf is None:
+                # Only create TF-IDF if it doesn't exist yet
+                tfidf, self.vocab = dataset.get_tfidf(**kwargs)
+            else:
+                # Use existing preprocessed TF-IDF
+                if hasattr(dataset, "_tfidf_vocab"):
+                    self.vocab = dataset._tfidf_vocab
+                else:
+                    # Fallback: get vocab from existing TF-IDF
+                    _, self.vocab = dataset.get_tfidf()
         if word_embeddings:
             self.wembs = dataset.get_word_embeddings(**kwargs)
+        if tokens:
+            dataset.tokens = self._prepare_tokens(
+                dataset, self.vocab if bow else None, **kwargs
+            )
 
         self.train_dataset, self.val_dataset = dataset.split_dataset(
             train_ratio=train, val_ratio=val, seed=random_state
         )
+
+    def _prepare_tokens(self, dataset, vocab=None, **kwargs):
+        """Prepare token indices for models that use sequences."""
+        import numpy as np
+
+        if vocab is None:
+            _, vocab = dataset.get_bow(**kwargs)
+
+        vocab_list = vocab.tolist()
+        word_to_idx = {word: idx for idx, word in enumerate(vocab_list)}
+
+        tokens_list = []
+        for text in dataset.texts:
+            words = text.split()
+            token_ids = [word_to_idx.get(w, 0) for w in words]  # 0 for unknown
+            tokens_list.append(np.array(token_ids, dtype=np.int64))
+
+        return tokens_list
 
     def train_dataloader(self):
         """
@@ -103,7 +144,69 @@ class TMDataModule(pl.LightningDataModule):
         Returns:
             DataLoader: DataLoader instance for the training dataset.
         """
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            collate_fn=self._collate_fn,
+            **self.dataloader_kwargs,
+        )
 
+    def _collate_fn(self, batch):
+        """Custom collate function to handle variable-length sequences."""
+        import torch
+        import numpy as np
+
+        collated = {}
+
+        # Handle each key in the batch
+        for key in batch[0].keys():
+            if key == "tokens":
+                # Pad token sequences
+                tokens_list = [item[key] for item in batch]
+                max_len = max(len(t) for t in tokens_list)
+                padded = np.zeros((len(tokens_list), max_len), dtype=np.int64)
+                for i, tokens in enumerate(tokens_list):
+                    padded[i, : len(tokens)] = tokens
+                collated[key] = torch.from_numpy(padded)
+            elif key == "text":
+                collated[key] = [item[key] for item in batch]
+            elif key in ["bow", "tfidf", "embedding", "features", "boc"]:
+                collated[key] = torch.stack(
+                    [
+                        (
+                            torch.from_numpy(item[key])
+                            if isinstance(item[key], np.ndarray)
+                            else item[key]
+                        )
+                        for item in batch
+                    ]
+                )
+            else:
+                # Default: try to stack
+                try:
+                    collated[key] = torch.stack(
+                        [
+                            (
+                                item[key]
+                                if torch.is_tensor(item[key])
+                                else torch.tensor(item[key])
+                            )
+                            for item in batch
+                        ]
+                    )
+                except:
+                    collated[key] = [item[key] for item in batch]
+
+        return collated
+
+    def predict_dataloader(self):
+        """
+        Returns the predict dataloader for the complete training dataset.
+
+        Returns:
+            DataLoader: DataLoader instance for the training dataset.
+        """
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
@@ -122,5 +225,6 @@ class TMDataModule(pl.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
+            collate_fn=self._collate_fn,
             **self.dataloader_kwargs,
         )

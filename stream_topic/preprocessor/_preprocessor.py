@@ -88,12 +88,31 @@ class TextPreprocessor:
         self.remove_words_with_special_chars = kwargs.get(
             "remove_words_with_special_chars", False
         )
+        self.remove_top_frequent_percent = kwargs.get("remove_top_frequent_percent", None)
 
         if self.language != "en" and self.remove_stopwords:
             self.stop_words = set(stopwords.words(self.language))
         else:
             self.stop_words = set(stopwords.words("english"))
-
+        
+        # Add extended stopwords for better topic modeling
+        extended_stopwords = {
+            'said', 'would', 'could', 'should', 'might', 'may', 'also', 'one', 'two', 'three',
+            'get', 'go', 'come', 'see', 'know', 'think', 'say', 'make', 'take', 'use', 'way',
+            'time', 'year', 'new', 'first', 'last', 'good', 'great', 'well', 'back', 'much',
+            'many', 'still', 'even', 'just', 'like', 'right', 'want', 'need', 'work', 'people',
+            'man', 'woman', 'day', 'week', 'month', 'told', 'asked', 'went', 'came', 'got',
+            'put', 'give', 'gave', 'look', 'looked', 'find', 'found', 'call', 'called',
+            'help', 'helped', 'try', 'tried', 'keep', 'kept', 'left', 'felt', 'seem', 'seemed',
+            'turn', 'turned', 'show', 'showed', 'move', 'moved', 'play', 'played', 'run', 'ran',
+            'bring', 'brought', 'happen', 'happened', 'write', 'wrote', 'sit', 'sat', 'stand',
+            'stood', 'hear', 'heard', 'let', 'meet', 'met', 'include', 'including', 'follow',
+            'following', 'create', 'created', 'live', 'lived', 'feel', 'felt', 'become', 'became',
+            'leave', 'left', 'hand', 'part', 'group', 'number', 'area', 'fact', 'place', 'case',
+            'point', 'end', 'start', 'lot', 'bit', 'kind', 'sort', 'type', 'thing', 'things',
+            'something', 'someone', 'anyone', 'everyone', 'nothing', 'everything', 'anything'
+        }
+        self.stop_words.update(extended_stopwords)
         self.stop_words.update(self.custom_stopwords)
 
         if self.lemmatize:
@@ -203,6 +222,10 @@ class TextPreprocessor:
         if self.remove_words_with_special_chars:
             words = [word for word in words if not re.search(r"[^a-zA-Z0-9\s]", word)]
 
+        # Remove top frequent words if specified
+        if self.remove_top_frequent_percent is not None and hasattr(self, 'most_common_words'):
+            words = [word for word in words if word not in self.most_common_words]
+
         if self.detokenize:
             text = TreebankWordDetokenizer().detokenize(words)
         else:
@@ -257,6 +280,25 @@ class TextPreprocessor:
         return df
 
     def preprocess_documents(self, documents: List[str]) -> List[str]:
+        # First pass: count word frequencies after basic cleaning and stopword removal
+        if self.remove_top_frequent_percent is not None:
+            for doc in documents:
+                # Basic cleaning
+                text = doc.lower() if self.lowercase else doc
+                if self.remove_punctuation:
+                    text = re.sub(r"[^\w\s]", " ", text)
+                words = word_tokenize(text)
+                # Remove stopwords before counting
+                if self.remove_stopwords:
+                    words = [word for word in words if word not in self.stop_words]
+                self.word_freq.update(words)
+            
+            # Calculate top frequent words to remove
+            total_words = len(self.word_freq)
+            top_n = int(total_words * self.remove_top_frequent_percent / 100)
+            self.most_common_words = set([word for word, _ in self.word_freq.most_common(top_n)])
+        
+        # Second pass: preprocess documents
         preprocessed_docs = []
         for doc in tqdm(documents, desc="Preprocessing documents"):
             preprocessed_docs.append(self.preprocess_text(doc))

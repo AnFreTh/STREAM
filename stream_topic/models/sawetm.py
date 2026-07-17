@@ -1,0 +1,315 @@
+import numpy as np
+import torch
+import torch.nn as nn
+from loguru import logger
+from datetime import datetime
+import lightning as pl
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
+from optuna.integration import PyTorchLightningPruningCallback
+
+from ..utils.dataset import TMDataset
+from ..utils.datamodule import TMDataModule
+from .abstract_helper_models.base import BaseModel, TrainingStatus
+from .abstract_helper_models.neural_basemodel import NeuralBaseModel
+from .neural_base_models.sawetm_base import SawETMBase
+from ..commons.check_steps import check_dataset_steps
+
+time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+MODEL_NAME = "SawETM"
+
+
+class SawETM(BaseModel):
+    """
+    SawETM: Sawtooth Factorial Topic Embeddings Guided Gamma Belief Network.
+
+    Hierarchical topic model using Weibull-Gamma distributions.
+
+    Reference: Zhibin Duan et al. ICML 2021
+
+    Parameters
+    ----------
+    n_topics_list : list, optional
+        Number of topics per layer (top to bottom), by default [50, 36, 12]
+    embed_size : int, optional
+        Embedding size, by default 100
+    hidden_size : int, optional
+        Hidden layer size, by default 256
+    pretrained_WE : np.ndarray, optional
+        Pretrained word embeddings, by default None
+    batch_size : int, optional
+        Batch size, by default 64
+    val_size : float, optional
+        Validation set proportion, by default 0.2
+    shuffle : bool, optional
+        Whether to shuffle data, by default True
+    random_state : int, optional
+        Random seed, by default 42
+    """
+
+    def __init__(
+        self,
+        n_topics_list=[50, 36, 12],
+        embed_size: int = 100,
+        hidden_size: int = 256,
+        pretrained_WE=None,
+        batch_size: int = 256,
+        val_size: float = 0.2,
+        shuffle: bool = True,
+        random_state: int = 42,
+        **kwargs,
+    ):
+        super().__init__(
+            use_pretrained_embeddings=False,
+            n_topics_list=n_topics_list,
+            embed_size=embed_size,
+            hidden_size=hidden_size,
+            pretrained_WE=pretrained_WE,
+        )
+        self.save_hyperparameters(ignore=["random_state"])
+
+        self.n_topics = n_topics_list[0]  # Top layer topics
+        self._status = TrainingStatus.NOT_STARTED
+
+        self.hparams["datamodule_args"] = {
+            "batch_size": batch_size,
+            "val_size": val_size,
+            "shuffle": shuffle,
+            "random_state": random_state,
+            "embeddings": False,
+            "bow": True,
+            "tf_idf": False,
+            "word_embeddings": False,
+        }
+
+        self.optimize = False
+
+    def get_info(self):
+        info = {
+            "model_name": MODEL_NAME,
+            "num_topics": self.n_topics,
+            "n_topics_list": self.hparams.get("n_topics_list"),
+            "trained": self._status.name,
+        }
+        return info
+
+    def _initialize_model(self):
+        self.model = NeuralBaseModel(
+            model_class=SawETMBase,
+            dataset=self.dataset,
+            **{
+                k: v
+                for k, v in self.hparams.items()
+                if k not in ["datamodule_args", "max_epochs"]
+            },
+        )
+
+    def _initialize_trainer(
+        self,
+        max_epochs,
+        monitor,
+        patience,
+        mode,
+        checkpoint_path,
+        trial=None,
+        **trainer_kwargs,
+    ):
+        logger.info(f"--- Initializing Trainer for {MODEL_NAME} ---")
+        early_stop_callback = EarlyStopping(
+            monitor=monitor, min_delta=0.00, patience=patience, verbose=False, mode=mode
+        )
+
+        checkpoint_callback = ModelCheckpoint(
+            monitor="val_loss",
+            mode="min",
+            save_top_k=1,
+            dirpath=checkpoint_path,
+            filename="best_model",
+        )
+
+        model_callbacks = [
+            early_stop_callback,
+            checkpoint_callback,
+            ModelSummary(max_depth=2),
+        ]
+
+        if self.optimize:
+            model_callbacks.append(
+                PyTorchLightningPruningCallback(trial, monitor="val_loss")
+            )
+
+        self.trainer = pl.Trainer(
+            max_epochs=max_epochs,
+            callbacks=model_callbacks,
+            **trainer_kwargs,
+        )
+
+    def _initialize_datamodule(self, dataset):
+        logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
+        self.data_module = TMDataModule(
+            batch_size=self.hparams["datamodule_args"]["batch_size"],
+            shuffle=self.hparams["datamodule_args"]["shuffle"],
+            val_size=self.hparams["datamodule_args"]["val_size"],
+            random_state=self.hparams["datamodule_args"]["random_state"],
+        )
+
+        self.data_module.preprocess_data(
+            dataset=dataset,
+            **{
+                k: v
+                for k, v in self.hparams["datamodule_args"].items()
+                if k not in ["batch_size", "shuffle", "val_size"]
+            },
+        )
+
+        self.dataset = dataset
+
+    def fit(
+        self,
+        dataset: TMDataset = None,
+        n_topics_list=[50, 36, 12],
+        val_size: float = 0.2,
+        lr: float = 1e-02,
+        lr_patience: int = 10,
+        patience: int = 50,
+        weight_decay: float = 1e-07,
+        max_epochs: int = 1000,
+        batch_size: int = 256,
+        shuffle: bool = True,
+        random_state: int = 101,
+        checkpoint_path: str = "checkpoints",
+        monitor: str = "val_loss",
+        mode: str = "min",
+        trial=None,
+        optimize=False,
+        **kwargs,
+    ):
+        self.optimize = optimize
+        assert isinstance(
+            dataset, TMDataset
+        ), "The dataset must be an instance of TMDataset."
+        check_dataset_steps(dataset, logger, MODEL_NAME)
+
+        self.n_topics = n_topics_list[0]
+        self.dataset = dataset
+
+        self.hparams.update(
+            {
+                "n_topics_list": n_topics_list,
+                "lr": lr,
+                "lr_patience": lr_patience,
+                "patience": patience,
+                "weight_decay": weight_decay,
+                "max_epochs": max_epochs,
+            }
+        )
+
+        self.hparams["datamodule_args"].update(
+            {
+                "batch_size": batch_size,
+                "val_size": val_size,
+                "shuffle": shuffle,
+                "random_state": random_state,
+            }
+        )
+
+        try:
+            self._status = TrainingStatus.INITIALIZED
+
+            self._initialize_datamodule(dataset=dataset)
+            self._initialize_model()
+            self._initialize_trainer(
+                max_epochs=self.hparams["max_epochs"],
+                monitor=monitor,
+                patience=patience,
+                mode=mode,
+                checkpoint_path=checkpoint_path,
+                trial=trial,
+                **kwargs,
+            )
+
+            logger.info(f"--- Training {MODEL_NAME} topic model ---")
+            self._status = TrainingStatus.RUNNING
+            self.trainer.fit(self.model, self.data_module)
+
+            # Load best checkpoint weights
+            if hasattr(self.trainer, "checkpoint_callback") and self.trainer.checkpoint_callback and self.trainer.checkpoint_callback.best_model_path:
+                import torch as _torch
+                _ckpt = _torch.load(self.trainer.checkpoint_callback.best_model_path, weights_only=True)
+                self.model.load_state_dict(_ckpt["state_dict"])
+                logger.info(f"Loaded best checkpoint from epoch {self.trainer.checkpoint_callback.best_model_score}")
+
+        except Exception as e:
+            logger.error(f"Error in training: {e}")
+            self._status = TrainingStatus.FAILED
+            raise
+        except KeyboardInterrupt:
+            logger.error("Training interrupted.")
+            self._status = TrainingStatus.INTERRUPTED
+            raise
+
+        logger.info("--- Training completed successfully. ---")
+        self._status = TrainingStatus.SUCCEEDED
+
+        # Get theta for top layer
+        theta_list = self.model.model.get_theta(
+            torch.tensor(self.dataset.bow), only_theta=True
+        )
+        self.theta = theta_list[0].detach().cpu().numpy()
+        self.theta = self.theta / self.theta.sum(axis=1, keepdims=True)
+
+        # Get beta for top layer
+        beta_list = self.model.model.get_beta()
+        self.beta = beta_list[0].detach().cpu().numpy()
+        self.labels = np.array(np.argmax(self.theta, axis=1))
+
+        self.topic_dict = self.get_topic_word_dict(self.data_module.vocab)
+
+    def get_topic_word_dict(self, vocab, num_words=100):
+        topic_word_dict = {}
+        for topic_idx, topic_dist in enumerate(self.beta):
+            top_word_indices = topic_dist.argsort()[-num_words:][::-1]
+            top_words_probs = [(vocab[i], topic_dist[i]) for i in top_word_indices]
+            topic_word_dict[topic_idx] = top_words_probs
+        return topic_word_dict
+
+    def predict(self, dataset):
+        pass
+
+    def suggest_hyperparameters(self, trial):
+        # Top layer is fixed to n_topics (set by the benchmark)
+        n_topics_top = self.hparams.get("n_topics", self.n_topics)
+        n_layers = trial.suggest_int("n_layers", 2, 4)
+        n_topics_list = [n_topics_top]
+        for i in range(1, n_layers):
+            prev = n_topics_list[-1]
+            lower = max(3, prev // 3)
+            upper = max(lower + 1, prev - 2)
+            n_topics_list.append(trial.suggest_int(f"n_topics_layer_{i}", lower, upper))
+
+        self.hparams["n_topics_list"] = n_topics_list
+        self.hparams["hidden_size"] = trial.suggest_int("hidden_size", 128, 512)
+        self.hparams["embed_size"] = trial.suggest_int("embed_size", 50, 200)
+        self.hparams["lr"] = trial.suggest_float("lr", 1e-5, 1e-2)
+        self.hparams["weight_decay"] = trial.suggest_float("weight_decay", 1e-7, 1e-3)
+        self.hparams["datamodule_args"]["batch_size"] = trial.suggest_int(
+            "batch_size", 12, 512
+        )
+
+    def optimize_and_fit(
+        self,
+        dataset,
+        criterion="val_loss",
+        n_trials=100,
+        custom_metric=None,
+        timeout=None,
+    ):
+        best_params = super().optimize_hyperparameters_neural(
+            dataset=dataset,
+            min_topics=2,
+            max_topics=20,
+            criterion=criterion,
+            n_trials=n_trials,
+            custom_metric=custom_metric,
+            timeout=timeout,
+        )
+        return best_params

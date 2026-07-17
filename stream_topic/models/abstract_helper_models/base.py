@@ -208,7 +208,11 @@ class BaseModel(ABC):
             The dataset to be used for clustering.
         """
 
-        if dataset.has_embeddings(self.embedding_model_name):
+        if dataset.embeddings is not None:
+            logger.info("--- Reusing in-memory document embeddings ---")
+            return dataset, dataset.embeddings
+
+        if dataset.has_embeddings(self.embedding_model_name, path=self.embeddings_path, file_name=self.embeddings_file_path):
             logger.info(
                 f"--- Loading precomputed {self.embedding_model_name} embeddings ---"
             )
@@ -313,6 +317,7 @@ class BaseModel(ABC):
         criterion="aic",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         Optimize model parameters using Optuna.
@@ -353,10 +358,13 @@ class BaseModel(ABC):
             ), "Custom metric must be provided for criterion 'custom'."
 
         def objective(trial):
-            # Suggest number of topics
-            self.hparams["n_topics"] = trial.suggest_int(
-                "n_topics", min_topics, max_topics
-            )
+            # Only suggest n_topics if range is given; otherwise use fixed value
+            if min_topics < max_topics:
+                self.hparams["n_topics"] = trial.suggest_int(
+                    "n_topics", min_topics, max_topics
+                )
+            else:
+                self.hparams["n_topics"] = min_topics
 
             # Call the model-specific parameter suggestion method
             self.suggest_hyperparameters(trial)
@@ -384,11 +392,11 @@ class BaseModel(ABC):
 
         # Create an Optuna study and optimize the objective function
         study = optuna.create_study(direction="minimize")
-        study.optimize(objective, n_trials=n_trials)
+        study.optimize(objective, n_trials=n_trials, timeout=timeout)
 
         best_params = study.best_params
         best_score = study.best_value
-        best_n_topics = best_params.pop("n_topics")
+        best_n_topics = best_params.pop("n_topics", self.hparams.get("n_topics", 20))
 
         logger.info(
             f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
@@ -436,6 +444,7 @@ class BaseModel(ABC):
         criterion="val_loss",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         Optimize model parameters using Optuna.
@@ -469,11 +478,17 @@ class BaseModel(ABC):
                 custom_metric is not None
             ), "Custom metric must be provided for criterion 'custom'."
 
+        import importlib
+        optuna = importlib.import_module("optuna")
+
         def objective(trial):
-            # Suggest number of topics
-            self.hparams["n_topics"] = trial.suggest_int(
-                "n_topics", min_topics, max_topics
-            )
+            # Only suggest n_topics if range is given; otherwise use fixed value
+            if min_topics < max_topics:
+                self.hparams["n_topics"] = trial.suggest_int(
+                    "n_topics", min_topics, max_topics
+                )
+            else:
+                self.hparams["n_topics"] = min_topics
 
             # Call the model-specific parameter suggestion method
             self.suggest_hyperparameters(trial)
@@ -499,11 +514,11 @@ class BaseModel(ABC):
         study = optuna.create_study(
             direction="minimize", pruner=optuna.pruners.MedianPruner()
         )
-        study.optimize(objective, n_trials=n_trials)
+        study.optimize(objective, n_trials=n_trials, timeout=timeout)
 
         best_params = study.best_params
         best_score = study.best_value
-        best_n_topics = best_params.pop("n_topics")
+        best_n_topics = best_params.pop("n_topics", self.hparams.get("n_topics", 20))
 
         logger.info(
             f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."

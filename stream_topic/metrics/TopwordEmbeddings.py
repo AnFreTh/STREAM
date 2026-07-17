@@ -140,6 +140,10 @@ class TopwordEmbeddings:
         if self.cache_to_file:
             self._save_embedding_dict_to_disc()
         topword_embeddings = np.array(topword_embeddings)
-        topword_embeddings = np.squeeze(topword_embeddings)
-
+        
+        # Ensure shape is (n_topics, n_topwords, embedding_dim)
+        # Remove only trailing dimensions of size 1, not all
+        while topword_embeddings.ndim > 3 and topword_embeddings.shape[-1] == 1:
+            topword_embeddings = topword_embeddings.squeeze(-1)
+        
         return topword_embeddings

@@ -35,21 +35,24 @@ class ETMBase(nn.Module):
         pretrained_WE=None,
         train_WE: bool = True,
         encoder_activation: callable = nn.ReLU(),
+        kl_weight: float = None,
     ):
         super().__init__()
 
         vocab_size = dataset.bow.shape[1]
+        self.kl_weight = kl_weight if kl_weight is not None else 1.0
 
         if pretrained_WE is not None:
+            embed_size = pretrained_WE.shape[1]
             self.word_embeddings = nn.Parameter(torch.from_numpy(pretrained_WE).float())
         else:
-            self.word_embeddings = nn.Parameter(torch.randn((vocab_size, embed_size)))
+            self.word_embeddings = nn.Parameter(torch.empty(vocab_size, embed_size))
+            nn.init.normal_(self.word_embeddings, mean=0.0, std=0.02)
 
         self.word_embeddings.requires_grad = train_WE
 
-        self.topic_embeddings = nn.Parameter(
-            torch.randn((n_topics, self.word_embeddings.shape[1]))
-        )
+        self.topic_embeddings = nn.Parameter(torch.empty(n_topics, embed_size))
+        nn.init.xavier_uniform_(self.topic_embeddings)
 
         self.encoder1 = nn.Sequential(
             nn.Linear(vocab_size, encoder_dim),
@@ -59,8 +62,8 @@ class ETMBase(nn.Module):
             nn.Dropout(dropout),
         )
 
-        self.fc21 = nn.Linear(encoder_dim, n_topics)
-        self.fc22 = nn.Linear(encoder_dim, n_topics)
+        self.fc_mu = nn.Linear(encoder_dim, n_topics)
+        self.fc_var = nn.Linear(encoder_dim, n_topics)
 
     def reparameterize(self, mu, logvar):
         """
@@ -100,7 +103,7 @@ class ETMBase(nn.Module):
             The mean and log variance of the latent variables.
         """
         e1 = self.encoder1(x)
-        return self.fc21(e1), self.fc22(e1)
+        return self.fc_mu(e1), self.fc_var(e1)
 
     def get_theta(self, x, only_theta=False):
         """
@@ -178,7 +181,7 @@ class ETMBase(nn.Module):
         recon_x, mu, logvar = self.forward(x)
         x = x["bow"]
         loss = self.loss_function(x, recon_x, mu, logvar)
-        return loss * 1e-02
+        return loss
 
     def loss_function(self, x, recon_x, mu, logvar):
         """
@@ -202,7 +205,7 @@ class ETMBase(nn.Module):
         """
         recon_loss = -(x * (recon_x + 1e-12).log()).sum(1)
         KLD = -0.5 * (1 + logvar - mu**2 - logvar.exp()).sum(1)
-        loss = (recon_loss + KLD).mean()
+        loss = (recon_loss + self.kl_weight * KLD).mean()
         return loss
 
     def get_complete_theta_mat(self, x):

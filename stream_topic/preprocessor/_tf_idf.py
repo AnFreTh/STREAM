@@ -23,13 +23,15 @@ def c_tf_idf(documents, m, ngram_range=(1, 1)):
     # Suppress divide by zero warning
     with np.errstate(divide="ignore", invalid="ignore"):
         tf = np.divide(t.T, w)
-        if np.any(np.isnan(tf)) or np.any(np.isinf(tf)):
-            logger.warning("NaNs or inf in tf matrix")
-            tf[~np.isfinite(tf)] = 0
+        tf[~np.isfinite(tf)] = 0
 
     sum_t = t.sum(axis=0)
+    # Avoid log(0) and division by zero
+    sum_t = np.maximum(sum_t, 1)
     idf = np.log(np.divide(m, sum_t)).reshape(-1, 1)
+    idf[~np.isfinite(idf)] = 0
     tf_idf = np.multiply(tf, idf)
+    tf_idf = np.nan_to_num(tf_idf, nan=0.0, posinf=0.0, neginf=0.0)
 
     return tf_idf, count
 

@@ -58,7 +58,7 @@ class TNTMBase(CTMBase):
         self.mus = nn.Parameter(mus_init)   #create topic means as learnable paramter
         self.L_lower = nn.Parameter(L_lower_init)   # factor of covariance per topic
         self.log_diag = nn.Parameter(log_diag_init)  # summand for diagonal of covariance
-        self.word_embeddings_projected = torch.tensor(word_embeddings_projected)
+        self.register_buffer("word_embeddings_projected", torch.tensor(word_embeddings_projected, dtype=torch.float32))
 
         emb_dim = word_embeddings_projected.shape[1]
 
@@ -106,7 +106,7 @@ class TNTMBase(CTMBase):
         diag = torch.exp(self.log_diag)
 
         normal_dis_lis = [LowRankMultivariateNormal(mu, cov_factor= lower, cov_diag = D) for mu, lower, D in zip(self.mus, self.L_lower, diag)]
-        log_probs = torch.zeros(self.n_topics, self.vocab_size)
+        log_probs = torch.zeros(self.n_topics, self.vocab_size, device=self.word_embeddings_projected.device)
 
         for i, dis in enumerate(normal_dis_lis):
             log_probs[i] = dis.log_prob(self.word_embeddings_projected)

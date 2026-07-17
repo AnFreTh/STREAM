@@ -108,6 +108,16 @@ class DataDownloader:
                 )
             )
             return os.path.exists(embeddings_file)
+        else:
+            # Custom path provided
+            embeddings_file = (
+                os.path.join(path, file_name)
+                if file_name
+                else os.path.join(
+                    path, f"{self.name}_embeddings_{embedding_model_name}.pkl"
+                )
+            )
+            return os.path.exists(embeddings_file)
 
     def save_embeddings(
         self, embeddings, embedding_model_name, path=None, file_name=None

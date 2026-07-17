@@ -1,9 +1,9 @@
 from datetime import datetime
 
-import gensim.corpora as corpora
 import numpy as np
 import pandas as pd
-from gensim.models import ldamodel
+from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.feature_extraction.text import CountVectorizer
 from loguru import logger
 from nltk.tokenize import word_tokenize
 
@@ -18,27 +18,26 @@ time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 class LDA(BaseModel):
 
-    def __init__(self, id2word=None, id_corpus=None, random_state=None, **kwargs):
+    def __init__(self, vectorizer=None, random_state=None, **kwargs):
         """
         Initialize the LDA model.
 
         Parameters
         ----------
-        id2word : Dictionary or None, optional
-            A Gensim dictionary mapping word ids to words.
-        id_corpus : List of lists or None, optional
-            The corpus represented as a list of lists of (word_id, word_frequency) tuples.
+        vectorizer : CountVectorizer or None, optional
+            A scikit-learn CountVectorizer for text preprocessing.
         random_state : int or None, optional
             Seed for random number generation.
         """
         super().__init__(use_pretrained_embeddings=True, **kwargs)
-        self.save_hyperparameters(ignore=["id2word", "id_corpus"])
+        self.save_hyperparameters(ignore=["vectorizer"])
 
         self._status = TrainingStatus.NOT_STARTED
         self.n_topics = None
-        self.id2word = id2word
-        self.id_corpus = id_corpus
+        self.vectorizer = vectorizer
         self.random_state = random_state
+        self.doc_term_matrix = None
+        self.feature_names = None
 
     def get_info(self):
         """
@@ -101,16 +100,19 @@ class LDA(BaseModel):
 
         logger.info(f"--- Preparing the documents for {MODEL_NAME} ---")
 
-        dataset = self._assert_and_tokenize(dataset)
-
-        if self.id2word is None:
-            self.id2word = corpora.Dictionary(dataset.dataframe["tokens"])
-
-        if self.id_corpus is None:
-            self.id_corpus = [
-                self.id2word.doc2bow(document)
-                for document in dataset.dataframe["tokens"]
-            ]
+        # Get text documents
+        documents = dataset.dataframe["text"].tolist()
+        
+        if self.vectorizer is None:
+            self.vectorizer = CountVectorizer(
+                max_df=0.95, 
+                min_df=2, 
+                stop_words='english',
+            )
+        
+        # Create document-term matrix
+        self.doc_term_matrix = self.vectorizer.fit_transform(documents)
+        self.feature_names = self.vectorizer.get_feature_names_out()
 
     def fit(self, dataset: TMDataset = None, n_topics: int = 20, **lda_params):
         """
@@ -145,16 +147,25 @@ class LDA(BaseModel):
             self._status = TrainingStatus.INITIALIZED
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
-            if not self.id_corpus and not self.id2word:
+            if self.doc_term_matrix is None:
                 self._prepare_documents(dataset)
+            
             lda_params = {
                 key: value
                 for key, value in {**self.hparams, **lda_params}.items()
-                if key != "n_topics"
+                if key not in ["n_topics", "vectorizer"]
             }
-            self.model = ldamodel.LdaModel(
-                self.id_corpus, num_topics=n_topics, **lda_params
+            
+            # Set default parameters if not provided
+            lda_params.setdefault('random_state', self.random_state)
+            lda_params.setdefault('max_iter', 10)
+            lda_params.setdefault('learning_method', 'batch')
+            
+            self.model = LatentDirichletAllocation(
+                n_components=n_topics, 
+                **lda_params
             )
+            self.model.fit(self.doc_term_matrix)
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED
@@ -175,41 +186,44 @@ class LDA(BaseModel):
     def optimize_and_fit(
         self,
         dataset,
-        metric,
+        metric=None,
         min_topics=2,
         max_topics=20,
+        criterion="aic",
         n_trials=100,
+        timeout=None,
     ):
         """
-        A new method in the child class that calls the parent class's optimize_hyperparameters method.
+        Optimize hyperparameters and fit the LDA model.
 
         Parameters
         ----------
         dataset : TMDataset
             The dataset to train the model on.
+        metric : object, optional
+            Custom metric with a score() method. Used when criterion='custom'.
         min_topics : int, optional
-            Minimum number of topics to evaluate, by default 2.
+            Minimum number of topics, by default 2.
         max_topics : int, optional
-            Maximum number of topics to evaluate, by default 20.
+            Maximum number of topics, by default 20.
         criterion : str, optional
-            Criterion to use for optimization ('aic', 'bic', or 'custom'), by default 'aic'.
+            'aic', 'bic', or 'custom', by default 'aic'.
         n_trials : int, optional
-            Number of trials for optimization, by default 100.
-        custom_metric : object, optional
-            Custom metric object with a `score` method for evaluation, by default None.
-
-        Returns
-        -------
-        dict
-            Dictionary containing the best parameters and the optimal number of topics.
+            Number of HPO trials, by default 100.
+        timeout : int, optional
+            HPO timeout in seconds, by default None.
         """
+        if criterion == "custom" and metric is None:
+            raise ValueError("metric must be provided when criterion='custom'")
+
         best_params = super().optimize_hyperparameters(
             dataset=dataset,
             min_topics=min_topics,
             max_topics=max_topics,
-            criterion="custom",
+            criterion=criterion if metric is None else "custom",
             n_trials=n_trials,
             custom_metric=metric,
+            timeout=timeout,
         )
 
         return best_params
@@ -235,48 +249,14 @@ class LDA(BaseModel):
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
 
-        topic_document_matrix = []
-        for doc_bow in self.id_corpus:
-            topic_distribution = self.model.get_document_topics(doc_bow)
-            topic_document_matrix.append(topic_distribution)
-        return self._convert_to_dataframe(topic_document_matrix, self.n_topics)
+        # Get document-topic distribution
+        doc_topic_dist = self.model.transform(self.doc_term_matrix)
+        
+        # Convert to DataFrame with proper column names
+        columns = [f"topic_{i}" for i in range(self.n_topics)]
+        return pd.DataFrame(doc_topic_dist, columns=columns)
 
-    def _convert_to_dataframe(self, topic_distributions, num_topics):
-        """
-        Convert topic distributions to a DataFrame.
 
-        Parameters
-        ----------
-        topic_distributions : list of list of tuples
-            List of topic distributions, where each distribution is a list of (topic_id, probability) tuples.
-        num_topics : int
-            The number of topics.
-
-        Returns
-        -------
-        df : pd.DataFrame
-            DataFrame where each row corresponds to a document and each column to a topic,
-            with the values representing the topic probabilities for each document.
-        """
-        # Initialize an empty list to store the document-topic distributions
-        data = []
-
-        # Iterate through each document's topic distribution
-        for doc_distribution in topic_distributions:
-            # Create a dictionary with the topic probabilities
-            doc_data = {
-                f"topic_{topic_id}": prob for topic_id, prob in doc_distribution
-            }
-            # Add missing topics with probability 0
-            for topic_id in range(num_topics):
-                if f"topic_{topic_id}" not in doc_data:
-                    doc_data[f"topic_{topic_id}"] = 0.0
-            data.append(doc_data)
-
-        # Create a DataFrame from the list of dictionaries
-        df = pd.DataFrame(data)
-
-        return df
 
     def get_beta(self):
         """
@@ -284,8 +264,8 @@ class LDA(BaseModel):
 
         Returns
         -------
-        topic_word_matrix : list of list of tuples
-            List of topics, where each topic is a list of (word_id, probability) tuples.
+        beta_matrix : np.ndarray
+            Topic-word distribution matrix.
 
         Raises
         ------
@@ -295,26 +275,9 @@ class LDA(BaseModel):
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
 
-        topic_word_matrix = []
-        for topic_id in range(self.n_topics):
-            word_distribution = self.model.get_topic_terms(
-                topic_id, topn=len(self.id2word)
-            )
-            topic_word_matrix.append(word_distribution)
-
-        n = max(max(t[0] for t in topic) for topic in topic_word_matrix) + 1
-        num_topics = len(topic_word_matrix)
-        num_words_per_topic = len(topic_word_matrix[0])
-
-        # Initialize the matrix with zeros
-        beta_matrix = np.zeros((n, num_topics))
-
-        # Fill the matrix with values from the beta list
-        for topic_idx, topic in enumerate(topic_word_matrix):
-            for word_index, probability in topic:
-                beta_matrix[word_index, topic_idx] = probability
-
-        self.beta = beta_matrix
+        # Get topic-word distribution (components_)
+        # Shape: (n_topics, n_features)
+        self.beta = self.model.components_.T  # Transpose to get (n_features, n_topics)
         return self.beta
 
     def _get_topic_word_dict(self, num_words=100):
@@ -332,16 +295,36 @@ class LDA(BaseModel):
             Dictionary where keys are topic ids and values are lists of tuples (word, probability).
         """
         topic_word_dict = {}
-
-        for topic_id in range(self.model.num_topics):
-            topic_terms = self.model.get_topic_terms(topic_id, topn=num_words)
+        
+        # Get topic-word distribution
+        topic_word_dist = self.model.components_
+        
+        for topic_id in range(self.n_topics):
+            # Get top words for this topic
+            top_word_indices = np.argsort(topic_word_dist[topic_id])[::-1][:num_words]
             topic_word_dict[topic_id] = [
-                (self.id2word[term_id], prob) for term_id, prob in topic_terms
+                (self.feature_names[word_idx], topic_word_dist[topic_id][word_idx])
+                for word_idx in top_word_indices
             ]
 
         return topic_word_dict
 
+    def calculate_aic(self, n_topics=None):
+        """AIC using sklearn LDA's log-likelihood score."""
+        log_likelihood = self.model.score(self.doc_term_matrix)
+        n_params = n_topics * self.doc_term_matrix.shape[1]  # K * V
+        return -2 * log_likelihood + 2 * n_params
+
+    def calculate_bic(self, n_topics=None):
+        """BIC using sklearn LDA's log-likelihood score."""
+        log_likelihood = self.model.score(self.doc_term_matrix)
+        n_samples = self.doc_term_matrix.shape[0]
+        n_params = n_topics * self.doc_term_matrix.shape[1]
+        return -2 * log_likelihood + n_params * np.log(n_samples)
+
     def suggest_hyperparameters(self, trial):
-        # Suggest LDA-specific hyperparameters (e.g., alpha, beta)
-        self.hparams["alpha"] = trial.suggest_float("alpha", 0.01, 1.0)
-        self.hparams["eta"] = trial.suggest_float("eta", 0.01, 1.0)
+        # Suggest LDA-specific hyperparameters for scikit-learn LDA
+        self.hparams["doc_topic_prior"] = trial.suggest_float("doc_topic_prior", 0.01, 1.0)
+        self.hparams["topic_word_prior"] = trial.suggest_float("topic_word_prior", 0.01, 1.0)
+        self.hparams["learning_decay"] = trial.suggest_float("learning_decay", 0.5, 1.0)
+        self.hparams["max_iter"] = trial.suggest_int("max_iter", 5, 50)

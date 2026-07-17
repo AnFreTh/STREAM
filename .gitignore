@@ -191,3 +191,39 @@ docs/notebooks/embeddings
 docs/notebooks/embeddings/*
 docs/notebooks/checkpoints
 docs/notebooks/checkpoints/*
+
+
+stream-backend/*
+stream-website/*
+node_modules/*
+data/*
+stream_topic/stream_topic_data/*
+docs/*
+lightning_logs/*
+/examples
+*.png
+/docs
+/checkpoints
+/stream_venv
+/TopMost
+*.csv
+*.ipynb
+*.json
+
+# --- Benchmark harness (scripts/) ---
+# The benchmark source is published for reproducibility, but its run artifacts,
+# cached model weights, and local secrets are not.
+scripts/**/.env
+scripts/benchmark/results/
+scripts/**/checkpoints/
+scripts/**/lightning_logs/
+scripts/**/embeddings/
+scripts/benchmark/sagemaker/models/
+scripts/**/*.tar.gz
+scripts/**/*.safetensors
+scripts/**/*.pkl
+
+# README assets (images referenced by the top-level README)
+!assets/topicarena_elo.png
+!assets/topicarena_cd_overall.png
+scripts/.DS_Store

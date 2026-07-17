@@ -2,12 +2,12 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from gensim.models import Word2Vec
+from sentence_transformers import SentenceTransformer
 from loguru import logger
 from sklearn.mixture import GaussianMixture
 import os
 from ..commons.check_steps import check_dataset_steps
-from ..preprocessor._embedder import BaseEmbedder, GensimBackend
+from ..preprocessor._embedder import BaseEmbedder
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 
@@ -121,34 +121,21 @@ class WordCluTM(BaseModel):
         }
         return info
 
-    def train_word2vec(
-        self, sentences, epochs, vector_size, window, min_count, workers, logger
+    def train_sentence_transformer(
+        self, sentences, logger
     ):
         """
-        Train a Word2Vec model on the given sentences.
+        Initialize a SentenceTransformer model for word embeddings.
 
         Args:
-            sentences (list): List of tokenized sentences.
+            sentences (list): List of tokenized sentences (not used for pre-trained models).
         """
-        # Initialize Word2Vec model
-        self.word2vec_model = Word2Vec(
-            vector_size=vector_size,
-            window=window,
-            min_count=min_count,
-            workers=workers,
-        )
-
-        # Build the vocabulary from the sentences
-        self.word2vec_model.build_vocab(sentences)
-
-        logger.info(f"--- Train Word2Vec ---")
-        # Train the Word2Vec model
-        self.word2vec_model.train(
-            sentences, total_examples=len(sentences), epochs=epochs
-        )
-
-        # Initialize BaseEmbedder with GensimBackend
-        self.base_embedder = BaseEmbedder(GensimBackend(self.word2vec_model.wv))
+        logger.info(f"--- Loading SentenceTransformer model ---")
+        # Use pre-trained sentence transformer
+        self.sentence_model = SentenceTransformer(self.word_embedding_model_name)
+        
+        # Initialize BaseEmbedder with SentenceTransformer
+        self.base_embedder = BaseEmbedder(self.sentence_model)
 
     def _prepare_word_embeddings(self, dataset, logger):
         """
@@ -258,26 +245,16 @@ class WordCluTM(BaseModel):
             logger.info(f"--- Training {MODEL_NAME} topic model ---")
             self._status = TrainingStatus.RUNNING
             if self.train_word_embeddings:
-                self.train_word2vec(
+                self.train_sentence_transformer(
                     sentences=sentences,
-                    epochs=word2vec_epochs,
-                    vector_size=vector_size,
-                    window=window,
-                    min_count=min_count,
-                    workers=workers,
                     logger=logger,
-                )  # Train Word2Vec model
+                )  # Initialize SentenceTransformer model
 
-                self.embeddings = np.array(
-                    [
-                        (
-                            self.word2vec_model.wv[word]
-                            if word in dataset.get_vocabulary()
-                            else np.zeros(vector_size)
-                        )
-                        for word in unique_words
-                    ]
-                )
+                # Get embeddings for unique words
+                logger.info(f"--- Computing word embeddings ---")
+                word_embeddings = self.sentence_model.encode(unique_words, show_progress_bar=True)
+                self.embeddings = np.array(word_embeddings)
+                self.vector_size = self.embeddings.shape[1]
 
             else:
                 self._prepare_word_embeddings(dataset, logger)
@@ -292,23 +269,25 @@ class WordCluTM(BaseModel):
             self.doc_embeddings = []
             logger.info(f"--- Compute doc embeddings ---")
             for doc in sentences:
-                # Collect word embeddings for the document
+                # Convert tokenized document back to text
+                doc_text = ' '.join(doc)
+                
                 if self.train_word_embeddings:
-                    word_embeddings = [
-                        self.word2vec_model.wv[word]
-                        for word in doc
-                        if word in self.word2vec_model.wv
-                    ]
+                    # Use sentence transformer to encode the document
+                    doc_embedding = self.sentence_model.encode([doc_text])[0]
+                    self.doc_embeddings.append(doc_embedding)
                 else:
+                    # Collect word embeddings for the document
                     word_embeddings = [
                         np.array(self.word_embeddings[word]) for word in doc
+                        if word in self.word_embeddings
                     ]
-                # Compute the mean embedding for the document if there are valid word embeddings
-                if word_embeddings:
-                    self.doc_embeddings.append(np.mean(word_embeddings, axis=0))
-                else:
-                    # Append a zero array if no valid word embeddings are found
-                    self.doc_embeddings.append(np.zeros(self.vector_size))
+                    # Compute the mean embedding for the document if there are valid word embeddings
+                    if word_embeddings:
+                        self.doc_embeddings.append(np.mean(word_embeddings, axis=0))
+                    else:
+                        # Append a zero array if no valid word embeddings are found
+                        self.doc_embeddings.append(np.zeros(self.vector_size))
 
             # Replace any NaN values in the final list with zero arrays
             self.doc_embeddings = [
@@ -392,6 +371,7 @@ class WordCluTM(BaseModel):
         criterion="aic",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that optimizes and fits the model.
@@ -423,6 +403,7 @@ class WordCluTM(BaseModel):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params

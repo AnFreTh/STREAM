@@ -16,16 +16,17 @@ class NeuralBaseModel(pl.LightningModule):
         patience=15,
         weight_decay=1e-07,
         lr_factor=0.1,
+        batch_size=None,
         **kwargs,
     ):
         super().__init__()
 
         # Separate dataset from other kwargs
-        model_kwargs = {key: value for key,
-                        value in kwargs.items() if key != "dataset"}
+        model_kwargs = {key: value for key, value in kwargs.items() if key != "dataset"}
+        self.batch_given = batch_size is not None
+        self.batch_size = batch_size
 
-        self.model = model_class(
-            dataset=dataset, n_topics=n_topics, **model_kwargs)
+        self.model = model_class(dataset=dataset, n_topics=n_topics, **model_kwargs)
         self.lr = lr
         self.lr_patience = lr_patience
         self.patience = patience
@@ -35,40 +36,70 @@ class NeuralBaseModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
 
         loss = self.model.compute_loss(batch)
-
-        self.log(
-            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
-        )
+        
+        if self.batch_given:
+            batch_size = self._get_batch_size(batch)
+            self.log(
+                "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=batch_size
+            )
+        else:
+            self.log(
+                "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+            )
 
         return loss
 
     def validation_step(self, batch, batch_idx):
 
         val_loss = self.model.compute_loss(batch)
-
-        self.log(
-            "val_loss",
-            val_loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
+        
+        if self.batch_given:
+            batch_size = self._get_batch_size(batch)
+            self.log(
+                "val_loss",
+                val_loss,
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+            )
+        else:
+            self.log(
+                "val_loss",
+                val_loss,
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+            )
 
         return val_loss
 
     def test_step(self, batch, batch_idx):
 
         test_loss = self.model.compute_loss(batch)
-
-        self.log(
-            "test_loss",
-            test_loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
+        
+        if self.batch_given:
+            batch_size = self._get_batch_size(batch)
+            self.log(
+                "test_loss",
+                test_loss,
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                batch_size=batch_size,
+            )
+        else:
+            self.log(
+                "test_loss",
+                test_loss,
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+            )
 
         return test_loss
 
@@ -92,3 +123,19 @@ class NeuralBaseModel(pl.LightningModule):
         }
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
+    
+    def _get_batch_size(self, batch):
+        """Infer batch size from batch structure."""
+        if isinstance(batch, dict):
+            for key, value in batch.items():
+                if isinstance(value, torch.Tensor):
+                    return value.shape[0]
+                elif isinstance(value, list):
+                    return len(value)
+        elif isinstance(batch, torch.Tensor):
+            return batch.shape[0]
+        elif isinstance(batch, list):
+            return len(batch)
+        
+        # Fallback
+        return 1

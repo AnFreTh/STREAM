@@ -139,5 +139,6 @@ def cos_sim_pw(mat):
     """
     calculate the average cosine similarity of all rows in the matrix (but exclude the similarity of a row to itself)
     """
+    mat = np.nan_to_num(mat, nan=0.0)
     sim = cosine_similarity(mat)
     return mean_over_diag(sim)

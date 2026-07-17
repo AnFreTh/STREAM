@@ -1,14 +1,17 @@
 import re
 from itertools import compress
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from gensim.models.keyedvectors import Word2VecKeyedVectors
+from sentence_transformers import SentenceTransformer
 from nltk import pos_tag
 from nltk.corpus import brown as nltk_words
 from nltk.corpus import words as eng_dict
 from numpy.linalg import norm
-from ..utils.dataset import TMDataset
+
+if TYPE_CHECKING:
+    from ..utils.dataset import TMDataset
 
 from ._embedder import BaseEmbedder
 
@@ -74,6 +77,7 @@ class TopicExtractor:
             word_list = [word.lower().strip() for word in word_list]
             word_list = [re.sub(r"[^a-zA-Z0-9]+\s*", "", word) for word in word_list]
         elif corpus == "stream":
+            from ..utils.dataset import TMDataset
             data = TMDataset()
             data.fetch_dataset("20NewsGroups")
             word_list = data.get_vocabulary()
@@ -104,16 +108,22 @@ class TopicExtractor:
 
         word_list = list(set(word_list))
 
-        # embedd the noun_corpus
+        # embed the noun_corpus
         nouns = self.embedder.create_word_embeddings(word_list)
 
-        if isinstance(self.embedder.embedder, Word2VecKeyedVectors):
-            word_list = list(compress(word_list, list(~pd.isnull(nouns))))
-            nouns = nouns[~pd.isnull(nouns)]
-            try:
-                nouns.shape[1]
-            except IndexError:
-                nouns = np.stack([noun for noun in nouns])
+        # Handle case where some words might not have embeddings
+        if isinstance(nouns, np.ndarray) and len(nouns.shape) == 1:
+            # If we get a 1D array of objects, stack them
+            valid_embeddings = [emb for emb in nouns if emb is not None and not np.isnan(emb).any()]
+            if valid_embeddings:
+                nouns = np.stack(valid_embeddings)
+                # Filter word_list to match valid embeddings
+                word_list = [word for i, word in enumerate(word_list) if i < len(valid_embeddings)]
+            else:
+                raise ValueError("No valid word embeddings found")
+        elif not isinstance(nouns, np.ndarray):
+            # Convert to numpy array if needed
+            nouns = np.array(nouns)
 
         mean_embeddings = []
 

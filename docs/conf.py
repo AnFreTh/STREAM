@@ -61,7 +61,6 @@ autodoc_mock_imports = [
     "wordcloud",
     "plotly",
     "matplotlib",
-    "gensim",
     "nltk",
     "langdetect",
     "loguru",

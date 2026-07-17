@@ -1,0 +1,40 @@
+# Core (from project requirements.txt)
+numpy
+pandas
+scikit-learn
+nltk
+datasets
+
+# DL (torch is in the container already)
+lightning==2.4.0
+sentence_transformers==3.3.1
+transformers==4.44.2
+accelerate==0.33.0
+torchmetrics
+
+# NLP
+umap-learn
+gensim
+
+# Clustering
+hdbscan
+
+# Community detection
+community
+networkx
+python_louvain
+langdetect
+
+# Misc
+loguru
+optuna
+optuna-integration
+boto3
+spacy
+
+# Extras needed at runtime
+scipy
+tqdm
+pyarrow
+requests
+peft

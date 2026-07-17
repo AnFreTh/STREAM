@@ -123,7 +123,8 @@ class NMFTM(BaseModel):
             logger.info("--- Applying NMF clustering ---")
             self.nmf_model = NMF(
                 n_components=self.n_topics,
-                **self.hparams["nmf_args"],
+                max_iter=self.hparams["nmf_args"].get("max_iter", 200),
+                **{k: v for k, v in self.hparams["nmf_args"].items() if k != "max_iter"},
             )
 
             W = self.nmf_model.fit_transform(matrix)  # Document-topic matrix (Theta)
@@ -228,6 +229,7 @@ class NMFTM(BaseModel):
         criterion="recon",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that calls the parent class's optimize_hyperparameters method.
@@ -259,6 +261,7 @@ class NMFTM(BaseModel):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params
@@ -266,60 +269,33 @@ class NMFTM(BaseModel):
     def reconstruction_loss(self):
         """
         Calculate the reconstruction loss (Frobenius norm) for the NMF model.
+        Uses sklearn's built-in reconstruction_err_ when available.
 
         Returns
         -------
         float
-            Reconstruction loss (Frobenius norm) of the NMF model.
+            Reconstruction loss of the NMF model.
         """
-        # Ensure the NMF model has been trained
         if self.nmf_model is None:
             raise ValueError("NMF model has not been trained yet.")
 
-        # Get the original matrix
+        # Use sklearn's built-in attribute (avoids dense matrix explosion)
+        if hasattr(self.nmf_model, 'reconstruction_err_'):
+            return self.nmf_model.reconstruction_err_
+
+        # Fallback: compute on sparse matrices
         original_matrix = self.vectorizer.transform(self.dataset.texts)
-
-        # Reconstruct the matrix using W and H
-        reconstructed_matrix = np.dot(self.theta, self.beta)
-
-        # Calculate the Frobenius norm of the difference
-        reconstruction_loss = np.linalg.norm(
-            original_matrix - reconstructed_matrix, "fro"
-        )
-
-        return reconstruction_loss
+        reconstructed = csr_matrix(np.dot(self.theta, self.beta))
+        diff = original_matrix - reconstructed
+        return np.sqrt(diff.multiply(diff).sum())
 
     def suggest_hyperparameters(self, trial):
-        """
-        Suggest hyperparameters for the NMF model.
-
-        Parameters
-        ----------
-        trial : optuna.trial.Trial
-            A single trial of the optuna optimization process.
-
-        Returns
-        -------
-        None
-        """
-
-        # Suggest NMF parameters
-        # self.hparams["nmf_args"]["alpha_W"] = trial.suggest_float("alpha_W", 0.0, 0.1)
-        # self.hparams["nmf_args"]["alpha_H"] = trial.suggest_float("alpha_H", 0.0, 0.1)
         self.hparams["nmf_args"]["l1_ratio"] = trial.suggest_float("l1_ratio", 0.0, 1.0)
         self.hparams["nmf_args"]["init"] = trial.suggest_categorical(
-            "init", ["random", "nndsvd", "nndsvda", "nndsvdar"]
+            "init", ["nndsvda", "nndsvdar", "random"]
         )
-        self.hparams["nmf_args"]["max_iter"] = trial.suggest_int("max_iter", 200, 1000)
-        # self.hparams["nmf_args"]["beta_loss"] = trial.suggest_categorical(
-        #    "beta_loss", ["frobenius", "kullback-leibler", "itakura-saito"]
-        # )
+        self.hparams["nmf_args"]["max_iter"] = trial.suggest_int("max_iter", 100, 400)
         self.hparams["nmf_args"]["solver"] = trial.suggest_categorical(
             "solver", ["cd", "mu"]
         )
-
-        # if self.hparams["nmf_args"]["beta_loss"] in [
-        #    "kullback-leibler",
-        #    "itakura-saito",
-        # ]:
-        #    self.hparams["nmf_args"]["solver"] = "mu"
+        self.hparams["nmf_args"]["tol"] = trial.suggest_float("tol", 1e-5, 1e-2, log=True)

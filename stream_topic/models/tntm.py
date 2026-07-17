@@ -18,6 +18,7 @@ from ..utils.datamodule import TMDataModule
 from ..utils.dataset import TMDataset
 from .abstract_helper_models.base import BaseModel, TrainingStatus
 from .abstract_helper_models.neural_basemodel import NeuralBaseModel
+from .abstract_helper_models.mixins import SentenceEncodingMixin
 from .neural_base_models.tntm_base import TNTMBase
 
 time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -29,7 +30,7 @@ WORD_EMBEDDING_MODEL_NAME = (
 )
 
 
-class TNTM(BaseModel):
+class TNTM(BaseModel, SentenceEncodingMixin):
     def __init__(
         self,
         word_embedding_model_name: str = WORD_EMBEDDING_MODEL_NAME,
@@ -163,7 +164,7 @@ class TNTM(BaseModel):
         torch.Tensor
             The initial log diagonal matrices.
         """
-        word_embedding_list = [value for key, value in word_embeddings.items()]
+        word_embedding_list = [torch.tensor(value, dtype=torch.float32) for key, value in word_embeddings.items()]
         word_embeding_array = torch.stack(word_embedding_list)
 
         umap_model = umap.UMAP(
@@ -388,13 +389,13 @@ class TNTM(BaseModel):
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 1e-04,
-        lr_patience: int = 15,
-        patience: int = 15,
+        lr: float = 2e-03,
+        lr_patience: int = 10,
+        patience: int = 50,
         factor: float = 0.5,
         weight_decay: float = 1e-07,
-        max_epochs: int = 100,
-        batch_size: int = 32,
+        max_epochs: int = 1000,
+        batch_size: int = 64,
         shuffle: bool = True,
         random_state: int = 101,
         inferece_type="zeroshot",
@@ -486,6 +487,13 @@ class TNTM(BaseModel):
             self._status = TrainingStatus.RUNNING
             self.trainer.fit(self.model, self.data_module)
 
+            # Load best checkpoint weights
+            if hasattr(self.trainer, "checkpoint_callback") and self.trainer.checkpoint_callback and self.trainer.checkpoint_callback.best_model_path:
+                import torch as _torch
+                _ckpt = _torch.load(self.trainer.checkpoint_callback.best_model_path, weights_only=True)
+                self.model.load_state_dict(_ckpt["state_dict"])
+                logger.info(f"Loaded best checkpoint from epoch {self.trainer.checkpoint_callback.best_model_score}")
+
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED
@@ -526,7 +534,6 @@ class TNTM(BaseModel):
         self.theta = self.theta / self.theta.sum(axis=1, keepdims=True)
 
         self.beta = self.model.model.get_beta().detach().cpu().numpy()
-        self.beta = self.beta.transpose(1, 0)
         self.labels = np.array(np.argmax(self.theta, axis=1))
 
         # self.beta = self.beta.transpose(0, 1)
@@ -570,7 +577,7 @@ class TNTM(BaseModel):
             The beta distribution.
         """
 
-        return self.model.model.get_beta().transpose(0, 1)
+        return self.model.model.get_beta()
 
     def suggest_hyperparameters(self, trial, max_topics=100):
         # self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)  # is already suggested in the parent class
@@ -607,6 +614,7 @@ class TNTM(BaseModel):
         criterion="val_loss",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that calls the parent class's optimize_hyperparameters method.
@@ -638,6 +646,7 @@ class TNTM(BaseModel):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params

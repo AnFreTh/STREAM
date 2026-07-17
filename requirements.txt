@@ -12,17 +12,21 @@ sentence_transformers
 
 # nlp
 transformers
-gensim
 umap-learn
+gensim
 
+# clustering
+hdbscan
 
+# community detection
 community
 networkx
 python_louvain
 langdetect
 
-
 # misc
 loguru
 optuna
 optuna-integration
+boto3
+spacy

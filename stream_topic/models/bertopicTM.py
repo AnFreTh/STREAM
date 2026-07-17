@@ -1,6 +1,7 @@
 from datetime import datetime
 import numpy as np
 from loguru import logger
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import OneHotEncoder
 
 from ..commons.check_steps import check_dataset_steps
@@ -154,18 +155,73 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             # Store the mean embedding in the dictionary
             self.topic_centroids.append(mean_embedding)
 
+    def _reduce_topics(self, n_topics):
+        """
+        Hierarchically merge topics until n_topics remain.
+
+        At each step, the two most similar topics (by c-TF-IDF cosine
+        similarity) are merged: their documents are reassigned to the
+        smaller label, and c-TF-IDF is recomputed.
+
+        Parameters
+        ----------
+        n_topics : int
+            Target number of topics.
+        """
+        current_k = len(np.unique(self.labels))
+        if current_k <= n_topics:
+            return
+
+        logger.info(
+            f"--- Reducing {current_k} topics to {n_topics} via hierarchical merging ---"
+        )
+
+        while len(np.unique(self.labels)) > n_topics:
+            # Recompute c-TF-IDF for current clusters
+            self.dataframe["predictions"] = self.labels
+            docs_per_topic = self.dataframe.groupby(
+                ["predictions"], as_index=False
+            ).agg({"text": " ".join})
+
+            tfidf, _ = c_tf_idf(
+                docs_per_topic["text"].values, m=len(self.dataframe)
+            )
+
+            # Cosine similarity between topic c-TF-IDF vectors
+            sim = cosine_similarity(tfidf.T)
+            np.fill_diagonal(sim, -1)
+
+            # Find the most similar pair
+            i, j = np.unravel_index(sim.argmax(), sim.shape)
+            topic_labels = docs_per_topic["predictions"].values
+            merge_from = topic_labels[max(i, j)]
+            merge_into = topic_labels[min(i, j)]
+
+            # Merge: reassign all docs from merge_from -> merge_into
+            self.labels[self.labels == merge_from] = merge_into
+
+        # Relabel to contiguous 0..n_topics-1
+        unique_labels = np.unique(self.labels)
+        label_map = {old: new for new, old in enumerate(unique_labels)}
+        self.labels = np.array([label_map[l] for l in self.labels])
+
+        logger.info(f"--- Topic reduction complete: {len(unique_labels)} topics ---")
+
     def fit(self, dataset, n_topics=None):
         """
         Trains the BERTOPIC topic model on the provided dataset.
 
         Applies sentence embedding, UMAP dimensionality reduction, and hdbscan clustering
-        to the dataset to identify distinct topics within the text data.
+        to the dataset to identify distinct topics within the text data. When n_topics is
+        provided, topics are hierarchically merged to the target count.
 
-        Parameters:
-            dataset: The dataset to train the model on. It should contain the text documents.
-
-        Returns:
-            dict: A dictionary containing the identified topics and the topic-word matrix.
+        Parameters
+        ----------
+        dataset : TMDataset
+            The dataset to train the model on.
+        n_topics : int, optional
+            Target number of topics. If provided, HDBSCAN topics are merged
+            down to this count. If None, uses HDBSCAN's natural clustering.
         """
 
         assert isinstance(
@@ -182,6 +238,10 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             self.reduced_embeddings = self.dim_reduction(logger)
 
             self._clustering()
+
+            # Reduce to target n_topics if specified
+            if n_topics is not None:
+                self._reduce_topics(n_topics)
 
             self.dataframe["predictions"] = self.labels
             docs_per_topic = self.dataframe.groupby(
@@ -287,6 +347,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         criterion="aic",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that calls the parent class's optimize_hyperparameters method.
@@ -318,6 +379,7 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params

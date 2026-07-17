@@ -76,6 +76,7 @@ class ETM(BaseModel):
         embed_size: int = 128,
         encoder_dim: int = 256,
         dropout: float = 0.1,
+        kl_weight: float = None,
         pretrained_WE=None,
         train_WE: bool = True,
         encoder_activation: callable = nn.ReLU(),
@@ -122,6 +123,7 @@ class ETM(BaseModel):
             pretrained_WE=pretrained_WE,
             train_WE=train_WE,
             encoder_activation=encoder_activation,
+            kl_weight=kl_weight,
         )
         self.save_hyperparameters(
             ignore=[
@@ -290,12 +292,12 @@ class ETM(BaseModel):
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 1e-04,
-        lr_patience: int = 15,
-        patience: int = 15,
+        lr: float = 5e-03,
+        lr_patience: int = 10,
+        patience: int = 50,
         weight_decay: float = 1e-07,
-        max_epochs: int = 100,
-        batch_size: int = 32,
+        max_epochs: int = 1000,
+        batch_size: int = 256,
         shuffle: bool = True,
         random_state: int = 101,
         checkpoint_path: str = "checkpoints",
@@ -407,6 +409,13 @@ class ETM(BaseModel):
             self._status = TrainingStatus.RUNNING
             self.trainer.fit(self.model, self.data_module)
 
+            # Load best checkpoint weights
+            if hasattr(self.trainer, "checkpoint_callback") and self.trainer.checkpoint_callback and self.trainer.checkpoint_callback.best_model_path:
+                import torch as _torch
+                _ckpt = _torch.load(self.trainer.checkpoint_callback.best_model_path, weights_only=True)
+                self.model.load_state_dict(_ckpt["state_dict"])
+                logger.info(f"Loaded best checkpoint from epoch {self.trainer.checkpoint_callback.best_model_score}")
+
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED
@@ -464,7 +473,6 @@ class ETM(BaseModel):
         pass
 
     def suggest_hyperparameters(self, trial, max_topics=100):
-        self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)
         self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
         self.hparams["embed_size"] = trial.suggest_int("embed_size", 16, 512)
         self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
@@ -497,6 +505,7 @@ class ETM(BaseModel):
         criterion="val_loss",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that calls the parent class's optimize_hyperparameters method.
@@ -528,6 +537,7 @@ class ETM(BaseModel):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params

@@ -1,24 +1,24 @@
 import re
 from collections.abc import Iterable
-from typing import List
+from typing import List, Union, Any
 
 import numpy as np
 import pandas as pd
-from gensim.models.keyedvectors import Word2VecKeyedVectors
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 
-class GensimBackend:
+class SentenceTransformerBackend:
     """
-    Gensim Embedding Model
+    SentenceTransformer Embedding Model Backend
 
-    This class provides functionality to create document embeddings using Gensim Word2Vec embeddings.
+    This class provides functionality to create document embeddings using SentenceTransformer models.
 
     Args:
-        embedding_model (Word2VecKeyedVectors): A Gensim Word2Vec model for word embeddings.
+        embedding_model: A SentenceTransformer model for embeddings.
 
     Attributes:
-        embedding_model (Word2VecKeyedVectors): The Gensim Word2Vec model used for embeddings.
+        embedding_model: The SentenceTransformer model used for embeddings.
 
     Methods:
         encode(documents: List[str], verbose: bool = False) -> np.ndarray:
@@ -26,26 +26,27 @@ class GensimBackend:
 
     """
 
-    def __init__(self, embedding_model: Word2VecKeyedVectors):
+    def __init__(self, embedding_model: Union[SentenceTransformer, str]):
         """
-        Initialize the GensimBackend with a Word2VecKeyedVectors model.
+        Initialize the SentenceTransformerBackend with an embedding model.
 
         Args:
-            embedding_model (Word2VecKeyedVectors): A Gensim Word2Vec model for word embeddings.
+            embedding_model: A SentenceTransformer model or model name string.
 
         Raises:
-            ValueError: If the provided model is not a Word2VecKeyedVectors instance.
+            ValueError: If the provided model is not valid.
 
         """
         super().__init__()
 
-        if isinstance(embedding_model, Word2VecKeyedVectors):
+        if isinstance(embedding_model, str):
+            self.embedding_model = SentenceTransformer(embedding_model)
+        elif isinstance(embedding_model, SentenceTransformer):
             self.embedding_model = embedding_model
         else:
             raise ValueError(
-                "Please select a correct Gensim model: \n"
-                "`import gensim.downloader as api` \n"
-                "`ft = api.load('fasttext-wiki-news-subwords-300')`"
+                "Please provide a SentenceTransformer model or model name string. \n"
+                "Example: SentenceTransformer('paraphrase-MiniLM-L3-v2')"
             )
 
     def encode(self, documents: List[str], verbose: bool = False) -> np.ndarray:
@@ -61,30 +62,14 @@ class GensimBackend:
             that each have an embeddings size of `m`.
 
         """
-        # unused variables
-        # vector_shape = self.embedding_model.get_vector(
-        #     list(self.embedding_model.index_to_key)[0]
-        # ).shape[0]
-        # empty_vector = np.zeros(vector_shape)
-
-        embeddings = []
-        for doc in tqdm(documents, disable=not verbose, position=0, leave=True):
-            doc_embedding = []
-
-            # Extract word embeddings
-            for word in doc.split(" "):
-                try:
-                    word_embedding = self.embedding_model.get_vector(word)
-                    doc_embedding.append(word_embedding)
-                except KeyError:
-                    continue
-
-            # Pool word embeddings
-            doc_embedding = np.mean(doc_embedding, axis=0)
-            embeddings.append(doc_embedding)
-
-        embeddings = np.array(embeddings, dtype=object)
-        return embeddings
+        # Use SentenceTransformer to encode all documents at once
+        embeddings = self.embedding_model.encode(
+            documents, 
+            show_progress_bar=verbose,
+            convert_to_tensor=False
+        )
+        
+        return np.array(embeddings)
 
 
 class BaseEmbedder:
@@ -116,9 +101,10 @@ class BaseEmbedder:
             embedding_model: The embedding model used for generating embeddings.
 
         """
-        if isinstance(embedding_model, Word2VecKeyedVectors):
-            self.embedder = GensimBackend(embedding_model)
+        if isinstance(embedding_model, (SentenceTransformer, str)):
+            self.embedder = SentenceTransformerBackend(embedding_model)
         else:
+            # Assume it's already a backend or compatible model
             self.embedder = embedding_model
         self.embedding_model = embedding_model
 

@@ -333,13 +333,13 @@ class CTM(BaseModel, SentenceEncodingMixin):
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 1e-04,
-        lr_patience: int = 15,
-        patience: int = 15,
+        lr: float = 2e-03,
+        lr_patience: int = 10,
+        patience: int = 50,
         factor: float = 0.5,
         weight_decay: float = 1e-07,
-        max_epochs: int = 100,
-        batch_size: int = 32,
+        max_epochs: int = 1000,
+        batch_size: int = 64,
         shuffle: bool = True,
         random_state: int = 101,
         checkpoint_path: str = "checkpoints",
@@ -459,6 +459,13 @@ class CTM(BaseModel, SentenceEncodingMixin):
             self._status = TrainingStatus.RUNNING
             self.trainer.fit(self.model, self.data_module)
 
+            # Load best checkpoint weights
+            if hasattr(self.trainer, "checkpoint_callback") and self.trainer.checkpoint_callback and self.trainer.checkpoint_callback.best_model_path:
+                import torch as _torch
+                _ckpt = _torch.load(self.trainer.checkpoint_callback.best_model_path, weights_only=True)
+                self.model.load_state_dict(_ckpt["state_dict"])
+                logger.info(f"Loaded best checkpoint from epoch {self.trainer.checkpoint_callback.best_model_score}")
+
         except Exception as e:
             logger.error(f"Error in training: {e}")
             self._status = TrainingStatus.FAILED
@@ -544,7 +551,6 @@ class CTM(BaseModel, SentenceEncodingMixin):
             - `datamodule_args.batch_size`: Batch size for training.
         """
 
-        self.hparams["n_topics"] = trial.suggest_int("n_topics", 1, max_topics)
         self.hparams["encoder_dim"] = trial.suggest_int("encoder_dim", 16, 512)
         self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
         self.hparams["inference_type"] = trial.suggest_categorical(
@@ -582,6 +588,7 @@ class CTM(BaseModel, SentenceEncodingMixin):
         criterion="val_loss",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that calls the parent class's optimize_hyperparameters method.
@@ -613,6 +620,7 @@ class CTM(BaseModel, SentenceEncodingMixin):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params

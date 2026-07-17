@@ -12,7 +12,7 @@ HOMEPAGE = "https://github.com/AnFreTh/STREAM"
 DOCS = "https://stream.readthedocs.io/en/"
 EMAIL = "anton.thielmann@tu-clausthal.de"
 AUTHOR = "Anton Thielmann"
-REQUIRES_PYTHON = ">=3.6"
+REQUIRES_PYTHON = ">=3.9"
 
 
 class PostInstallCommand(install):
@@ -52,8 +52,20 @@ with open(os.path.join(ROOT_DIR, "requirements.txt")) as f:
 
 extras_require = {
     "plotting": ["dash", "plotly", "matplotlib", "wordcloud"],
-    "bertopic": ["hdbscan"],
+    "hdbscan": ["hdbscan"],
     "dcte": ["pyarrow", "setfit"],
+    "benchmark": [
+        "boto3",
+        "gensim",
+        "hdbscan",
+    ],
+    "all": [
+        "dash", "plotly", "matplotlib", "wordcloud",
+        "hdbscan",
+        "pyarrow", "setfit",
+        "boto3",
+        "gensim",
+    ],
 }
 
 

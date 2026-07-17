@@ -1,4 +1,3 @@
-import gensim
 import nltk
 import numpy as np
 from nltk.corpus import stopwords
@@ -18,11 +17,92 @@ from .constants import (
 )
 from .TopwordEmbeddings import TopwordEmbeddings
 
-GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
+
 NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
 STOPWORDS = list(
-    set(list(NLTK_STOPWORDS) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS))
+    set(list(NLTK_STOPWORDS) + list(ENGLISH_STOP_WORDS))
 )
+
+
+class TopicDiversity(BaseMetric):
+    """
+    Topic Diversity: proportion of unique words across all topic top-word lists.
+
+    TD = |union(W_k)| / sum(|W_k|)
+
+    TD = 1.0 means no word repetition across topics; low TD signals redundant topics.
+
+    Parameters
+    ----------
+    n_words : int, optional
+        Number of top words per topic. Defaults to 10.
+
+    Examples
+    --------
+    >>> from stream_topic.metrics import TopicDiversity
+    >>> td = TopicDiversity()
+    >>> score = td.score(topics)
+    """
+
+    def __init__(self, n_words=10):
+        self.n_words = n_words
+
+    def get_info(self):
+        return {
+            "metric_name": "Topic Diversity",
+            "n_words": self.n_words,
+            "metric_range": "0 to 1, higher is better",
+            "description": "Proportion of unique words across all topic top-word lists.",
+        }
+
+    def score(self, topic_words):
+        """
+        Compute topic diversity.
+
+        Parameters
+        ----------
+        topic_words : list of list of str
+            Top words per topic.
+
+        Returns
+        -------
+        float
+            Topic diversity score in [0, 1].
+        """
+        all_words = []
+        for topic in topic_words:
+            all_words.extend(topic[: self.n_words])
+        if len(all_words) == 0:
+            return 0.0
+        return float(np.around(len(set(all_words)) / len(all_words), 5))
+
+    def score_per_topic(self, topic_words):
+        """
+        Compute per-topic unique word ratio (words unique to this topic / n_words).
+
+        Parameters
+        ----------
+        topic_words : list of list of str
+            Top words per topic.
+
+        Returns
+        -------
+        dict
+            Topic string -> uniqueness ratio.
+        """
+        # Collect all words from all other topics for each topic
+        results = {}
+        all_topic_words = [set(t[: self.n_words]) for t in topic_words]
+        for k, words in enumerate(all_topic_words):
+            other_words = set()
+            for j, ow in enumerate(all_topic_words):
+                if j != k:
+                    other_words |= ow
+            unique_to_topic = words - other_words
+            ratio = len(unique_to_topic) / max(len(words), 1)
+            half = topic_words[k][: len(topic_words[k]) // 2]
+            results[", ".join(half)] = float(np.around(ratio, 5))
+        return results
 
 
 class Embedding_Topic_Diversity(BaseMetric):
@@ -122,8 +202,19 @@ class Embedding_Topic_Diversity(BaseMetric):
         float
             The overall diversity score for all topics.
         """
-        topics_tw = topics  # size: (n_topics, voc_size)
-        topic_weights = beta[:, : self.n_words]  # select the weights of the top words
+        topics_tw = topics  # size: (n_topics, n_words)
+        n_topics = len(topics_tw)
+        
+        # Beta should be (n_topics, vocab_size), extract weights for top words
+        if beta.shape[0] != n_topics:
+            beta = beta.T  # Transpose if needed
+        
+        # Replace NaN with 0
+        beta = np.nan_to_num(beta, nan=0.0)
+
+        # Weights of the top n_words per topic, in descending order (aligned with
+        # topics returned by get_topics, which are sorted by beta descending).
+        topic_weights = -np.sort(-beta, axis=1)[:, : self.n_words]
 
         topic_weights = topic_weights / np.sum(topic_weights, axis=1).reshape(
             -1, 1
@@ -161,10 +252,19 @@ class Embedding_Topic_Diversity(BaseMetric):
         numpy.ndarray
             An array of diversity scores for each topic.
         """
-        topics_tw = topics  # size: (n_topics, voc_size)
-        topic_weights = beta[
-            :, : self.n_words
-        ]  # select the weights of the top words size: (n_topics, n_topwords)
+        topics_tw = topics  # size: (n_topics, n_words)
+        n_topics = len(topics_tw)
+        
+        # Beta should be (n_topics, vocab_size), extract weights for top words
+        if beta.shape[0] != n_topics:
+            beta = beta.T  # Transpose if needed
+        
+        # Replace NaN with 0
+        beta = np.nan_to_num(beta, nan=0.0)
+
+        # Weights of the top n_words per topic, in descending order (aligned with
+        # topics returned by get_topics, which are sorted by beta descending).
+        topic_weights = -np.sort(-beta, axis=1)[:, : self.n_words]
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True
@@ -350,11 +450,19 @@ class Expressivity(BaseMetric):
         if new_embeddings:
             self.embeddings = None
 
-        # not used for now, but could be useful in the future
-        # ntopics = len(model_output["topics"])
+        topics_tw = topics  # size: (n_topics, n_words)
+        n_topics = len(topics_tw)
+        
+        # Beta should be (n_topics, vocab_size), extract weights for top words
+        if beta.shape[0] != n_topics:
+            beta = beta.T  # Transpose if needed
+        
+        # Replace NaN with 0
+        beta = np.nan_to_num(beta, nan=0.0)
 
-        topics_tw = topics  # size: (n_topics, voc_size)
-        topic_weights = beta[:, : self.n_words]  # select the weights of the top words
+        # Weights of the top n_words per topic, in descending order (aligned with
+        # topics returned by get_topics, which are sorted by beta descending).
+        topic_weights = -np.sort(-beta, axis=1)[:, : self.n_words]
 
         topic_weights = topic_weights / np.nansum(
             topic_weights, axis=1, keepdims=True

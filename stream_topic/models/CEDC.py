@@ -409,6 +409,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
         criterion="aic",
         n_trials=100,
         custom_metric=None,
+        timeout=None,
     ):
         """
         A new method in the child class that optimizes and fits the model.
@@ -440,6 +441,7 @@ class CEDC(BaseModel, SentenceEncodingMixin):
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,
+            timeout=timeout,
         )
 
         return best_params

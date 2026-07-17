@@ -1,9 +1,10 @@
 import re
-import gensim
 import numpy as np
 from nltk.corpus import stopwords
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+from gensim.corpora import Dictionary
+from gensim.models.coherencemodel import CoherenceModel
 from .base import BaseMetric
 from ._helper_funcs import cos_sim_pw
 from .constants import (
@@ -13,11 +14,97 @@ from .constants import (
 )
 from .TopwordEmbeddings import TopwordEmbeddings
 
-GENSIM_STOPWORDS = gensim.parsing.preprocessing.STOPWORDS
+
 NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
 STOPWORDS = list(
-    set(list(NLTK_STOPWORDS) + list(GENSIM_STOPWORDS) + list(ENGLISH_STOP_WORDS))
+    set(list(NLTK_STOPWORDS) + list(ENGLISH_STOP_WORDS))
 )
+
+
+class CV(BaseMetric):
+    """
+    Gensim-based C_V coherence metric.
+
+    C_V combines sliding window segmentation, indirect cosine similarity,
+    and NPMI confirmation, achieving the highest correlation with human
+    topic ratings among automated coherence measures (Röder et al., 2015).
+
+    Parameters
+    ----------
+    dataset : TMDataset
+        The dataset used for computing coherence.
+    n_words : int, optional
+        Number of top words per topic to evaluate. Defaults to 10.
+
+    Examples
+    --------
+    >>> from stream_topic.metrics import CV
+    >>> cv = CV(dataset)
+    >>> score = cv.score(topics)
+    """
+
+    def __init__(self, dataset, n_words=10):
+        self.n_words = n_words
+        self.texts = [doc.split() for doc in dataset.dataframe["text"].tolist()]
+        self.dictionary = Dictionary(self.texts)
+
+    def get_info(self):
+        return {
+            "metric_name": "C_V",
+            "n_words": self.n_words,
+            "description": "Gensim C_V coherence (Röder et al., 2015)",
+        }
+
+    def score(self, topic_words):
+        """
+        Compute average C_V coherence across all topics.
+
+        Parameters
+        ----------
+        topic_words : list of list of str
+            Top words per topic.
+
+        Returns
+        -------
+        float
+            Average C_V score.
+        """
+        topics_trimmed = [t[: self.n_words] for t in topic_words]
+        cm = CoherenceModel(
+            topics=topics_trimmed,
+            texts=self.texts,
+            dictionary=self.dictionary,
+            coherence="c_v",
+        )
+        return float(np.around(cm.get_coherence(), 5))
+
+    def score_per_topic(self, topic_words):
+        """
+        Compute C_V coherence per topic.
+
+        Parameters
+        ----------
+        topic_words : list of list of str
+            Top words per topic.
+
+        Returns
+        -------
+        dict
+            Topic string -> C_V score.
+        """
+        topics_trimmed = [t[: self.n_words] for t in topic_words]
+        cm = CoherenceModel(
+            topics=topics_trimmed,
+            texts=self.texts,
+            dictionary=self.dictionary,
+            coherence="c_v",
+        )
+        per_topic = cm.get_coherence_per_topic()
+        results = {}
+        for k, score in enumerate(per_topic):
+            half = topic_words[k][: len(topic_words[k]) // 2]
+            results[", ".join(half)] = float(np.around(score, 5))
+        return results
 
 
 class NPMI(BaseMetric):
