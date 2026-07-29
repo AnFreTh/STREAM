@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/topicarena_elo.png" width="900"/>
+  <img src="./assets/bt_default_vs_v7.png" width="900"/>
 </div>
 
 <h1 align="center">TopicArena: Toward Reproducible Topic Model Evaluation</h1>
@@ -7,7 +7,8 @@
 <p align="center">
   The largest and most comprehensive benchmark for topic models to date —
   <b>16 models</b> across <b>5 paradigms</b>, <b>18 datasets</b> from <b>9 domains</b>,
-  <b>11 complementary metrics</b>, multi-seed stability analysis, and LLM-as-a-judge evaluation.
+  <b>11 complementary metrics</b>, multi-seed stability analysis, human-validated
+  LLM-as-a-judge evaluation, and a topic-count (<i>K</i>) sensitivity sweep.
 </p>
 
 ---
@@ -22,9 +23,12 @@ comparison effectively impossible.
 
 **TopicArena** addresses this by evaluating every model on the same datasets, with
 the same metrics and preprocessing, across multiple random seeds. The figure above
-shows ELO ratings from pairwise comparisons across all 11 metrics and 18 datasets
-(95% CI from 200 bootstrap resamples), with default and hyperparameter-tuned
-variants competing in a single tournament.
+ranks models by a **Bradley–Terry** model fit to pairwise comparisons across all 11
+metrics and 18 datasets (95% CI from 200 dataset-level bootstrap resamples), with
+default and hyperparameter-tuned variants competing in a single tournament. Unlike
+an Elo heuristic, Bradley–Terry is **order-independent and parameter-free** (no
+K-factor, update order, or initialization), so the ranking depends only on aggregate
+outcomes.
 
 <div align="center">
   <img src="./assets/topicarena_cd_overall.png" width="900"/>
@@ -42,6 +46,36 @@ metrics at *k* = 10. Models connected by a bar are not significantly different.
    single-run comparisons unreliable — stability requires multi-seed evaluation.
 3. **Simple baselines remain competitive.** NMF and KMeans achieve high coherence
    at a fraction of the computational cost of neural models.
+
+## Robustness analyses
+
+Beyond the headline ranking, TopicArena includes analyses that stress-test the
+conclusions:
+
+- **Human-validated LLM judge.** The LLM-as-a-judge is validated against the
+  canonical human study of topic interpretability
+  ([Chang et al., 2009, *Reading Tea Leaves*](http://www.umiacs.umd.edu/~jbg/docs/nips2009-rtl.pdf)).
+  On 4,168 human word-intrusion trials, the LLM (Claude Opus 4.6) **reproduces the
+  human model ranking exactly** (LDA > pLSI > CTM), tracks human difficulty as the
+  topic count grows, and agrees with the human majority on 83% of topics — evidence
+  that it measures the same construct humans do, not merely correlating with
+  automated metrics.
+
+- **Order-independent aggregation (Bradley–Terry).** Model rankings are aggregated
+  with a Bradley–Terry model rather than Elo. The two agree closely (Kendall
+  τ = 0.95), but Bradley–Terry removes Elo's dependence on update order, K-factor,
+  and initialization.
+
+- **Within-dataset metric correlations.** Metric–metric agreement is computed
+  *within each dataset* and then summarized across datasets, avoiding the
+  cross-dataset pooling that can induce Simpson's-paradox artifacts.
+
+- **Topic-count (*K*) sensitivity.** Each dataset is additionally evaluated at
+  three topic counts bracketing its default *K* (≈ ½K, 1.5K, 2K, 5 seeds). Model
+  rankings are stable across *K* — median Kendall τ = 0.75 across the 18 datasets
+  (τ > 0.5 on 17 of 18) — confirming they are not an artifact of the chosen *K*.
+
+Rebuttal / analysis scripts for these live in [`scripts/rebuttal/`](scripts/rebuttal/).
 
 ## What's in the benchmark
 

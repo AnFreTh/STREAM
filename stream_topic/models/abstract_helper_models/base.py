@@ -510,9 +510,17 @@ class BaseModel(ABC):
 
             return score
 
-        # Create an Optuna study and optimize the objective function
+        # Create an Optuna study and optimize the objective function.
+        # n_warmup_steps ensures no trial is pruned before it has had a chance to
+        # train (some models, e.g. the hierarchical SawETM/HyperMiner, have poor
+        # epoch-0 val_loss that would otherwise be pruned instantly against the
+        # running median, collapsing HPO to defaults). n_startup_trials builds a
+        # stable median before any pruning decisions are made.
         study = optuna.create_study(
-            direction="minimize", pruner=optuna.pruners.MedianPruner()
+            direction="minimize",
+            pruner=optuna.pruners.MedianPruner(
+                n_startup_trials=10, n_warmup_steps=15
+            ),
         )
         study.optimize(objective, n_trials=n_trials, timeout=timeout)
 

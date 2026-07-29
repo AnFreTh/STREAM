@@ -9,7 +9,12 @@ from nltk import pos_tag
 from nltk.corpus import brown as nltk_words
 from nltk.corpus import words as eng_dict
 from numpy.linalg import norm
-import hanlp
+
+# Optional heavy Chinese POS dep; only used on the Chinese extraction path.
+try:
+    import hanlp
+except ImportError:
+    hanlp = None
 
 if TYPE_CHECKING:
     from ..utils.dataset import TMDataset

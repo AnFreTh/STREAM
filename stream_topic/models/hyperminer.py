@@ -102,13 +102,17 @@ class HyperMiner(BaseModel):
         return info
 
     def _initialize_model(self):
+        # HPO registers helper keys 'n_layers' and 'n_topics_layer_i' as Optuna
+        # trial params; these are converted into 'n_topics_list' and must NOT be
+        # forwarded to HyperMinerBase, which does not accept them.
+        _EXCLUDE = {"datamodule_args", "max_epochs", "n_layers", "batch_size"}
         self.model = NeuralBaseModel(
             model_class=HyperMinerBase,
             dataset=self.dataset,
             **{
                 k: v
                 for k, v in self.hparams.items()
-                if k not in ["datamodule_args", "max_epochs"]
+                if k not in _EXCLUDE and not k.startswith("n_topics_layer_")
             },
         )
 
@@ -176,6 +180,7 @@ class HyperMiner(BaseModel):
         self,
         dataset: TMDataset = None,
         n_topics_list=[50, 36, 12],
+        n_topics=None,
         val_size: float = 0.2,
         lr: float = 1e-02,
         lr_patience: int = 10,
@@ -192,6 +197,23 @@ class HyperMiner(BaseModel):
         optimize=False,
         **kwargs,
     ):
+        # Hierarchical model. HPO tunes 'n_layers' and per-layer sizes
+        # ('n_topics_layer_i'); reconstruct the tuned n_topics_list so the
+        # post-HPO refit uses the BEST configuration, and so the scalar
+        # n_topics never leaks into trainer kwargs.
+        top = n_topics if n_topics is not None else self.hparams.get("n_topics")
+        n_layers = self.hparams.get("n_layers")
+        if top is not None and n_layers:
+            rebuilt = [top]
+            for i in range(1, n_layers):
+                li = self.hparams.get(f"n_topics_layer_{i}")
+                if li is None:
+                    break
+                rebuilt.append(li)
+            n_topics_list = rebuilt
+        elif top is not None and (not n_topics_list or n_topics_list[0] != top):
+            n_topics_list = [top, max(3, top // 2), max(2, top // 4)]
+        self.hparams["n_topics_list"] = n_topics_list
         self.optimize = optimize
         assert isinstance(
             dataset, TMDataset
@@ -308,6 +330,8 @@ class HyperMiner(BaseModel):
     def optimize_and_fit(
         self,
         dataset,
+        min_topics=2,
+        max_topics=20,
         criterion="val_loss",
         n_trials=100,
         custom_metric=None,
@@ -315,8 +339,8 @@ class HyperMiner(BaseModel):
     ):
         best_params = super().optimize_hyperparameters_neural(
             dataset=dataset,
-            min_topics=2,
-            max_topics=20,
+            min_topics=min_topics,
+            max_topics=max_topics,
             criterion=criterion,
             n_trials=n_trials,
             custom_metric=custom_metric,

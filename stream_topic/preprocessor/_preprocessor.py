@@ -12,12 +12,20 @@ from nltk.tokenize.treebank import TreebankWordDetokenizer
 from tqdm import tqdm
 import pandas as pd
 import jieba
-import thulac
-import pkuseg
-import hanlp
-import opencc
-from snownlp import SnowNLP 
 import jieba.posseg as pseg
+
+# Heavy Chinese-only segmentation/normalization deps. Imported lazily so that
+# English-only usage (and lightweight deploy environments) doesn't require them.
+# They are only touched on the language == "chinese" code path.
+try:
+    import thulac
+    import pkuseg
+    import hanlp
+    import opencc
+    from snownlp import SnowNLP
+except ImportError:
+    thulac = pkuseg = hanlp = opencc = None
+    SnowNLP = None
 # from .Chinese_config import ChineseConfig
 
 class TextPreprocessor:
