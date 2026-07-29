@@ -75,7 +75,6 @@ conclusions:
   rankings are stable across *K* — median Kendall τ = 0.75 across the 18 datasets
   (τ > 0.5 on 17 of 18) — confirming they are not an artifact of the chosen *K*.
 
-Rebuttal / analysis scripts for these live in [`scripts/rebuttal/`](scripts/rebuttal/).
 
 ## What's in the benchmark
 
