@@ -104,6 +104,15 @@ conclusions:
   unchanged. Encoder choice affects *reproducibility* (fix and report it), not the
   ranking.
 
+<div align="center">
+  <img src="./assets/bt_default_vs_embedding.png" width="900"/>
+</div>
+
+  *Bradley–Terry ratings (default runs, 8 automated metrics), baseline
+  `all-MiniLM-L6-v2` vs. the 1.24B `gtr-t5-xl` encoder. The 13 non-embedding models
+  are encoder-invariant by construction; only the three embedding-dependent models
+  can move, and they barely do — the leaderboard is unchanged.*
+
   | Encoder | Params | KMeans-UMAP *Cᵥ* | BERTopic *Cᵥ* | CTM *Cᵥ* |
   |---|---:|---:|---:|---:|
   | all-MiniLM-L6-v2 | 22M | 0.620 | 0.530 | 0.564 |

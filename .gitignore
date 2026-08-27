@@ -246,5 +246,6 @@ scripts/**/*.pkl
 !assets/cd_llm_rating_mean.png
 !assets/bt_default_vs_v7.png
 !assets/bt_default_vs_v8.png
+!assets/bt_default_vs_embedding.png
 !assets/topicarena_rankings_4panel.png
 scripts/.DS_Store
