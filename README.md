@@ -74,8 +74,8 @@ conclusions:
 
 - **Topic-count (*K*) sensitivity.** Each dataset is additionally evaluated at
   three topic counts bracketing its default *K* (≈ ½K, 1.5K, 2K, 5 seeds). Model
-  rankings are stable across *K* — median Kendall τ = 0.75 across the 18 datasets
-  (τ > 0.5 on 17 of 18) — confirming they are not an artifact of the chosen *K*.
+  rankings are stable across *K* — median Kendall τ = 0.71 across the 18 datasets
+  (τ > 0.5 on **all 18**) — confirming they are not an artifact of the chosen *K*.
 
 - **Hyperparameter budget and objective.** Beyond default settings, every
   model–dataset is tuned for 5 hours under both its *native* objective and the *Cᵥ
