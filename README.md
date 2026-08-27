@@ -114,6 +114,17 @@ conclusions:
   tightly, and the rank is set by the **model**, not the encoder: CTM's variants
   top the group, then KMeans-UMAP, then BERTopic, regardless of encoder.*
 
+<div align="center">
+  <img src="./assets/bt_embedding_full.png" width="1000"/>
+</div>
+
+  *The same encoder variants placed in the **full 16-model field** (11 metrics
+  including the LLM-as-a-judge metrics; the opus5 judge is used throughout so the
+  swapped encoders and the other models are scored on the same basis). The
+  embedding variants (colored) land exactly where their model sits — TNTM still
+  leads, CTM's four encoder variants cluster near the top, and no encoder swap
+  reorders the field.*
+
   | Encoder | Params | KMeans-UMAP *Cᵥ* | BERTopic *Cᵥ* | CTM *Cᵥ* |
   |---|---:|---:|---:|---:|
   | all-MiniLM-L6-v2 | 22M | 0.620 | 0.530 | 0.564 |
