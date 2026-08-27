@@ -1,10 +1,11 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, timedelta
 import lightning as pl
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary, Timer
 from optuna.integration import PyTorchLightningPruningCallback
 
 from ..utils.dataset import TMDataset
@@ -58,7 +59,7 @@ class ECRTM(BaseModel):
         dropout: float = 0.0,
         embed_size: int = 200,
         beta_temp: float = 0.2,
-        weight_loss_ECR: float = 100.0,
+        weight_loss_ECR: float = 250.0,  # official ECRTM default (was 100.0)
         sinkhorn_alpha: float = 20.0,
         sinkhorn_max_iter: int = 1000,
         pretrained_WE=None,
@@ -149,6 +150,19 @@ class ECRTM(BaseModel):
             model_callbacks.append(
                 PyTorchLightningPruningCallback(trial, monitor="val_loss")
             )
+            # Per-trial wall-clock cap. Optuna's study-level `timeout` is only
+            # checked BETWEEN trials, so it cannot stop a single trial that runs
+            # for hours -- which is exactly what happens for ECRTM on a large
+            # corpus (max_epochs=1000, patience=50, ~minutes/epoch): one slow
+            # trial blows the whole HPO budget (observed: 41h against a 5h cap).
+            # STREAM_HPO_TRIAL_MAX_MIN bounds each trial's training so the
+            # between-trial timeout fires near the intended budget. Applies to
+            # HPO trials ONLY (self.optimize); the final refit is uncapped.
+            _cap = os.environ.get("STREAM_HPO_TRIAL_MAX_MIN", "").strip()
+            if _cap:
+                model_callbacks.append(
+                    Timer(duration=timedelta(minutes=float(_cap)))
+                )
 
         self.trainer = pl.Trainer(
             max_epochs=max_epochs,
@@ -181,12 +195,12 @@ class ECRTM(BaseModel):
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 2e-03,
+        lr: float = None,
         lr_patience: int = 10,
         patience: int = 50,
-        weight_decay: float = 1e-07,
+        weight_decay: float = None,
         max_epochs: int = 1000,
-        batch_size: int = 256,
+        batch_size: int = None,
         shuffle: bool = True,
         random_state: int = 101,
         checkpoint_path: str = "checkpoints",
@@ -205,6 +219,12 @@ class ECRTM(BaseModel):
         self.n_topics = n_topics
         self.dataset = dataset
 
+        # Resolve tuned hyperparameters: an explicitly passed value wins,
+        # otherwise fall back to whatever is already in hparams (set by HPO
+        # suggest / refit / eval override), and finally the canonical default.
+        lr = lr if lr is not None else self.hparams.get("lr", 2e-03)
+        weight_decay = weight_decay if weight_decay is not None else self.hparams.get("weight_decay", 1e-07)
+        batch_size = batch_size if batch_size is not None else self.hparams.get("datamodule_args", {}).get("batch_size", 256)
         self.hparams.update(
             {
                 "n_topics": n_topics,
@@ -266,6 +286,11 @@ class ECRTM(BaseModel):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
+        # Extract theta deterministically (eval mode: no reparameterization
+        # sampling / dropout / batchnorm batch-stats). Affects labels/NMI/
+        # Purity/Perplexity; beta is unaffected.
+        self.model.model.eval()
+
         self.theta = (
             self.model.model.get_theta(torch.tensor(self.dataset.bow), only_theta=True)
             .detach()
@@ -295,7 +320,7 @@ class ECRTM(BaseModel):
         self.hparams["dropout"] = trial.suggest_float("dropout", 0.0, 0.5)
         self.hparams["beta_temp"] = trial.suggest_float("beta_temp", 0.1, 1.0)
         self.hparams["weight_loss_ECR"] = trial.suggest_float(
-            "weight_loss_ECR", 10.0, 200.0
+            "weight_loss_ECR", 10.0, 300.0
         )
         self.hparams["sinkhorn_alpha"] = trial.suggest_float(
             "sinkhorn_alpha", 10.0, 50.0

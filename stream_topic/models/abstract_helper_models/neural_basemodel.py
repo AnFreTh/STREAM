@@ -124,6 +124,27 @@ class NeuralBaseModel(pl.LightningModule):
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
     
+    # --- Validation-epoch cache scoping ---
+    # Some inner models (currently ETM; extensible) memoize a param-only quantity
+    # (e.g. beta = softmax(alpha @ rho.T)) that is invariant across a validation
+    # epoch (params frozen, no optimizer step) but is recomputed per val batch.
+    # We scope the cache to STRICTLY the validation epoch via these hooks so:
+    #   - during training (params change every step): no cache is consulted;
+    #   - during eval AFTER checkpoint reload in fit() (best-checkpoint export):
+    #     no _in_val_epoch flag is set, so the inner model recomputes fresh.
+    # This eliminates the classic "stale beta after ckpt reload" trap agents flagged.
+    def on_validation_epoch_start(self):
+        inner = getattr(self, "model", None)
+        if inner is not None:
+            inner._in_val_epoch = True
+            inner._val_cache = {}
+
+    def on_validation_epoch_end(self):
+        inner = getattr(self, "model", None)
+        if inner is not None:
+            inner._in_val_epoch = False
+            inner._val_cache = {}
+
     def _get_batch_size(self, batch):
         """Infer batch size from batch structure."""
         if isinstance(batch, dict):

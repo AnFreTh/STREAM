@@ -130,7 +130,9 @@ class ETP(nn.Module):
 
             col_err = torch.abs(col_sums - b).sum()
 
-            return max(row_err.item(), col_err.item())
+            # Single GPU->CPU sync (was two: .item() on each side of max()).
+            # torch.maximum yields the same scalar; bit-identical.
+            return torch.maximum(row_err, col_err).item()
 
 
 class FAStopicBase(nn.Module):

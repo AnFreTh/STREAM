@@ -106,6 +106,7 @@ def boto_session():
     the named profile is unavailable (e.g. inside a SageMaker container that
     authenticates via its instance role rather than a local profile).
     """
+    import os as _os
     import boto3
     from botocore.exceptions import ProfileNotFound
 
@@ -113,7 +114,12 @@ def boto_session():
         try:
             return boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION)
         except ProfileNotFound:
-            pass
+            # Profile named but unavailable (e.g. inside a SageMaker container that
+            # authenticates via an instance role). Drop it from the environment so
+            # the default credential chain isn't poisoned by AWS_PROFILE, then fall
+            # back to the instance role / default chain.
+            _os.environ.pop("AWS_PROFILE", None)
+            _os.environ.pop("AWS_DEFAULT_PROFILE", None)
     return boto3.Session(region_name=AWS_REGION)
 
 

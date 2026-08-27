@@ -52,11 +52,11 @@ class HyperMiner(BaseModel):
 
     def __init__(
         self,
-        n_topics_list=[50, 36, 12],
+        n_topics_list=None,
         embed_size: int = 50,
         hidden_size: int = 300,
         pretrained_WE=None,
-        curvature: float = -0.01,
+        curvature: float = -1.0,
         clip_r: float = None,
         batch_size: int = 256,
         val_size: float = 0.2,
@@ -64,6 +64,12 @@ class HyperMiner(BaseModel):
         random_state: int = 42,
         **kwargs,
     ):
+        # n_topics_list=None: net is built lazily in fit(); the benchmark computes
+        # a per-dataset [K, 0.6K, 0.3K] hierarchy. A fixed default would shadow it
+        # and train every dataset at K=50.
+        # curvature=-1.0 (was -0.01): -0.01 is near-Euclidean and largely disables
+        # the Poincare-ball geometry that is HyperMiner's whole contribution. -1.0
+        # matches the paper's unit-curvature convention and the learnable init.
         super().__init__(
             use_pretrained_embeddings=False,
             n_topics_list=n_topics_list,
@@ -75,7 +81,7 @@ class HyperMiner(BaseModel):
         )
         self.save_hyperparameters(ignore=["random_state"])
 
-        self.n_topics = n_topics_list[0]
+        self.n_topics = n_topics_list[0] if n_topics_list else None
         self._status = TrainingStatus.NOT_STARTED
 
         self.hparams["datamodule_args"] = {
@@ -182,12 +188,12 @@ class HyperMiner(BaseModel):
         n_topics_list=[50, 36, 12],
         n_topics=None,
         val_size: float = 0.2,
-        lr: float = 1e-02,
+        lr: float = None,
         lr_patience: int = 10,
         patience: int = 50,
-        weight_decay: float = 1e-07,
+        weight_decay: float = None,
         max_epochs: int = 1000,
-        batch_size: int = 256,
+        batch_size: int = None,
         shuffle: bool = True,
         random_state: int = 101,
         checkpoint_path: str = "checkpoints",
@@ -223,6 +229,12 @@ class HyperMiner(BaseModel):
         self.n_topics = n_topics_list[0]
         self.dataset = dataset
 
+        # Resolve tuned hyperparameters: an explicitly passed value wins,
+        # otherwise fall back to whatever is already in hparams (set by HPO
+        # suggest / refit / eval override), and finally the canonical default.
+        lr = lr if lr is not None else self.hparams.get("lr", 1e-02)
+        weight_decay = weight_decay if weight_decay is not None else self.hparams.get("weight_decay", 1e-07)
+        batch_size = batch_size if batch_size is not None else self.hparams.get("datamodule_args", {}).get("batch_size", 256)
         self.hparams.update(
             {
                 "n_topics_list": n_topics_list,
@@ -281,6 +293,10 @@ class HyperMiner(BaseModel):
         logger.info("--- Training completed successfully. ---")
         self._status = TrainingStatus.SUCCEEDED
 
+        # Extract theta deterministically (eval mode: Weibull uses its mode, not
+        # a sample). Affects labels/NMI/Purity/Perplexity; beta is unaffected.
+        self.model.model.eval()
+
         # Get theta for top layer
         theta_list = self.model.model.get_theta(
             torch.tensor(self.dataset.bow), only_theta=True
@@ -315,8 +331,13 @@ class HyperMiner(BaseModel):
             prev = n_topics_list[-1]
             lower = max(3, prev // 3)
             upper = max(lower + 1, prev - 2)
-            n_topics_list.append(trial.suggest_int(f"n_topics_layer_{i}", lower, upper))
+            layer_size = trial.suggest_int(f"n_topics_layer_{i}", lower, upper)
+            n_topics_list.append(layer_size)
+            # Persist per-layer size so fit() rebuilds THIS trial's hierarchy.
+            self.hparams[f"n_topics_layer_{i}"] = layer_size
 
+        # Persist n_layers too, so fit()'s branch-1 reconstruction fires.
+        self.hparams["n_layers"] = n_layers
         self.hparams["n_topics_list"] = n_topics_list
         self.hparams["hidden_size"] = trial.suggest_int("hidden_size", 128, 512)
         self.hparams["embed_size"] = trial.suggest_int("embed_size", 50, 200)

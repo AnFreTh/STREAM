@@ -8,6 +8,64 @@ import umap.umap_ as umap
 from loguru import logger
 
 
+_ACTIVATION_MAPPING = {
+    "Softplus": nn.Softplus(),
+    "ReLU": nn.ReLU(),
+    "LeakyReLU": nn.LeakyReLU(),
+    "Tanh": nn.Tanh(),
+}
+
+
+def _coerce_hparam(k, v):
+    """Map an activation string back to its nn module.
+
+    Accepts both the Optuna categorical form ('ReLU') and the JSON-serialized
+    form of a live module ('ReLU()') that arises when best-params are dumped to
+    JSON with default=str and reloaded (e.g. the resume / native-HPO entry
+    points). Without the '()' stripping, a reloaded activation would silently
+    stay a string and reach the nn.Module as an invalid activation.
+    """
+    if "activation" in k and isinstance(v, str):
+        key = v[:-2] if v.endswith("()") else v
+        if key in _ACTIVATION_MAPPING:
+            return _ACTIVATION_MAPPING[key]
+    return v
+
+
+def apply_best_params(hparams, best_params):
+    """Write each best-trial hyperparameter back into ``hparams`` at the location
+    where it actually lives, so the final HPO refit uses the best configuration.
+
+    Optuna returns a FLAT dict of the suggested names, but models store many of
+    these NESTED, e.g. NMF's l1_ratio/init/tol under ``nmf_args``; UMAP/KMeans/
+    HDBSCAN params under ``umap_args``/``kmeans_args``/``hdbscan_args``;
+    ``batch_size`` under ``datamodule_args``. For each flat key we resolve its
+    home: (1) recurse when the value itself is a dict; (2) if the key already
+    exists inside a nested dict, write it there; (3) otherwise write it at the
+    top level. Previously flat keys owned by a nested dict were silently dropped,
+    so the refit kept the LAST trial's values instead of the best.
+    """
+    for k, v in best_params.items():
+        # (1) nested-dict value -> recurse
+        if isinstance(hparams.get(k), dict) and isinstance(v, dict):
+            apply_best_params(hparams[k], v)
+            continue
+        # (2) key lives inside one or more nested dicts -> write it there
+        nested_owners = [
+            sub_key
+            for sub_key in hparams
+            if isinstance(hparams[sub_key], dict) and k in hparams[sub_key]
+        ]
+        if k not in hparams and nested_owners:
+            for sub_key in nested_owners:
+                hparams[sub_key][k] = _coerce_hparam(k, v)
+            continue
+        # (3) top-level (skip a top-level key that is itself a dict)
+        if isinstance(hparams.get(k), dict):
+            continue
+        hparams[k] = _coerce_hparam(k, v)
+
+
 class BaseModel(ABC):
     """
     Abstract base class for topic modeling.
@@ -369,8 +427,9 @@ class BaseModel(ABC):
             # Call the model-specific parameter suggestion method
             self.suggest_hyperparameters(trial)
 
-            # Perform dimensionality reduction and clustering
-            self.fit(dataset)
+            # Train the trial at the target K. fit()'s signature default is 20,
+            # so pass n_topics explicitly or trials train at the wrong topic count.
+            self.fit(dataset, n_topics=self.hparams["n_topics"])
 
             # Calculate the score based on the criterion
             if criterion in ["aic", "bic", "recon"]:
@@ -402,30 +461,7 @@ class BaseModel(ABC):
             f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
         )
 
-        def update_hparams(hparams, best_params):
-            activation_mapping = {
-                "Softplus": nn.Softplus(),
-                "ReLU": nn.ReLU(),
-                "LeakyReLU": nn.LeakyReLU(),
-                "Tanh": nn.Tanh(),
-            }
-            # First, update the nested dictionary parameters
-            for k, v in best_params.items():
-                if isinstance(hparams.get(k), dict) and isinstance(v, dict):
-                    update_hparams(hparams[k], v)
-
-            # Next, update the top-level parameters, skipping keys that belong to nested dictionaries
-            for k, v in best_params.items():
-                if k in hparams and isinstance(hparams[k], dict):
-                    continue
-                if not any(
-                    k in hparams.get(sub_key, {})
-                    for sub_key in hparams
-                    if isinstance(hparams[sub_key], dict)
-                ):
-                    hparams[k] = v
-
-        update_hparams(self.hparams, best_params)
+        apply_best_params(self.hparams, best_params)
         self.hparams["n_topics"] = best_n_topics
 
         self.fit(dataset, n_topics=best_n_topics)
@@ -481,6 +517,13 @@ class BaseModel(ABC):
         import importlib
         optuna = importlib.import_module("optuna")
 
+        # Optional max_epochs override for HPO trials (STREAM_MAX_EPOCHS), so a
+        # paper-native-budget variant (e.g. FASTopic @ 200) trains its TRIALS and
+        # final refit at that budget too -- not just the downstream 5-seed eval.
+        # Without this the trials would silently run the fit-default 1000 epochs.
+        _me = os.environ.get("STREAM_MAX_EPOCHS", "").strip()
+        _me_kw = {"max_epochs": int(_me)} if _me else {}
+
         def objective(trial):
             # Only suggest n_topics if range is given; otherwise use fixed value
             if min_topics < max_topics:
@@ -493,8 +536,11 @@ class BaseModel(ABC):
             # Call the model-specific parameter suggestion method
             self.suggest_hyperparameters(trial)
 
-            # Perform dimensionality reduction and clustering
-            self.fit(dataset, trial=trial, optimize=True)
+            # Train the trial. Pass n_topics explicitly: fit()'s signature default
+            # is 20, so without this each trial would train at K=20 regardless of
+            # the dataset's target K (the benchmark fixes min_topics==max_topics==K),
+            # and hyperparameters would be selected at the wrong topic count.
+            self.fit(dataset, n_topics=self.hparams["n_topics"], trial=trial, optimize=True, **_me_kw)
 
             if criterion == "val_loss":
 
@@ -532,36 +578,10 @@ class BaseModel(ABC):
             f"Optimal parameters: {best_params} with {best_n_topics} topics based on {criterion.upper()}."
         )
 
-        def update_hparams(hparams, best_params):
-            activation_mapping = {
-                "Softplus": nn.Softplus(),
-                "ReLU": nn.ReLU(),
-                "LeakyReLU": nn.LeakyReLU(),
-                "Tanh": nn.Tanh(),
-            }
-            # First, update the nested dictionary parameters
-            for k, v in best_params.items():
-                if isinstance(hparams.get(k), dict) and isinstance(v, dict):
-                    update_hparams(hparams[k], v)
-
-            # Next, update the top-level parameters, skipping keys that belong to nested dictionaries
-            for k, v in best_params.items():
-                if k in hparams and isinstance(hparams[k], dict):
-                    continue
-                if not any(
-                    k in hparams.get(sub_key, {})
-                    for sub_key in hparams
-                    if isinstance(hparams[sub_key], dict)
-                ):
-                    if "activation" in k and isinstance(v, str):
-                        hparams[k] = activation_mapping[v]
-                    else:
-                        hparams[k] = v
-
-        update_hparams(self.hparams, best_params)
+        apply_best_params(self.hparams, best_params)
         self.hparams["n_topics"] = best_n_topics
 
-        self.fit(dataset, n_topics=best_n_topics, optimize=False)
+        self.fit(dataset, n_topics=best_n_topics, optimize=False, **_me_kw)
 
         return {
             "best_params": best_params,

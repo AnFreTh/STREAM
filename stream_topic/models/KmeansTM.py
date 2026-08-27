@@ -107,8 +107,17 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         self.hparams["umap_args"] = self.umap_args
         self.hparams["kmeans_args"] = self.kmeans_args
 
+        # n_init=10 (vs modern sklearn's 'auto' -> 1): more k-means++ restarts give
+        # a stronger, more stable clustering baseline and match the KmeansTM_PCA HPO
+        # path. Overridable via kmeans_args.
+        self.kmeans_args.setdefault("n_init", 10)
+
         if random_state is not None:
             self.umap_args["random_state"] = random_state
+            # Seed KMeans explicitly too (mirrors KmeansTM_PCA), rather than
+            # relying on the global NumPy RNG, so per-seed clustering is
+            # reproducible and consistent across the clustering models.
+            self.kmeans_args.setdefault("random_state", random_state)
 
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
@@ -159,17 +168,23 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
             self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
             self.clustering_model.fit(self.reduced_embeddings)
             self.labels = self.clustering_model.labels_
-
-            labels = np.array(self.labels)
-            self.topic_centroids = []
-
-            for label in np.unique(labels):
-                label_embeddings = self.embeddings[labels == label]
-                mean_embedding = np.mean(label_embeddings, axis=0)
-                self.topic_centroids.append(mean_embedding)
+            # topic_centroids is only consumed by stream_topic/visuals; it is
+            # computed lazily via the topic_centroids property (below) instead of
+            # eagerly on every fit/HPO trial, where it was pure dead work.
 
         except Exception as e:
             raise RuntimeError(f"Error in clustering: {e}") from e
+
+    @property
+    def topic_centroids(self):
+        """Mean full-dimensional embedding per cluster (lazy; used by visuals only)."""
+        if getattr(self, "_topic_centroids", None) is None:
+            labels = np.array(self.labels)
+            self._topic_centroids = [
+                np.mean(self.embeddings[labels == label], axis=0)
+                for label in np.unique(labels)
+            ]
+        return self._topic_centroids
 
     def fit(
         self,
@@ -202,6 +217,13 @@ class KmeansTM(BaseModel, SentenceEncodingMixin):
         else:
             check_dataset_steps(dataset, logger, MODEL_NAME)
         self.dataset = dataset
+
+        # Resync from hparams: HPO writes tuned UMAP/KMeans args into hparams, but
+        # dim-reduction/clustering read the instance attributes, which were set in
+        # __init__ from defaults. Without this the 5-seed HPO refit silently uses
+        # default UMAP/KMeans params (mirrors the kmeans_pca n_components resync).
+        self.umap_args = self.hparams.get("umap_args", self.umap_args)
+        self.kmeans_args = self.hparams.get("kmeans_args", self.kmeans_args)
 
         self.n_topics = n_topics
 

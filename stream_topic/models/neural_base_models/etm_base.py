@@ -139,9 +139,22 @@ class ETMBase(nn.Module):
         torch.Tensor
             The topic-word distribution.
         """
+        # beta depends only on the frozen params during a validation epoch, and
+        # is recomputed identically for every val batch. NeuralBaseModel sets
+        # _in_val_epoch strictly across on_validation_epoch_{start,end} so the
+        # cache is inaccessible during training AND during the post-fit
+        # best-checkpoint extraction (which happens outside the val epoch) --
+        # eliminates the stale-beta-after-checkpoint-reload trap.
+        cache = getattr(self, "_val_cache", None)
+        if getattr(self, "_in_val_epoch", False) and cache is not None:
+            beta = cache.get("beta")
+            if beta is not None:
+                return beta
         beta = F.softmax(
             torch.matmul(self.topic_embeddings, self.word_embeddings.T), dim=1
         )
+        if getattr(self, "_in_val_epoch", False) and cache is not None:
+            cache["beta"] = beta
         return beta
 
     def forward(self, x):

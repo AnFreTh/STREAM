@@ -107,6 +107,29 @@ class NMFTM(BaseModel):
         }
         return info
 
+    def _fit_transform_cached(self):
+        """Build NMF's input matrix over the SHARED benchmark vocabulary.
+
+        NMF factorizes TF-IDF (use_tfidf, the canonical NMF setup) computed over
+        the SHARED benchmark BOW (dataset.get_bow(), min_df/max_df set during
+        preprocessing = 25 / 0.7). This makes NMF's vocabulary IDENTICAL to every
+        other model's and fixes its perplexity (previously NMF re-vectorized
+        dataset.texts with its own min_df=2/max_df=0.95/max_features=5000 -> a
+        different, larger vocab that was incomparable and nulled perplexity).
+        get_bow() caches on the dataset (computed once, reused across the 5 seeds;
+        no RNG consumed, so NMF's init RNG is unperturbed). The shared vocabulary
+        is stored on self.feature_names for topic extraction.
+        """
+        from sklearn.feature_extraction.text import TfidfTransformer
+
+        bow, vocab = self.dataset.get_bow()
+        self.feature_names = vocab
+        if self.use_tfidf:
+            # L2-normalized TF-IDF (sklearn defaults) over the shared count matrix
+            # == what TfidfVectorizer would produce on this vocabulary.
+            return TfidfTransformer().fit_transform(bow)
+        return bow
+
     def _clustering(self, matrix):
         """
         Applies NMF clustering to the matrix.
@@ -136,6 +159,27 @@ class NMFTM(BaseModel):
             self.labels = np.argmax(W, axis=1)
             self.theta = W
             self.beta = H
+
+            # Build the topic dictionary directly from the NMF factor matrix H
+            # (canonical NMF topics: the top-weighted words of each component),
+            # rather than via c-TF-IDF of strongly-assigned documents. This
+            # guarantees exactly K topics, each aligned with its beta row, and
+            # never drops a topic that happens to have no document with
+            # theta > threshold (the previous behaviour returned < K topics and
+            # misaligned topics vs beta).
+            # Shared benchmark vocabulary (set in _fit_transform_cached from
+            # dataset.get_bow()); falls back to the vectorizer only on the
+            # explicit user-supplied path.
+            feature_names = getattr(self, "feature_names", None)
+            if feature_names is None:
+                feature_names = self.vectorizer.get_feature_names_out()
+            n_top = 100
+            self.topic_dict = {}
+            for k in range(H.shape[0]):
+                top_idx = np.argsort(H[k])[::-1][:n_top]
+                self.topic_dict[k] = [
+                    (feature_names[j], float(H[k][j])) for j in top_idx
+                ]
 
         except Exception as e:
             raise RuntimeError(f"Error in clustering: {e}") from e
@@ -172,30 +216,8 @@ class NMFTM(BaseModel):
             stopwords_list = set(stopwords['w'])
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
-                matrix = self.vectorizer.fit_transform(self.dataset.texts)
-                self._clustering(matrix)
-
-                # Prepare data for visualization
-                topic_data = pd.DataFrame(columns=["predictions", "text"])
-                for i in range(self.nmf_model.n_components_):
-                    topic_texts = [
-                        self.dataset.texts[j]
-                        for j, z in enumerate(self.theta[:, i])
-                        if z > 0.1
-                    ]
-                    if not topic_texts:
-                        continue
-                    aggregated_texts = " ".join(topic_texts)
-                    new_row = pd.DataFrame({"predictions": [i], "text": [aggregated_texts]})
-                    topic_data = pd.concat([topic_data, new_row], ignore_index=True)
-
-                if topic_data.empty:
-                    raise RuntimeError("No topics were extracted, model training failed.")
-
-                tfidf, count = c_tf_idf(
-                    topic_data["text"].tolist(), len(self.dataset.texts),stop_words=stopwords_list
-                )
-                self.topic_dict = extract_tfidf_topics(tfidf, count, topic_data)
+                matrix = self._fit_transform_cached()
+                self._clustering(matrix)  # builds self.topic_dict from beta
 
             except Exception as e:
                 logger.error(f"Error in training: {e}")
@@ -208,30 +230,8 @@ class NMFTM(BaseModel):
         else:
             try:
                 logger.info(f"--- Training {MODEL_NAME} topic model ---")
-                matrix = self.vectorizer.fit_transform(self.dataset.texts)
-                self._clustering(matrix)
-
-                # Prepare data for visualization
-                topic_data = pd.DataFrame(columns=["predictions", "text"])
-                for i in range(self.nmf_model.n_components_):
-                    topic_texts = [
-                        self.dataset.texts[j]
-                        for j, z in enumerate(self.theta[:, i])
-                        if z > 0.1
-                    ]
-                    if not topic_texts:
-                        continue
-                    aggregated_texts = " ".join(topic_texts)
-                    new_row = pd.DataFrame({"predictions": [i], "text": [aggregated_texts]})
-                    topic_data = pd.concat([topic_data, new_row], ignore_index=True)
-
-                if topic_data.empty:
-                    raise RuntimeError("No topics were extracted, model training failed.")
-
-                tfidf, count = c_tf_idf(
-                    topic_data["text"].tolist(), len(self.dataset.texts)
-                )
-                self.topic_dict = extract_tfidf_topics(tfidf, count, topic_data)
+                matrix = self._fit_transform_cached()
+                self._clustering(matrix)  # builds self.topic_dict from beta
 
             except Exception as e:
                 logger.error(f"Error in training: {e}")

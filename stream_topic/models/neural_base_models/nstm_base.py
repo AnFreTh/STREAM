@@ -198,12 +198,19 @@ class NSTMBase(nn.Module):
         torch.Tensor
             The total loss, averaged over the batch.
         """
+        from ...utils.fast_mode import fast_mode
         theta, beta, M = self.forward(x)
         sh_loss = sinkhorn_loss(
             M, theta.T, F.softmax(x["bow"], dim=-1).T, lambda_sh=self.sinkhorn_alpha
         )
-        recon = F.softmax(torch.matmul(theta, beta), dim=-1)
-        recon_loss = -(x["bow"] * recon.log()).sum(axis=1)
+        if fast_mode():
+            # Fp-equivalent: log_softmax fuses softmax+log with better numerical
+            # stability. Values differ from softmax().log() at float32 epsilon.
+            log_recon = F.log_softmax(torch.matmul(theta, beta), dim=-1)
+            recon_loss = -(x["bow"] * log_recon).sum(axis=1)
+        else:
+            recon = F.softmax(torch.matmul(theta, beta), dim=-1)
+            recon_loss = -(x["bow"] * recon.log()).sum(axis=1)
 
         loss = self.recon_loss_weight * recon_loss + sh_loss
         loss = loss.mean()

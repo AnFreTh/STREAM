@@ -185,7 +185,31 @@ class TNTM(BaseModel, SentenceEncodingMixin):
         mus_init = torch.tensor(gmm_model.means_)
         sigmas_init = torch.tensor(gmm_model.covariances_)
 
+        # Add a small jitter to the GMM component covariances before the Cholesky
+        # factorization. A collapsed/under-populated GMM component (most likely at
+        # large K or on small-vocabulary datasets) can be numerically non-positive
+        # -definite, which makes torch.linalg.cholesky raise (the cause of the
+        # previously-observed initialization failures). The jitter (~1e-6) is
+        # negligible relative to the 1e-4 diagonal floor added at runtime via
+        # log_diag and does not change results on runs that already succeed.
+        jitter = 1e-6 * torch.eye(
+            sigmas_init.shape[-1], dtype=sigmas_init.dtype
+        )
+        sigmas_init = sigmas_init + jitter
+
+        # Keep the Cholesky in float64 (sklearn's GMM returns float64 covariances)
+        # for a numerically stable factorization, then downcast the learnable init
+        # tensors to float32. The rest of the model is already float32 (log_diag,
+        # word_embeddings_projected, proj_embeddings); mus/L_lower were float64 only
+        # as an accidental artifact of GaussianMixture's float64 outputs, which
+        # forced the entire log_prob hot path into float64 (a large, unnecessary
+        # slowdown, especially on GPU). Running it in float32 is the intended design.
         L_lower_init = torch.linalg.cholesky(sigmas_init)
+        from ..utils.fast_mode import tntm_legacy
+        if not tntm_legacy():
+            mus_init = mus_init.to(torch.float32)
+            L_lower_init = L_lower_init.to(torch.float32)
+        # legacy: keep float64 (original numerics) for the old-vs-new A/B
         log_diag_init = torch.log(
             torch.ones(n_topics, umap_n_dims) * 1e-4
         )  # initialize diag = (1,...,1)*eps, such that only a small value is added to the diagonal
@@ -393,16 +417,15 @@ class TNTM(BaseModel, SentenceEncodingMixin):
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 2e-03,
+        lr: float = None,
         lr_patience: int = 10,
         patience: int = 50,
         factor: float = 0.5,
-        weight_decay: float = 1e-07,
+        weight_decay: float = None,
         max_epochs: int = 1000,
-        batch_size: int = 64,
+        batch_size: int = None,
         shuffle: bool = True,
         random_state: int = 101,
-        inferece_type="zeroshot",
         checkpoint_path: str = "checkpoints",
         monitor: str = "val_loss",
         mode: str = "min",
@@ -443,6 +466,12 @@ class TNTM(BaseModel, SentenceEncodingMixin):
         self.n_topics = n_topics
         self.dataset = dataset
 
+        # Resolve tuned hyperparameters: an explicitly passed value wins,
+        # otherwise fall back to whatever is already in hparams (set by HPO
+        # suggest / refit / eval override), and finally the canonical default.
+        lr = lr if lr is not None else self.hparams.get("lr", 2e-03)
+        weight_decay = weight_decay if weight_decay is not None else self.hparams.get("weight_decay", 1e-07)
+        batch_size = batch_size if batch_size is not None else self.hparams.get("datamodule_args", {}).get("batch_size", 64)
         self.hparams.update(
             {
                 "n_topics": n_topics,
@@ -530,6 +559,11 @@ class TNTM(BaseModel, SentenceEncodingMixin):
             "embedding": torch.tensor(dataset.embeddings),
             "bow": torch.tensor(dataset.bow),
         }
+
+        # Extract theta deterministically (eval mode: no reparameterization
+        # sampling / dropout / batchnorm batch-stats). Affects labels/NMI/
+        # Purity/Perplexity; beta is unaffected.
+        self.model.model.eval()
 
         self.theta = (
             self.model.model.get_theta(data, only_theta=True).detach().cpu().numpy()

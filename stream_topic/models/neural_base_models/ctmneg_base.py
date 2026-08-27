@@ -129,6 +129,10 @@ class CTMNegBase(nn.Module):
 
         self.mu2.requires_grad = False
         self.var2.requires_grad = False
+        # var2 is a fixed prior (never updated by the optimizer); cache its log
+        # once so loss_function doesn't recompute self.var2.log() every step. As a
+        # non-trainable buffer it moves with .to(device) and survives state_dict.
+        self.register_buffer("_log_var2", self.var2.detach().log())
 
         self.mean_bn = nn.BatchNorm1d(n_topics, eps=0.001, momentum=0.001, affine=True)
         self.mean_bn.weight.data.copy_(torch.ones(n_topics))
@@ -296,7 +300,7 @@ class CTMNegBase(nn.Module):
         var_division = var / self.var2
         diff = mu - self.mu2
         diff_term = diff * diff / self.var2
-        logvar_division = self.var2.log() - logvar
+        logvar_division = self._log_var2 - logvar  # cached; bit-identical
         KLD = 0.5 * (
             (var_division + diff_term + logvar_division).sum(axis=1) - self.n_topics
         )

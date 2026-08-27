@@ -70,6 +70,10 @@ class SawETMBase(nn.Module):
         self.register_buffer("theta_max", torch.tensor(1000.0, dtype=torch.float))
         self.register_buffer("wei_shape_min", torch.tensor(1e-1, dtype=torch.float))
         self.register_buffer("wei_shape_max", torch.tensor(100.0, dtype=torch.float))
+        # Euler-Mascheroni constant; registered once as a buffer so it doesn't get
+        # re-allocated and H->D copied on every kl_weibull_gamma call (per layer per
+        # forward). Value is the exact same float32.
+        self.register_buffer("euler_c", torch.tensor(0.5772, dtype=torch.float))
 
         # Hyperparameters (reverse order for bottom-up)
         self.num_topics_list = n_topics_list[::-1]
@@ -125,21 +129,30 @@ class SawETMBase(nn.Module):
         return torch.log(torch.max(x, self.real_min))
 
     def reparameterize(self, shape, scale, sample_num=50):
-        """Reparameterization for Weibull distribution."""
-        shape = shape.unsqueeze(0).repeat(sample_num, 1, 1)
-        scale = scale.unsqueeze(0).repeat(sample_num, 1, 1)
-        eps = torch.rand_like(shape, dtype=torch.float)
-        samples = scale * torch.pow(-self.log_max(1 - eps), 1 / shape)
-        return torch.clamp(samples.mean(0), self.real_min.item(), self.theta_max.item())
+        """Reparameterization for Weibull distribution.
+
+        Uses broadcasting instead of .repeat(sample_num, 1, 1) to avoid two
+        (sample_num, B, T) dense materializations. torch.rand is drawn in the same
+        (sample_num, B, T) layout with the same global RNG state, so all values --
+        including the RNG stream consumed -- are identical. torch.clamp accepts
+        the buffer scalars directly, removing two GPU->CPU syncs per call.
+        """
+        eps = torch.rand(
+            (sample_num,) + tuple(shape.shape),
+            dtype=torch.float, device=shape.device,
+        )
+        samples = scale.unsqueeze(0) * torch.pow(
+            -self.log_max(1 - eps), 1 / shape.unsqueeze(0)
+        )
+        return torch.clamp(samples.mean(0), self.real_min, self.theta_max)
 
     def kl_weibull_gamma(self, wei_shape, wei_scale, gam_shape, gam_scale):
         """KL divergence between Weibull and Gamma distributions."""
-        euler_mascheroni_c = torch.tensor(
-            0.5772, dtype=torch.float, device=wei_shape.device
-        )
         t1 = torch.log(wei_shape) + torch.lgamma(gam_shape)
         t2 = -gam_shape * torch.log(wei_scale * gam_scale)
-        t3 = euler_mascheroni_c * (gam_shape / wei_shape - 1) - 1
+        # self.euler_c: pre-registered buffer (same value as the tensor previously
+        # rebuilt every call). Same device/dtype semantics; bit-identical result.
+        t3 = self.euler_c * (gam_shape / wei_shape - 1) - 1
         t4 = gam_scale * wei_scale * torch.exp(torch.lgamma(1 + 1 / wei_shape))
         return (t1 + t2 + t3 + t4).sum(1).mean()
 
@@ -209,8 +222,11 @@ class SawETMBase(nn.Module):
                 joint_feat = torch.cat((hidden_feats[n], phi_by_theta_list[0]), dim=1)
 
             k, lamb = torch.chunk(F.softplus(self.q_theta[n](joint_feat)), 2, dim=1)
-            k = torch.clamp(k, self.wei_shape_min.item(), self.wei_shape_max.item())
-            lamb = torch.clamp(lamb, self.real_min.item())
+            # torch.clamp accepts tensor bounds directly; passing the pre-registered
+            # scalar buffers avoids 3 GPU->CPU syncs per layer per forward. The
+            # compared value is the exact float image of the same buffer -> identical.
+            k = torch.clamp(k, self.wei_shape_min, self.wei_shape_max)
+            lamb = torch.clamp(lamb, min=self.real_min)
 
             if self.training:
                 lamb = lamb / torch.exp(torch.lgamma(1 + 1 / k))

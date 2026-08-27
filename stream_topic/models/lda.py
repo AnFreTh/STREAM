@@ -112,19 +112,21 @@ class LDA(BaseModel):
 
         logger.info(f"--- Preparing the documents for {MODEL_NAME} ---")
 
-        # Get text documents
-        documents = dataset.dataframe["text"].tolist()
-
-        if self.vectorizer is None:
-            self.vectorizer = CountVectorizer(
-                max_df=0.95,
-                min_df=2,
-                stop_words='english',
-            )
-
-        # Create document-term matrix
-        self.doc_term_matrix = self.vectorizer.fit_transform(documents)
-        self.feature_names = self.vectorizer.get_feature_names_out()
+        # Use the SHARED benchmark BOW (the min_df/max_df set during preprocessing,
+        # 25 / 0.7 in the benchmark) so LDA factorizes the IDENTICAL vocabulary as
+        # every other model, and its perplexity (dataset.bow vs LDA's beta) is
+        # dimensionally consistent. Previously LDA re-vectorized dataset.texts with
+        # its own min_df=2/max_df=0.95 -> a larger, different vocab that made it
+        # incomparable and nulled its perplexity. get_bow() caches on the dataset,
+        # so this is computed once and reused across the 5 seeds (no RNG consumed,
+        # so it does not perturb the RNG the LDA fit draws from).
+        if self.vectorizer is not None:
+            # Explicit user-supplied vectorizer path (not used in the benchmark).
+            documents = dataset.dataframe["text"].tolist()
+            self.doc_term_matrix = self.vectorizer.fit_transform(documents)
+            self.feature_names = self.vectorizer.get_feature_names_out()
+        else:
+            self.doc_term_matrix, self.feature_names = dataset.get_bow()
 
     def fit(self, dataset: TMDataset = None, n_topics: int = 20, language: str = "en", **lda_params):
         """
@@ -173,8 +175,14 @@ class LDA(BaseModel):
             
             # Set default parameters if not provided
             lda_params.setdefault('random_state', self.random_state)
-            lda_params.setdefault('max_iter', 10)
+            lda_params.setdefault('max_iter', 50)  # was 10; batch VI needs more passes to converge
             lda_params.setdefault('learning_method', 'batch')
+            # NOTE: sklearn's parallel batch E-step (n_jobs=-1) is theoretically
+            # only algebraically equivalent to serial, but empirically it drifts
+            # ~70% at theta / ~38% at components on real data over 10 iterations
+            # because reassociation errors compound. NOT enabled here -- it is a
+            # BEHAVIOR-CHANGING optimization, not fp-equivalent. Left as a
+            # documented option for future rerun-with-known-diff experiments.
             
             self.model = LatentDirichletAllocation(
                 n_components=n_topics, 
@@ -264,12 +272,21 @@ class LDA(BaseModel):
         if self._status != TrainingStatus.SUCCEEDED:
             raise RuntimeError("Model has not been trained yet or failed.")
 
+        # transform() over the fixed fitted components_ and DTM is deterministic
+        # (sklearn's E-step uses a fixed np.ones init, random_state unused), so the
+        # result is invariant across calls. It is invoked 2-3x per run (fit, then
+        # in bench_common for perplexity and NMI/Purity), each a full variational
+        # E-step; memoize it.
+        if getattr(self, "_theta_cache", None) is not None:
+            return self._theta_cache
+
         # Get document-topic distribution
         doc_topic_dist = self.model.transform(self.doc_term_matrix)
-        
+
         # Convert to DataFrame with proper column names
         columns = [f"topic_{i}" for i in range(self.n_topics)]
-        return pd.DataFrame(doc_topic_dist, columns=columns)
+        self._theta_cache = pd.DataFrame(doc_topic_dist, columns=columns)
+        return self._theta_cache
 
 
 

@@ -117,9 +117,16 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         }
         return info
 
-    def _clustering(self):
+    def _clustering(self, min_cluster_size=None):
         """
-        Applies K-Means clustering to the reduced embeddings.
+        Applies HDBSCAN clustering to the reduced embeddings.
+
+        Parameters
+        ----------
+        min_cluster_size : int, optional
+            Overrides the configured HDBSCAN ``min_cluster_size`` for this call.
+            Used to re-cluster with a smaller value when the initial run finds
+            fewer than the target number of topics.
         """
 
         import importlib
@@ -132,30 +139,34 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
 
         try:
             logger.info("--- Creating document cluster ---")
-            self.clustering_model = hdbscan.HDBSCAN(**self.hdbscan_args)
+            hdbscan_args = dict(self.hdbscan_args)
+            if min_cluster_size is not None:
+                hdbscan_args["min_cluster_size"] = int(min_cluster_size)
+            self.clustering_model = hdbscan.HDBSCAN(**hdbscan_args)
             self.clustering_model.fit(self.reduced_embeddings)
-            self.labels = self.clustering_model.labels_
+            # Copy before shifting: mutating clustering_model.labels_ in place
+            # would corrupt the -1 noise label that _compute_wcss relies on.
+            self.labels = self.clustering_model.labels_.copy()
             if self.labels.min() < 0:
                 self.labels += 1
 
         except Exception as e:
             raise RuntimeError(f"Error in clustering: {e}") from e
 
-        labels = np.array(self.labels)
+        # topic_centroids is only consumed by stream_topic/visuals; it is computed
+        # lazily via the topic_centroids property below instead of eagerly on every
+        # _clustering call (which the re-cluster retry loop invokes repeatedly).
 
-        # Initialize an empty dictionary to store mean embeddings for each label
-        self.topic_centroids = []
-
-        # Iterate over unique labels and compute mean embedding for each
-        for label in np.unique(labels):
-            # Find embeddings corresponding to the current label
-            label_embeddings = self.embeddings[labels == label]
-
-            # Compute mean embedding for the current label
-            mean_embedding = np.mean(label_embeddings, axis=0)
-
-            # Store the mean embedding in the dictionary
-            self.topic_centroids.append(mean_embedding)
+    @property
+    def topic_centroids(self):
+        """Mean full-dimensional embedding per cluster (lazy; used by visuals only)."""
+        if getattr(self, "_topic_centroids", None) is None:
+            labels = np.array(self.labels)
+            self._topic_centroids = [
+                np.mean(self.embeddings[labels == label], axis=0)
+                for label in np.unique(labels)
+            ]
+        return self._topic_centroids
 
     def _reduce_topics(self, n_topics):
         """
@@ -171,6 +182,30 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             Target number of topics.
         """
         current_k = len(np.unique(self.labels))
+
+        # If HDBSCAN found fewer than the target number of clusters, we cannot
+        # merge down to K. Re-cluster with progressively smaller min_cluster_size
+        # until at least K clusters are found (BERTopic's sanctioned route to a
+        # target K), then fall through to the merge-down step. This preserves the
+        # equal-K guarantee across all models. HDBSCAN's default min_cluster_size
+        # is 5, so we start just below whatever was used and shrink toward 2.
+        if current_k < n_topics:
+            start = int(self.hdbscan_args.get("min_cluster_size", 5))
+            for mcs in range(max(start - 1, 2), 1, -1):
+                logger.info(
+                    f"--- HDBSCAN found {current_k} < {n_topics} clusters; "
+                    f"re-clustering with min_cluster_size={mcs} ---"
+                )
+                self._clustering(min_cluster_size=mcs)
+                current_k = len(np.unique(self.labels))
+                if current_k >= n_topics:
+                    break
+            if current_k < n_topics:
+                logger.warning(
+                    f"--- HDBSCAN could not reach {n_topics} clusters "
+                    f"(max found: {current_k}); reporting {current_k} topics ---"
+                )
+
         if current_k <= n_topics:
             return
 
@@ -178,34 +213,87 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
             f"--- Reducing {current_k} topics to {n_topics} via hierarchical merging ---"
         )
 
-        while len(np.unique(self.labels)) > n_topics:
-            # Recompute c-TF-IDF for current clusters
-            self.dataframe["predictions"] = self.labels
-            docs_per_topic = self.dataframe.groupby(
-                ["predictions"], as_index=False
-            ).agg({"text": " ".join})
+        # Incremental c-TF-IDF merge (bit-identical to recomputing c_tf_idf every
+        # iteration, but tokenizes the corpus ONCE instead of once per merge).
+        #
+        # Why identical: CountVectorizer's vocabulary is the union of all corpus
+        # tokens, which is invariant to how documents are grouped into clusters,
+        # and its feature order is sorted, so the (k x V) count matrix has the same
+        # columns each iteration. Merging two clusters is exactly summing their two
+        # integer count rows -- the per-word column totals (sum_t, hence idf) are
+        # therefore invariant across merges, so idf is computed once. tf and tf-idf
+        # are then reproduced from the maintained counts with the same numpy ops as
+        # c_tf_idf, giving bit-identical similarities and argmax tie-breaking.
+        from sklearn.feature_extraction.text import CountVectorizer
 
-            tfidf, _ = c_tf_idf(
-                docs_per_topic["text"].values, m=len(self.dataframe)
-            )
+        self.dataframe["predictions"] = self.labels
+        docs_per_topic = self.dataframe.groupby(
+            ["predictions"], as_index=False
+        ).agg({"text": " ".join})
+        m = len(self.dataframe)
+
+        count = CountVectorizer(ngram_range=(1, 1), stop_words="english").fit(
+            docs_per_topic["text"].values
+        )
+        counts = count.transform(docs_per_topic["text"].values).toarray()
+        # groupby(sort=True) => rows aligned to ascending prediction labels.
+        labels_arr = docs_per_topic["predictions"].values.copy()
+
+        # idf is invariant across merges (see above): compute once.
+        sum_t = counts.sum(axis=0)
+        sum_t = np.maximum(sum_t, 1)
+        idf = np.log(np.divide(m, sum_t)).reshape(-1, 1)
+        idf[~np.isfinite(idf)] = 0
+
+        while len(labels_arr) > n_topics:
+            # Reproduce c_tf_idf's tf / tf-idf from the maintained count matrix.
+            t = counts
+            w = t.sum(axis=1)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                tf = np.divide(t.T, w)
+                tf[~np.isfinite(tf)] = 0
+            tf_idf = np.multiply(tf, idf)
+            tf_idf = np.nan_to_num(tf_idf, nan=0.0, posinf=0.0, neginf=0.0)
 
             # Cosine similarity between topic c-TF-IDF vectors
-            sim = cosine_similarity(tfidf.T)
+            sim = cosine_similarity(tf_idf.T)
             np.fill_diagonal(sim, -1)
 
             # Find the most similar pair
             i, j = np.unravel_index(sim.argmax(), sim.shape)
-            topic_labels = docs_per_topic["predictions"].values
-            merge_from = topic_labels[max(i, j)]
-            merge_into = topic_labels[min(i, j)]
+            merge_from_idx = max(i, j)
+            merge_into_idx = min(i, j)
+            merge_from = labels_arr[merge_from_idx]
+            merge_into = labels_arr[merge_into_idx]
+
+            # Merge cluster rows (exact integer sum) and drop the merged label,
+            # keeping labels_arr sorted so row/col order matches a fresh groupby.
+            counts[merge_into_idx] += counts[merge_from_idx]
+            counts = np.delete(counts, merge_from_idx, axis=0)
+            labels_arr = np.delete(labels_arr, merge_from_idx)
 
             # Merge: reassign all docs from merge_from -> merge_into
             self.labels[self.labels == merge_from] = merge_into
 
-        # Relabel to contiguous 0..n_topics-1
+        # Relabel to contiguous 0..n_topics-1. unique_labels == labels_arr (both
+        # sorted), so relabeled topic i corresponds exactly to counts row i.
         unique_labels = np.unique(self.labels)
         label_map = {old: new for new, old in enumerate(unique_labels)}
         self.labels = np.array([label_map[l] for l in self.labels])
+
+        # Stash the final c-TF-IDF state so fit() can reuse it on the english path
+        # instead of re-tokenizing the whole corpus a second time. counts/idf/vocab
+        # here are exactly what a fresh c_tf_idf over the merged clusters produces
+        # (vocab is grouping-invariant; counts are exact integer row-sums), so the
+        # reconstructed tf_idf and the CountVectorizer feature order are bit-identical.
+        w = counts.sum(axis=1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            tf = np.divide(counts.T, w)
+            tf[~np.isfinite(tf)] = 0
+        merged_tfidf = np.multiply(tf, idf)
+        merged_tfidf = np.nan_to_num(merged_tfidf, nan=0.0, posinf=0.0, neginf=0.0)
+        self._merged_tfidf = merged_tfidf     # (vocab, n_topics)
+        self._merged_count = count            # fitted CountVectorizer (english)
 
         logger.info(f"--- Topic reduction complete: {len(unique_labels)} topics ---")
 
@@ -234,6 +322,17 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
         else:
             check_dataset_steps(dataset, logger, MODEL_NAME)
         self._status = TrainingStatus.INITIALIZED
+
+        # Resync from hparams: HPO writes tuned UMAP/HDBSCAN args into hparams, but
+        # dim-reduction/clustering read the instance attributes set in __init__.
+        # Without this the 5-seed HPO refit silently uses default UMAP/HDBSCAN.
+        self.umap_args = self.hparams.get("umap_args", self.umap_args)
+        self.hdbscan_args = self.hparams.get("hdbscan_args", self.hdbscan_args)
+
+        # Reset any stashed merge-loop c-TF-IDF from a previous fit/HPO refit so a
+        # stale reuse can never leak across fits.
+        self._merged_tfidf = None
+        self._merged_count = None
 
         if self.stopwords_path is not None:
             with open(self.stopwords_path, 'r', encoding='UTF-8') as f:
@@ -294,20 +393,39 @@ class BERTopicTM(BaseModel, SentenceEncodingMixin):
                     self._reduce_topics(n_topics)
 
                 self.dataframe["predictions"] = self.labels
-                docs_per_topic = self.dataframe.groupby(
-                    ["predictions"], as_index=False
-                ).agg({"text": " ".join})
 
-                tfidf, count = c_tf_idf(
-                    docs_per_topic["text"].values, m=len(self.dataframe)
-                )
+                # If _reduce_topics ran, it left the final c-TF-IDF (over merged
+                # clusters, english stopwords, full corpus) in self._merged_tfidf /
+                # self._merged_count -- bit-identical to what the block below would
+                # recompute via a second groupby-join + full-corpus tokenization.
+                # Reuse it and skip the redundant work. Rows in _merged_tfidf.T
+                # correspond to the CONTIGUOUS relabeled topics 0..K-1 (labels_arr
+                # was kept in sorted order == np.unique(self.labels)).
+                if self._merged_tfidf is not None and self._merged_count is not None:
+                    tfidf, count = self._merged_tfidf, self._merged_count
+                    labels_sorted = np.unique(self.dataframe["predictions"].values)
+                    docs_per_topic = pd.DataFrame({"predictions": labels_sorted})
+                else:
+                    docs_per_topic = self.dataframe.groupby(
+                        ["predictions"], as_index=False
+                    ).agg({"text": " ".join})
+                    tfidf, count = c_tf_idf(
+                        docs_per_topic["text"].values, m=len(self.dataframe)
+                    )
 
                 self.topic_dict = extract_tfidf_topics(tfidf, count, docs_per_topic, n=100)
 
-                one_hot_encoder = OneHotEncoder(sparse_output=False)
-                predictions_one_hot = one_hot_encoder.fit_transform(
-                    self.dataframe[["predictions"]]
-                )
+                # theta is one-hot over contiguous cluster labels 0..K-1 (see
+                # _reduce_topics relabel). np.eye(K)[labels] is bit-identical to
+                # OneHotEncoder's dense output when categories are contiguous.
+                labels_int = self.dataframe["predictions"].to_numpy()
+                if labels_int.min() >= 0 and labels_int.max() == len(np.unique(labels_int)) - 1:
+                    predictions_one_hot = np.eye(int(labels_int.max()) + 1, dtype=float)[labels_int]
+                else:
+                    one_hot_encoder = OneHotEncoder(sparse_output=False)
+                    predictions_one_hot = one_hot_encoder.fit_transform(
+                        self.dataframe[["predictions"]]
+                    )
 
                 self.beta = tfidf
                 self.theta = predictions_one_hot

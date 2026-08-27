@@ -101,22 +101,28 @@ class HyperMinerBase(SawETMBase):
         return torch.where(cond, projected, x)
     
     def get_phis(self):
-        """Factor loading matrices using hyperbolic distance."""
+        """Factor loading matrices using hyperbolic distance.
+
+        The original implementation projected each ``alpha[n]`` twice per forward
+        (once as the "right" input in layer n, once as the "left" input in layer
+        n+1). ``proj(expmap0(x))`` is deterministic in x, so both calls return the
+        same tensor value; sharing the single projection is bit-identical and
+        removes ~33% of the delicate hyperbolic ops (the ``clip``/``truncate_c``/
+        ``tanh``/``atanh`` clamps inside are reused, not duplicated). Gradient
+        flow is preserved: layer n's phi uses the shared ``hyp_alpha[n]`` (grads
+        flow to ``self.alpha[n]``); layer n+1's phi uses ``hyp_alpha[n].detach()``
+        (no grads), matching the original ``.detach()`` semantics.
+        """
+        c = self.curvature
+        hyp_rho = self.manifold.proj(self.manifold.expmap0(self.rho, c), c)
+        hyp_alpha = [
+            self.manifold.proj(self.manifold.expmap0(a, c), c) for a in self.alpha
+        ]
         phis = []
         for n in range(self.num_layers):
-            if n == 0:
-                hyp_rho = self.manifold.proj(
-                    self.manifold.expmap0(self.rho, self.curvature), self.curvature)
-                hyp_alpha = self.manifold.proj(
-                    self.manifold.expmap0(self.alpha[n], self.curvature), self.curvature)
-                phi = torch.softmax(-self.manifold.dist(
-                    hyp_rho.unsqueeze(1), hyp_alpha.unsqueeze(0), self.curvature), dim=0)
-            else:
-                hyp_alpha1 = self.manifold.proj(
-                    self.manifold.expmap0(self.alpha[n - 1], self.curvature), self.curvature)
-                hyp_alpha2 = self.manifold.proj(
-                    self.manifold.expmap0(self.alpha[n], self.curvature), self.curvature)
-                phi = torch.softmax(-self.manifold.dist(
-                    hyp_alpha1.unsqueeze(1).detach(), hyp_alpha2.unsqueeze(0), self.curvature), dim=0)
-            phis.append(phi)
+            left = hyp_rho if n == 0 else hyp_alpha[n - 1].detach()
+            phis.append(torch.softmax(
+                -self.manifold.dist(left.unsqueeze(1), hyp_alpha[n].unsqueeze(0), c),
+                dim=0,
+            ))
         return phis

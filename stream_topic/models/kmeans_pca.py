@@ -64,8 +64,16 @@ class KmeansTM_PCA(BaseModel, SentenceEncodingMixin):
         self.kmeans_args = self.hparams.get("kmeans_args", kmeans_args or {})
         self.hparams["kmeans_args"] = self.kmeans_args
 
+        # Keep the run seed so BOTH stochastic stages (PCA randomized-SVD and
+        # KMeans) are seeded -- otherwise PCA's svd_solver='auto' dispatches to an
+        # UNSEEDED randomized SVD, making the "deterministic baseline" non-
+        # reproducible run-to-run.
+        self.random_state = random_state
         # Fixed random_state → deterministic clustering (paper claim)
         self.kmeans_args.setdefault("random_state", random_state)
+        # n_init=10 (vs modern sklearn's 'auto' -> 1): stronger/stabler baseline,
+        # and matches the n_init=10 the PCA HPO path already pins.
+        self.kmeans_args.setdefault("n_init", 10)
 
         self.embeddings_path = embeddings_folder_path
         self.embeddings_file_path = embeddings_file_path
@@ -86,8 +94,14 @@ class KmeansTM_PCA(BaseModel, SentenceEncodingMixin):
     def _dim_reduction(self):
         """PCA dimensionality reduction."""
         logger.info("--- Reducing dimensions with PCA ---")
+        # Resync from hparams: the post-HPO refit writes the BEST n_components
+        # into hparams, but this method reads the attribute, which otherwise
+        # still holds the last trial's value.
+        self.n_components = self.hparams.get("n_components", self.n_components)
         n_comp = min(self.n_components, self.embeddings.shape[1], self.embeddings.shape[0])
-        self.reducer = PCA(n_components=n_comp)
+        # Seed PCA: with svd_solver='auto' sklearn picks randomized SVD for these
+        # shapes, which is non-deterministic unless random_state is set.
+        self.reducer = PCA(n_components=n_comp, random_state=self.random_state)
         self.reduced_embeddings = self.reducer.fit_transform(self.embeddings)
 
     def _clustering(self):
@@ -97,12 +111,19 @@ class KmeansTM_PCA(BaseModel, SentenceEncodingMixin):
         self.clustering_model = KMeans(n_clusters=self.n_topics, **self.kmeans_args)
         self.clustering_model.fit(self.reduced_embeddings)
         self.labels = self.clustering_model.labels_
+        # topic_centroids is only consumed by stream_topic/visuals; computed
+        # lazily via the property below instead of eagerly on every fit/HPO trial.
 
-        labels = np.array(self.labels)
-        self.topic_centroids = []
-        for label in np.unique(labels):
-            label_embeddings = self.embeddings[labels == label]
-            self.topic_centroids.append(np.mean(label_embeddings, axis=0))
+    @property
+    def topic_centroids(self):
+        """Mean full-dimensional embedding per cluster (lazy; used by visuals only)."""
+        if getattr(self, "_topic_centroids", None) is None:
+            labels = np.array(self.labels)
+            self._topic_centroids = [
+                np.mean(self.embeddings[labels == label], axis=0)
+                for label in np.unique(labels)
+            ]
+        return self._topic_centroids
 
     def fit(self, dataset: TMDataset = None, n_topics: int = 20):
         assert isinstance(dataset, TMDataset), "Dataset must be a TMDataset instance."

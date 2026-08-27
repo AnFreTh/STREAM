@@ -87,7 +87,16 @@ from config import (  # noqa: E402
     boto_session,
 )
 
-MODELING_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+# Encoder that produces the document embeddings the models TRAIN on. Overridable
+# via STREAM_MODELING_EMBEDDING_MODEL for the embedding-swap ablation (default
+# benchmark re-run under a different, bigger encoder). Read at import so the
+# module global and precompute_embeddings' default arg both pick it up; the env
+# var must therefore be set before bench_common is imported.
+MODELING_EMBEDDING_MODEL = os.environ.get(
+    "STREAM_MODELING_EMBEDDING_MODEL", "all-MiniLM-L6-v2"
+)
+# Encoder used to SCORE embedding metrics. Held fixed across the ablation so the
+# metric has a common reference; only the modeling encoder above is swapped.
 EVAL_EMBEDDING_MODEL = "all-mpnet-base-v2"
 
 BENCHMARK_PREPROCESS = {
@@ -158,6 +167,15 @@ EMBEDDING_MODELS = {
     "FASTopic",
 }
 
+# Clustering models whose UMAP/PCA/KMeans stochastic components must be seeded
+# per-run (the neural models seed via pl.seed_everything in fit_model instead).
+CLUSTERING_MODELS = {"KmeansTM", "KmeansTM_PCA", "BERTopicTM"}
+
+# Non-neural models: they take no random_state in fit() and have no train/val
+# split. fit_model uses this set to decide whether to forward the run seed
+# through model.fit(..., random_state=seed) so the neural val split varies.
+NON_NEURAL_MODELS = {"LDA", "NMFTM", "KmeansTM", "KmeansTM_PCA", "BERTopicTM"}
+
 # Models that use AIC/BIC for HPO (non-neural)
 AIC_HPO_MODELS = {"LDA", "NMFTM", "KmeansTM", "KmeansTM_PCA", "BERTopicTM"}
 
@@ -227,6 +245,10 @@ class _S3Backend:
         except Exception:
             return False
 
+    def get_json(self, key):
+        obj = self.client.get_object(Bucket=S3_BUCKET, Key=key)
+        return json.loads(obj["Body"].read())
+
 
 class _LocalBackend:
     """Persist results to the local filesystem under config.LOCAL_RESULTS_DIR."""
@@ -253,6 +275,10 @@ class _LocalBackend:
     def exists(self, key):
         return os.path.exists(self._path(key))
 
+    def get_json(self, key):
+        with open(self._path(key)) as f:
+            return json.load(f)
+
 
 if STORAGE_BACKEND == "s3":
     _STORAGE = _S3Backend()
@@ -277,6 +303,11 @@ def obj_exists(key):
     return _STORAGE.exists(key)
 
 
+def get_json(key):
+    """Read and parse a JSON object from the configured backend at `key`."""
+    return _STORAGE.get_json(key)
+
+
 def result_key(dataset, version, model, filename):
     return f"{S3_PREFIX}/{dataset}/{version}/{model}/{filename}"
 
@@ -299,17 +330,33 @@ def load_and_preprocess(dataset_name):
     return ds
 
 
+# Cache modeling encoders across datasets in a worker. SentenceTransformer loads
+# the same weights deterministically and encode() is stateless w.r.t. prior calls,
+# so reusing one object yields identical embeddings while avoiding reloading the
+# model once per dataset. Mirrors _get_eval_embedder for the eval encoder.
+_modeling_embedders = {}
+
+
+def _get_modeling_embedder(embedding_model_name):
+    global _modeling_embedders
+    if embedding_model_name not in _modeling_embedders:
+        from sentence_transformers import SentenceTransformer
+
+        _modeling_embedders[embedding_model_name] = SentenceTransformer(
+            embedding_model_name
+        )
+    return _modeling_embedders[embedding_model_name]
+
+
 def precompute_embeddings(dataset, embedding_model_name=MODELING_EMBEDDING_MODEL):
     """Compute and cache document embeddings on the dataset object."""
-    from sentence_transformers import SentenceTransformer
-
     if dataset.embeddings is not None:
         return
 
     logger.info(
         f"Computing {embedding_model_name} document embeddings for {dataset.name}..."
     )
-    model = SentenceTransformer(embedding_model_name)
+    model = _get_modeling_embedder(embedding_model_name)
     dataset.embeddings = model.encode(
         dataset.texts, show_progress_bar=True, convert_to_numpy=True
     )
@@ -319,14 +366,28 @@ def precompute_embeddings(dataset, embedding_model_name=MODELING_EMBEDDING_MODEL
 # ---------------------------------------------------------------------------
 # Model instantiation
 # ---------------------------------------------------------------------------
-def make_model(model_name, model_cls, dataset, hparams_override=None):
-    """Instantiate a model with the right embedding config and optional hparam overrides."""
+def make_model(model_name, model_cls, dataset, hparams_override=None, seed=42):
+    """Instantiate a model with the right embedding config and optional hparam overrides.
+
+    ``seed`` is threaded into the clustering models (KmeansTM, KmeansTM_PCA,
+    BERTopicTM) so that their UMAP/PCA/KMeans stochastic components vary across
+    seeds. Without this, KmeansTM_PCA pins KMeans to random_state=42 (identical
+    across all 5 seeds) and KmeansTM/BERTopicTM leave UMAP's random_state=None
+    (non-deterministic threading). Neural models already seed via
+    pl.seed_everything in fit_model, so they take no random_state here.
+    """
     if model_name == "TNTM":
         model = model_cls(
             embedding_model_name=MODELING_EMBEDDING_MODEL,
             word_embedding_model_name=MODELING_EMBEDDING_MODEL,
             save_embeddings=False,
             save_word_embeddings=False,
+        )
+    elif model_name in CLUSTERING_MODELS:
+        model = model_cls(
+            embedding_model_name=MODELING_EMBEDDING_MODEL,
+            save_embeddings=False,
+            random_state=seed,
         )
     elif model_name in EMBEDDING_MODELS:
         model = model_cls(
@@ -354,6 +415,20 @@ def fit_model(model, model_name, dataset, n_topics, seed=42):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+    # Neural models take random_state through fit() and pipe it into the
+    # train/val split. Thread the RUN seed here so the split varies across the
+    # 5 seeds (otherwise it stays pinned to the fit-signature default of 101,
+    # freezing the val partition and understating cross-seed variance).
+    # Non-neural models (LDA, NMF, KMeans*, BERTopic) do not use a val split.
+    neural_kwargs = {"random_state": seed} if model_name not in NON_NEURAL_MODELS else {}
+
+    # Optional max_epochs override (e.g. STREAM_MAX_EPOCHS=200 to run a model at
+    # its paper-native budget instead of the uniform 1000). Only applies to neural
+    # models (which accept max_epochs in fit()); non-neural models ignore it.
+    _me = os.environ.get("STREAM_MAX_EPOCHS", "").strip()
+    if _me and model_name not in NON_NEURAL_MODELS:
+        neural_kwargs["max_epochs"] = int(_me)
+
     if model_name in HIERARCHICAL_MODELS:
         # Use HPO'd n_topics_list if available in hparams, otherwise compute default
         if (
@@ -367,9 +442,9 @@ def fit_model(model, model_name, dataset, n_topics, seed=42):
                 max(int(n_topics * 0.6), 5),
                 max(int(n_topics * 0.3), 3),
             ]
-        model.fit(dataset, n_topics_list=n_topics_list)
+        model.fit(dataset, n_topics_list=n_topics_list, **neural_kwargs)
     else:
-        model.fit(dataset, n_topics=n_topics)
+        model.fit(dataset, n_topics=n_topics, **neural_kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -419,8 +494,20 @@ def _compute_clustering_metrics(model, model_name, dataset):
             bow, _ = dataset.get_bow()
         bow = np.array(bow, dtype=np.float64)
 
-        # Normalize beta to get p(w|t)
-        beta_norm = beta / (beta.sum(axis=1, keepdims=True) + 1e-30)
+        # Normalize beta to get p(w|t). Some models expose beta with negative
+        # entries -- NSTM as a cosine-similarity matrix in [-1,1]; ProdLDA /
+        # NeuralLDA / CTM / CTMNeg as raw xavier-initialized logits before
+        # softmax. Sum-normalizing those directly produces meaningless (negative
+        # or near-zero-sum) rows. Detect and map to a proper distribution via
+        # a numerically stable softmax over the vocabulary. Models with
+        # non-negative beta (LDA, NMF, ETM, ECRTM, FASTopic, SawETM/HyperMiner,
+        # KMeans/BERTopic) fall through to the plain sum-normalization.
+        if beta.min() < 0:
+            beta_shift = beta - beta.max(axis=1, keepdims=True)
+            beta_exp = np.exp(beta_shift)
+            beta_norm = beta_exp / (beta_exp.sum(axis=1, keepdims=True) + 1e-30)
+        else:
+            beta_norm = beta / (beta.sum(axis=1, keepdims=True) + 1e-30)
         # Normalize theta to get p(t|d)
         theta_norm = theta / (theta.sum(axis=1, keepdims=True) + 1e-30)
 
@@ -494,7 +581,7 @@ def _compute_clustering_metrics(model, model_name, dataset):
     return results
 
 
-def evaluate_model(model, model_name, topics, dataset, raw_dataset, eval_embedder=None):
+def evaluate_model(model, model_name, topics, dataset, raw_dataset, eval_embedder=None, seed=42):
     """Compute all metrics at multiple top-k cutoffs. Keys: '{metric}@{k}'."""
     from sentence_transformers import SentenceTransformer
 
@@ -534,6 +621,13 @@ def evaluate_model(model, model_name, topics, dataset, raw_dataset, eval_embedde
     shared_tw.embed_topwords(topics, n_topwords_to_use=min(20, len(topics[0])))
 
     # Build metric instances once with shared embedder (reuses embedding_dict)
+    # Reseed the global RNG that the intruder metrics draw from. Training has
+    # consumed the RNG state by a model-dependent amount, so without this the
+    # intruder draws for a fixed run seed differ across models, adding noise to
+    # the seed-averaged intruder metrics. Reseeding makes the draws depend only
+    # on the run seed, as the multi-seed design intends.
+    np.random.seed(seed)
+
     isim = ISIM(n_words=20, metric_embedder=eval_embedder)
     isim.topword_embeddings = shared_tw
     intm = INT(n_words=20, metric_embedder=eval_embedder)
@@ -554,7 +648,7 @@ def evaluate_model(model, model_name, topics, dataset, raw_dataset, eval_embedde
         _eval(
             f"CV_train@{k}", lambda _t=topics_k, _k=k: CV(dataset, n_words=_k).score(_t)
         )
-        _eval(f"NPMI@{k}", lambda _t=topics_k: NPMI(raw_dataset).score(_t))
+        _eval(f"NPMI@{k}", lambda _t=topics_k: NPMI(raw_dataset, language="english").score(_t))
         _eval(f"TD@{k}", lambda _t=topics_k, _k=k: TopicDiversity(n_words=_k).score(_t))
 
         # Embedding metrics: update n_words per k, reuse cached embeddings
@@ -646,7 +740,7 @@ def run_single(
 
     try:
         model = make_model(
-            model_name, model_cls, dataset, hparams_override=hparams_override
+            model_name, model_cls, dataset, hparams_override=hparams_override, seed=seed
         )
         start = time.time()
         fit_model(model, model_name, dataset, n_topics, seed=seed)
@@ -662,6 +756,7 @@ def run_single(
             dataset,
             raw_dataset,
             eval_embedder=_get_eval_embedder(),
+            seed=seed,
         )
 
         result = {
@@ -706,6 +801,23 @@ def run_single(
             "error": str(e),
         }
 
+    finally:
+        # Free GPU memory between the 16 models x 5 seeds run in one worker
+        # process. Without this, a model's graph/allocations can persist and the
+        # caching allocator fragments, risking OOM on later (heavier) models in
+        # the same job group (e.g. FASTopic full-batch after several neural fits).
+        try:
+            import gc
+            import torch
+
+            if "model" in locals():
+                del model
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
 
 # ---------------------------------------------------------------------------
 # HPO helper
@@ -730,6 +842,21 @@ def run_hpo(
         f"  HPO: {model_name} on {dataset_name} "
         f"(budget={hpo_timeout}s, K={n_topics}, criterion={criterion})"
     )
+
+    # Reuse a previously-found best-params if the search already completed. HPO is
+    # deterministic-enough and far more expensive (up to 5h) than the eval, so on a
+    # backfill (a cell whose eval OOM-died AFTER the search succeeded) we skip the
+    # re-search and go straight to eval. Set STREAM_FORCE_HPO=1 to always re-search.
+    bp_key = s3_key(dataset_name, version, model_name, "hpo_best_params.json")
+    if not os.environ.get("STREAM_FORCE_HPO", "").strip() and obj_exists(bp_key):
+        try:
+            saved = get_json(bp_key)
+            best_hparams = saved.get("best_hparams")
+            if best_hparams:
+                logger.info(f"    HPO: reusing saved best_params from {bp_key}")
+                return best_hparams, saved
+        except Exception as e:
+            logger.warning(f"    could not reuse saved best_params ({e}); re-running HPO")
 
     try:
         model = make_model(model_name, model_cls, dataset)
@@ -810,3 +937,23 @@ def run_hpo(
         logger.error(f"    HPO FAILED: {e}")
         traceback.print_exc()
         return None, None
+
+    finally:
+        # Free GPU memory left by the (up to 1000-trial) Optuna search BEFORE the
+        # 5-seed eval starts. Without this the study's fitted models / allocator
+        # fragmentation persist into the eval on the same 24GB A10G, and the eval
+        # OOM-hard-kills the worker mid-run on the big corpora (AG_News, DBpedia,
+        # Arxiv, Reddit_GME) -- the exact silent misses seen in hpo_native_5h. The
+        # identical evals succeed 5/5 in the no-HPO default run, so this reclaim is
+        # the fix. (Pair with PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True.)
+        try:
+            import gc
+            import torch
+
+            if "model" in locals():
+                del model
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass

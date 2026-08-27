@@ -79,7 +79,7 @@ class ProdLDA(BaseModel):
         inference_activation=nn.Softplus(),
         rescale_loss=False,
         rescale_factor=1e-2,
-        batch_size=64,
+        batch_size=256,
         val_size=0.2,
         shuffle=True,
         random_state=42,
@@ -286,13 +286,13 @@ class ProdLDA(BaseModel):
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 2e-03,
+        lr: float = None,
         lr_patience: int = 10,
         patience: int = 50,
         factor: float = 0.5,
-        weight_decay: float = 1e-07,
+        weight_decay: float = None,
         max_epochs: int = 1000,
-        batch_size: int = 256,
+        batch_size: int = None,
         shuffle: bool = True,
         random_state: int = 101,
         checkpoint_path: str = "checkpoints",
@@ -341,6 +341,12 @@ class ProdLDA(BaseModel):
 
         self.n_topics = n_topics
 
+        # Resolve tuned hyperparameters: an explicitly passed value wins,
+        # otherwise fall back to whatever is already in hparams (set by HPO
+        # suggest / refit / eval override), and finally the canonical default.
+        lr = lr if lr is not None else self.hparams.get("lr", 2e-03)
+        weight_decay = weight_decay if weight_decay is not None else self.hparams.get("weight_decay", 1e-07)
+        batch_size = batch_size if batch_size is not None else self.hparams.get("datamodule_args", {}).get("batch_size", 256)
         self.hparams.update(
             {
                 "n_topics": n_topics,
@@ -410,6 +416,11 @@ class ProdLDA(BaseModel):
         data = {
             "bow": torch.tensor(dataset.bow),
         }
+
+        # Extract theta deterministically: eval mode disables reparameterization
+        # sampling, dropout, and batchnorm batch-statistics, so the reported
+        # theta (-> labels, NMI, Purity, Perplexity) is the mean inference.
+        self.model.model.eval()
 
         self.theta = (
             self.model.model.get_theta(data, only_theta=True).detach().cpu().numpy()

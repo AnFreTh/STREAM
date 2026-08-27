@@ -175,19 +175,73 @@ class FASTopic(BaseModel, SentenceEncodingMixin):
             **trainer_kwargs,
         )
 
+    @staticmethod
+    def _subsample_for_training(dataset, n_max, seed):
+        """Return a shallow-copy dataset with a random row subset of size n_max.
+
+        The 4 row-indexed fields (texts, labels, embeddings, bow) plus the
+        underlying dataframe are sliced to the same indices, keeping them
+        aligned. The original dataset object is NOT mutated (it's shared across
+        all 16 models per run, and needed for end-of-fit theta extraction).
+        """
+        import copy
+        import numpy as np
+
+        rng = np.random.default_rng(int(seed))
+        n = len(dataset.texts)
+        idx = np.sort(rng.choice(n, size=n_max, replace=False))
+        idx_list = idx.tolist()
+
+        sub = copy.copy(dataset)  # shallow; slices below replace the sliced attrs
+        sub.texts = [dataset.texts[i] for i in idx_list]
+        sub.labels = [dataset.labels[i] for i in idx_list]
+        if dataset.embeddings is not None:
+            sub.embeddings = dataset.embeddings[idx]
+        if dataset.bow is not None:
+            sub.bow = dataset.bow[idx]
+        if getattr(dataset, "dataframe", None) is not None:
+            sub.dataframe = dataset.dataframe.iloc[idx_list].reset_index(drop=True)
+        logger.info(
+            f"FASTopic: subsampled {n_max} of {n} training docs (seed={seed}) "
+            f"to keep global-OT training within GPU memory."
+        )
+        return sub
+
     def _initialize_datamodule(self, dataset):
-        """Initialize the data module."""
+        """Initialize the data module.
+
+        FASTopic requires a single full batch: its Sinkhorn optimal transport is
+        defined globally over all documents, so mini-batching would compute per-
+        batch (not global) transport plans and break the method. To keep the
+        method faithful on very large corpora that would otherwise OOM (dense
+        N x V tensors on GPU), we cap the training set at ``MAX_TRAIN_DOCS`` via
+        a seeded random subsample -- still a SINGLE global-OT batch, just over a
+        representative subsample. The full corpus is retained on ``self.dataset``
+        so end-of-fit theta extraction uses every document.
+        """
         logger.info(f"--- Initializing Datamodule for {MODEL_NAME} ---")
-        # Full batch by default for global optimal transport
-        # Cap at 20K to avoid OOM on large datasets
-        MAX_FULL_BATCH = 20000
+
+        # Keep the full corpus for end-of-fit theta extraction; use a
+        # (possibly-subsampled) TRAINING view only for the datamodule.
+        self.dataset = dataset
+        MAX_TRAIN_DOCS = 50_000
+        if len(dataset.texts) > MAX_TRAIN_DOCS:
+            train_dataset = self._subsample_for_training(
+                dataset,
+                MAX_TRAIN_DOCS,
+                seed=self.hparams["datamodule_args"].get("random_state", 42),
+            )
+        else:
+            train_dataset = dataset
+
         batch_size = self.hparams["datamodule_args"]["batch_size"]
         if batch_size is None:
-            batch_size = min(len(dataset.texts), MAX_FULL_BATCH)
-            if len(dataset.texts) > MAX_FULL_BATCH:
-                logger.warning(
-                    f"Dataset has {len(dataset.texts)} docs, capping FASTopic batch to {MAX_FULL_BATCH} to avoid OOM"
-                )
+            batch_size = len(train_dataset.texts)
+            logger.info(
+                f"FASTopic: full-batch training over {batch_size} documents "
+                f"(global optimal transport). Full corpus size = "
+                f"{len(dataset.texts)}."
+            )
         self.data_module = TMDataModule(
             batch_size=batch_size,
             shuffle=self.hparams["datamodule_args"]["shuffle"],
@@ -196,7 +250,7 @@ class FASTopic(BaseModel, SentenceEncodingMixin):
         )
 
         self.data_module.preprocess_data(
-            dataset=dataset,
+            dataset=train_dataset,
             **{
                 k: v
                 for k, v in self.hparams["datamodule_args"].items()
@@ -204,17 +258,15 @@ class FASTopic(BaseModel, SentenceEncodingMixin):
             },
         )
 
-        self.dataset = dataset
-
     def fit(
         self,
         dataset: TMDataset = None,
         n_topics: int = 20,
         val_size: float = 0.2,
-        lr: float = 0.002,
+        lr: float = None,
         lr_patience: int = 10,
         patience: int = 50,
-        weight_decay: float = 1e-07,
+        weight_decay: float = None,
         max_epochs: int = 1000,
         batch_size: int = None,  # None = full batch (required for global OT)
         shuffle: bool = True,
@@ -275,6 +327,9 @@ class FASTopic(BaseModel, SentenceEncodingMixin):
         self.n_topics = n_topics
         self.dataset = dataset
 
+        # Resolve tuned hyperparameters: explicit arg wins, else hparams, else default.
+        lr = lr if lr is not None else self.hparams.get("lr", 0.002)
+        weight_decay = weight_decay if weight_decay is not None else self.hparams.get("weight_decay", 1e-07)
         self.hparams.update(
             {
                 "n_topics": n_topics,
@@ -344,6 +399,10 @@ class FASTopic(BaseModel, SentenceEncodingMixin):
             "embedding": torch.tensor(dataset.embeddings),
             "bow": torch.tensor(dataset.bow),
         }
+
+        # Extract theta deterministically (eval mode: no dropout / batchnorm
+        # batch-stats). Affects labels/NMI/Purity/Perplexity; beta unaffected.
+        self.model.model.eval()
 
         self.theta = (
             self.model.model.get_theta(data, only_theta=True).detach().cpu().numpy()

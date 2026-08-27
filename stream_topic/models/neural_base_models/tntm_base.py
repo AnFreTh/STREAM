@@ -68,6 +68,14 @@ class TNTMBase(CTMBase):
         self.inference_activation = inference_activation
         self.inference_type = inference_type
         self.dropout = dropout
+        # Reconstruction mode for log(beta @ theta):
+        #   "matmul"    -> stable shifted-GEMM form (default; ~17x faster, avoids
+        #                  the (batch, n_topics, vocab) intermediate)
+        #   "logsumexp" -> original explicit logsumexp (kept for validation/compare)
+        # Both are algebraically identical; see forward(). Legacy mode restores the
+        # original logsumexp so the old-vs-new A/B reproduces exact old numerics.
+        from ...utils.fast_mode import tntm_legacy
+        self.recon_mode = "logsumexp" if tntm_legacy() else "matmul"
 
         assert self.mus.shape == (n_topics, emb_dim), f"Shape of mus is {self.mus.shape} but expected {(n_topics, emb_dim)}"
         assert self.L_lower.shape == (n_topics, emb_dim, emb_dim), f"Shape of L_lower is {self.L_lower.shape} but expected {(n_topics, emb_dim, emb_dim)}"
@@ -98,19 +106,75 @@ class TNTMBase(CTMBase):
             inference_type=inference_type,
         )
 
+    # Floor for the covariance diagonal exp(log_diag). In float32, over long
+    # training log_diag drifts negative until exp(log_diag) UNDERFLOWS to 0, which
+    # collapses each topic's covariance and makes the Gaussian degenerate. That
+    # caused torch.linalg.cholesky / the LowRankMultivariateNormal capacitance to
+    # fail (non-positive-definite) and killed TNTM on some seeds/datasets. Flooring
+    # keeps cov_diag strictly positive (>= LOG_DIAG_FLOOR) so the density is always
+    # well-defined. It is a variance floor consistent with the 1e-4 init; it only
+    # activates in the degenerate underflow regime, leaving normal training
+    # numerically unchanged.
+    _COV_DIAG_FLOOR = 1e-6
+
     def calc_log_beta(self):
         """
         Calculate the log of beta given self.mus, self.L_lower, and self.log_diag.
+
+        Each topic is a multivariate Gaussian over the projected embedding space
+        with covariance ``Sigma_k = L_k L_k^T + diag(exp(log_diag_k))``. Evaluated
+        with a single batched ``LowRankMultivariateNormal`` over all topics (its
+        Woodbury/capacitance path is numerically robust: the capacitance
+        I + Fᵀ D⁻¹ F ⪰ I is always well-conditioned for D > 0), which is why we use
+        it rather than forming Sigma and Choleskying it directly. cov_diag is
+        floored to _COV_DIAG_FLOOR so float32 exp() cannot underflow to 0.
         """
+        diag = torch.exp(self.log_diag).clamp_min(self._COV_DIAG_FLOOR)  # (K, emb)
+        Wproj = self.word_embeddings_projected                           # (vocab, emb)
 
-        diag = torch.exp(self.log_diag)
+        from ...utils.fast_mode import tntm_legacy
+        if tntm_legacy():
+            # Original per-topic loop over LowRankMultivariateNormal (exact old
+            # numerics; float64 if mus/L_lower are float64). For the old-vs-new A/B.
+            # NOTE: unfloored exp(log_diag) here to faithfully reproduce the old
+            # code; legacy is only used deliberately via STREAM_TNTM_LEGACY.
+            legacy_diag = torch.exp(self.log_diag)
+            normal_dis_lis = [
+                LowRankMultivariateNormal(mu, cov_factor=lo, cov_diag=D)
+                for mu, lo, D in zip(self.mus, self.L_lower, legacy_diag)
+            ]
+            log_probs = torch.zeros(
+                self.n_topics, self.vocab_size, device=Wproj.device
+            )
+            for i, dis in enumerate(normal_dis_lis):
+                log_probs[i] = dis.log_prob(Wproj)
+            return log_probs
 
-        normal_dis_lis = [LowRankMultivariateNormal(mu, cov_factor= lower, cov_diag = D) for mu, lower, D in zip(self.mus, self.L_lower, diag)]
-        log_probs = torch.zeros(self.n_topics, self.vocab_size, device=self.word_embeddings_projected.device)
-
-        for i, dis in enumerate(normal_dis_lis):
-            log_probs[i] = dis.log_prob(self.word_embeddings_projected)
-        return log_probs
+        # Batched over the (n_topics,) topic dimension; word_embeddings_projected
+        # (vocab, emb) -> (vocab, 1, emb) broadcasts to give (vocab, n_topics),
+        # transposed back to (n_topics, vocab).
+        #
+        # LowRankMultivariateNormal.log_prob Choleskys the capacitance matrix
+        # I + Fᵀ D⁻¹ F internally. Flooring cov_diag keeps D>0, but a degenerate
+        # cov_factor (L_lower) from an unlucky GMM init can still make the
+        # capacitance numerically non-PD on a single topic, which raises and kills
+        # the whole batch (observed on ACL/seed168, WikiText/seed126). Guard it:
+        # on failure, escalate a diagonal jitter and retry. The healthy path uses
+        # jitter=0 (first attempt) so normal-training numerics are unchanged; the
+        # guard only activates in the degenerate regime, regularizing that seed's
+        # covariance instead of losing the run.
+        for jitter in (0.0, 1e-4, 1e-3, 1e-2, 1e-1):
+            d = diag if jitter == 0.0 else diag + jitter
+            try:
+                dist = LowRankMultivariateNormal(
+                    self.mus, cov_factor=self.L_lower, cov_diag=d
+                )
+                log_probs = dist.log_prob(Wproj.unsqueeze(1))
+                return log_probs.transpose(0, 1).contiguous()
+            except Exception:
+                if jitter == 1e-1:
+                    raise
+                continue
 
     def get_beta(self):
         """
@@ -142,13 +206,28 @@ class TNTMBase(CTMBase):
 
         log_beta = self.calc_log_beta()
 
+        # Compute log_recon[b, v] = log( sum_k theta[b,k] * beta[k,v] )
+        #                         = logsumexp_k( log_theta[b,k] + log_beta[k,v] )
+        log_theta = torch.nn.LogSoftmax(dim=-1)(theta)  # log theta = log_softmax(theta_hat)
 
-
-        # prodLDA vs LDA
-        # use numerical trick to compute log(beta @ theta )
-        log_theta = torch.nn.LogSoftmax(dim=-1)(theta)        #calculate log theta = log_softmax(theta_hat)
-        A = log_beta + log_theta.unsqueeze(-1)               #calculate (log (beta @ theta))[i] = (log (exp(log_beta) @ exp(log_theta)))[i] = log(\sum_k exp (log_beta[i,k] + log_theta[k]))
-        log_recon = torch.logsumexp(A, dim = 1)
+        if self.recon_mode == "logsumexp":
+            # Original explicit form: materializes the (batch, n_topics, vocab)
+            # tensor and reduces over the topic axis.
+            A = log_beta + log_theta.unsqueeze(-1)
+            log_recon = torch.logsumexp(A, dim=1)
+        else:
+            # Stable GEMM form of the same logsumexp. Shift each word column by its
+            # max over topics (c_v), so every exponent is <= 0 (no overflow) and the
+            # dominant term is exp(0)=1 (no underflow of the term that matters); the
+            # topic-sum then collapses to a matmul, and we add the shift back:
+            #   log( sum_k exp(log_theta+log_beta - c_v) ) + c_v == logsumexp.
+            # Verified to match the logsumexp branch to float32 rounding even when
+            # most exp(log_beta) entries underflow, at ~17x lower cost.
+            c = log_beta.max(dim=0, keepdim=True).values      # (1, vocab)
+            beta_shift = torch.exp(log_beta - c)              # (n_topics, vocab)
+            theta_p = torch.exp(log_theta)                    # (batch, n_topics)
+            recon = torch.matmul(theta_p, beta_shift)         # (batch, vocab)
+            log_recon = torch.log(recon + 1e-30) + c
 
         return log_recon, posterior_mean, posterior_logvar
 

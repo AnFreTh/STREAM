@@ -144,11 +144,20 @@ class TMDataModule(pl.LightningDataModule):
         Returns:
             DataLoader: DataLoader instance for the training dataset.
         """
+        # Only drop the trailing batch when it would contain EXACTLY one sample
+        # (BatchNorm's "Expected more than 1 value per channel" crash). A broader
+        # guard (e.g. drop_last=True whenever n>batch_size) would drop up to
+        # batch_size-1 documents on small datasets under HPO with large batch
+        # sizes -- meaningful data loss per epoch. Full-batch models (FASTopic)
+        # keep their single batch: n <= batch_size -> n % batch_size == n != 1.
+        n = len(self.train_dataset)
+        drop_last = (n > self.batch_size) and (n % self.batch_size == 1)
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             collate_fn=self._collate_fn,
+            drop_last=drop_last,
             **self.dataloader_kwargs,
         )
 

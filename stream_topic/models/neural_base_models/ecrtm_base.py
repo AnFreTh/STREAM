@@ -22,15 +22,18 @@ class ECR(nn.Module):
         u = (torch.ones_like(a) / a.size()[0]).to(device)
 
         K = torch.exp(-M * self.sinkhorn_alpha)
-        err = 1
-        cpt = 0
+        err = 1                     # Python float — keeps the `while err > stopThr`
+        cpt = 0                     # compare on-host so it doesn't sync the GPU
         while err > self.stopThr and cpt < self.OT_max_iter:
             v = torch.div(b, torch.matmul(K.t(), u) + self.epsilon)
             u = torch.div(a, torch.matmul(K, v) + self.epsilon)
             cpt += 1
             if cpt % 50 == 1:
                 bb = torch.mul(v, torch.matmul(K.t(), u))
-                err = torch.norm(torch.sum(torch.abs(bb - b), dim=0), p=float('inf'))
+                # `.item()` here syncs ONLY every 50 iters (when err actually
+                # updates), not every iter via the tensor->bool convert in the
+                # while condition. Value passed to the compare is exact.
+                err = torch.norm(torch.sum(torch.abs(bb - b), dim=0), p=float('inf')).item()
 
         transp = u * (K * v.T)
         loss_ECR = torch.sum(transp * M) * self.weight_loss_ECR
@@ -52,7 +55,7 @@ class ECRTMBase(nn.Module):
         dropout=0.0,
         embed_size=200,
         beta_temp=0.2,
-        weight_loss_ECR=100.0,
+        weight_loss_ECR=250.0,  # official ECRTM default (was 100.0)
         sinkhorn_alpha=20.0,
         sinkhorn_max_iter=1000,
         pretrained_WE=None,
@@ -69,6 +72,9 @@ class ECRTMBase(nn.Module):
         self.var2 = nn.Parameter(torch.as_tensor((((1.0 / self.a) * (1 - (2.0 / n_topics))).T + (1.0 / (n_topics * n_topics)) * np.sum(1.0 / self.a, 1)).T))
         self.mu2.requires_grad = False
         self.var2.requires_grad = False
+        # var2 is a fixed prior; cache its log once so forward() doesn't recompute
+        # self.var2.log() every step. Non-trainable buffer; bit-identical.
+        self.register_buffer("_log_var2", self.var2.detach().log())
 
         # Encoder
         self.fc11 = nn.Linear(self.vocab_size, encoder_dim)
@@ -142,26 +148,44 @@ class ECRTMBase(nn.Module):
             input = x["bow"]
         else:
             input = x
-            
-        theta, mu, logvar = self.encode(input)
-        beta = self.get_beta()
 
-        recon = F.softmax(self.decoder_bn(torch.matmul(theta, beta)), dim=-1)
-        recon_loss = -(input * recon.log()).sum(axis=1).mean()
+        from ...utils.fast_mode import fast_mode
+        fast = fast_mode()
+
+        theta, mu, logvar = self.encode(input)
+
+        if fast:
+            # Fp-equivalent: compute the (topic x word) distance ONCE and share it
+            # between the beta softmax and the ECR cost. Same forward value; grads
+            # reassociate at ~1e-7 relative (float32 epsilon). ALSO fuse softmax+log
+            # into log_softmax to avoid one exp+log round-trip.
+            dist = self.pairwise_euclidean_distance(
+                self.topic_embeddings, self.word_embeddings
+            )
+            beta = F.softmax(-dist / self.beta_temp, dim=0)
+            log_recon = F.log_softmax(
+                self.decoder_bn(torch.matmul(theta, beta)), dim=-1
+            )
+            recon_loss = -(input * log_recon).sum(axis=1).mean()
+            cost = dist
+        else:
+            beta = self.get_beta()
+            recon = F.softmax(self.decoder_bn(torch.matmul(theta, beta)), dim=-1)
+            recon_loss = -(input * recon.log()).sum(axis=1).mean()
+            cost = self.pairwise_euclidean_distance(
+                self.topic_embeddings, self.word_embeddings
+            )
 
         # KL divergence
         var = logvar.exp()
         var_division = var / self.var2
         diff = mu - self.mu2
         diff_term = diff * diff / self.var2
-        logvar_division = self.var2.log() - logvar
+        logvar_division = self._log_var2 - logvar  # Tier A cached buffer
         KLD = 0.5 * ((var_division + diff_term + logvar_division).sum(axis=1) - self.n_topics)
         KLD = KLD.mean()
 
         loss_TM = recon_loss + KLD
-
-        # ECR loss
-        cost = self.pairwise_euclidean_distance(self.topic_embeddings, self.word_embeddings)
         loss_ECR = self.ECR(cost)
 
         loss = loss_TM + loss_ECR

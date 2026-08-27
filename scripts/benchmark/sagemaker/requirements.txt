@@ -38,3 +38,6 @@ tqdm
 pyarrow
 requests
 peft
+
+# Chinese tokenizer (lightweight; heavier CN deps below are optional/lazy in code)
+jieba==0.42.1

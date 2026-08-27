@@ -529,10 +529,18 @@ class TMDataset(Dataset, DataDownloader):
         train_size = int(train_ratio * total_size)
         val_size = total_size - train_size
 
+        # random_split draws from torch's global generator, NOT numpy, so seeding
+        # numpy here had no effect on the split. Pass an explicit torch Generator
+        # so the train/val split is genuinely reproducible from `seed`.
+        generator = None
         if seed is not None:
-            np.random.seed(seed)
+            import torch
 
-        train_dataset, val_dataset = random_split(self, [train_size, val_size])
+            generator = torch.Generator().manual_seed(int(seed))
+
+        train_dataset, val_dataset = random_split(
+            self, [train_size, val_size], generator=generator
+        )
         return train_dataset, val_dataset
 
     def get_bow(self, min_df=None, max_df=None, **kwargs):

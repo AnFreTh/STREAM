@@ -15,8 +15,11 @@ from .constants import (
 from .TopwordEmbeddings import TopwordEmbeddings
 import os
 from .metrics_config import MetricsConfig
-import jieba
-from collections import defaultdict 
+try:
+    import jieba  # optional; only needed for the (disabled) Chinese tokenization path
+except ImportError:
+    jieba = None
+from collections import defaultdict
 
 
 NLTK_STOPWORDS = stopwords.words(NLTK_STOPWORD_LANGUAGE)
@@ -49,8 +52,23 @@ class CV(BaseMetric):
 
     def __init__(self, dataset, n_words=10):
         self.n_words = n_words
-        self.texts = [doc.split() for doc in dataset.dataframe["text"].tolist()]
-        self.dictionary = Dictionary(self.texts)
+        # Cache the tokenized texts + gensim Dictionary on the dataset object.
+        # Both depend only on dataset.dataframe["text"] (not on n_words or the
+        # topics being scored), yet CV is re-instantiated once per top-k cutoff
+        # and per (model, seed), so the full-corpus Dictionary build is repeated
+        # hundreds of times per dataset. The cached artifacts are read-only inputs
+        # to gensim's CoherenceModel (verified not to mutate the dictionary), so
+        # scores are bit-identical to building them fresh each call.
+        cache = getattr(dataset, "_cv_cache", None)
+        if cache is None:
+            texts = [doc.split() for doc in dataset.dataframe["text"].tolist()]
+            dictionary = Dictionary(texts)
+            cache = (texts, dictionary)
+            try:
+                dataset._cv_cache = cache
+            except Exception:
+                pass
+        self.texts, self.dictionary = cache
 
     def get_info(self):
         return {
@@ -143,7 +161,7 @@ class NPMI(BaseMetric):
     def __init__(
         self,
         dataset,
-        language: str = None,
+        language: str = NLTK_STOPWORD_LANGUAGE,
         stopwords: list = None,
     ):
         """
@@ -167,8 +185,18 @@ class NPMI(BaseMetric):
         self.language = language
         self.dataset = dataset
 
-        files = self.dataset.get_corpus()
-        self.files = [" ".join(words) for words in files]
+        # Cache the joined corpus on the dataset: get_corpus() + join is
+        # deterministic in the dataset and NPMI is re-instantiated once per top-k
+        # cutoff (and per model/seed). Read-only downstream, so identical.
+        files_cache = getattr(dataset, "_npmi_files", None)
+        if files_cache is None:
+            files = self.dataset.get_corpus()
+            files_cache = [" ".join(words) for words in files]
+            try:
+                dataset._npmi_files = files_cache
+            except Exception:
+                pass
+        self.files = files_cache
 
     def get_info(self):
         """
@@ -273,7 +301,12 @@ class NPMI(BaseMetric):
                     word_to_file_mult.pop(word, None)
         else:
             for word in list(word_to_file):
-                if len(word_to_file[word]) <= preprocess or len(word) <= 3:
+                # Keep words of length >= 3 to match the benchmark preprocessing
+                # (min_word_length=3). Dropping len<=3 here excised 3-char topic
+                # words (war, law, tax, oil, ...) from the co-occurrence vocab
+                # while models still emit them, forcing every pair involving them
+                # to NPMI=-1 and biasing NPMI down unevenly across models.
+                if len(word_to_file[word]) <= preprocess or len(word) < 3:
                     word_to_file.pop(word, None)
                     word_to_file_mult.pop(word, None)
 
@@ -305,7 +338,23 @@ class NPMI(BaseMetric):
         tuple
             A tuple containing word-to-document mappings and other relevant data for NPMI calculation.
         """
-        return self._create_vocab_preprocess(self.files, preprocess)
+        # Memoize the (word_to_file, word_to_file_mult, data) triple per dataset.
+        # It is a pure function of (self.files, self.language, self.stopwords,
+        # preprocess) -- none of which depend on the topics being scored -- yet
+        # score() rebuilds the full-corpus co-occurrence vocab on every call
+        # (4 top-k cutoffs x every model x seed). The returned structures are only
+        # read (via .get()) in score()/score_per_topic(), so results are identical.
+        key = (self.language, id(self.stopwords), preprocess)
+        cache = getattr(self.dataset, "_npmi_vocab_cache", None)
+        if cache is None:
+            cache = {}
+            try:
+                self.dataset._npmi_vocab_cache = cache
+            except Exception:
+                pass
+        if key not in cache:
+            cache[key] = self._create_vocab_preprocess(self.files, preprocess)
+        return cache[key]
 
     def score(self, topic_words):
         """
