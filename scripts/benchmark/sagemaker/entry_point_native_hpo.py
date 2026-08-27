@@ -134,40 +134,26 @@ def main():
 
     print("[ENTRY] bench_common done", flush=True)
 
+    # Skip HPO (use defaults, still eval 5 seeds) only where a 5h budget yields
+    # < ~8 trials given the CORRECTED/optimized train times. Recomputed from the
+    # Revised baseline train_time per (dataset, model): the old 32-combo list was
+    # stale (pre-speedup); TNTM/BERTopic are now 7-8x faster and get real HPO on
+    # almost every dataset. These 9 are the genuinely-too-slow big-corpus combos.
     SKIP_HPO = {
-        ("PubMed", "TNTM"),
-        ("AG_News", "TNTM"),
-        ("AG_News", "BERTopicTM"),
         ("AG_News", "NSTM"),
-        ("ACL", "TNTM"),
-        ("DBpedia", "TNTM"),
-        ("WikiText", "TNTM"),
-        ("NYT", "TNTM"),
-        ("Reuters", "TNTM"),
-        ("ACL", "BERTopicTM"),
-        ("WikiText", "BERTopicTM"),
-        ("AG_News", "FASTopic"),
-        ("Yahoo_Answers", "TNTM"),
-        ("IMDB", "BERTopicTM"),
-        ("NeurIPS", "BERTopicTM"),
+        ("DBpedia", "ECRTM"),
         ("DBpedia", "NSTM"),
-        ("Spotify", "TNTM"),
-        ("NeurIPS", "TNTM"),
-        ("Poliblogs", "TNTM"),
-        ("Yahoo_Answers", "BERTopicTM"),
-        ("Arxiv", "TNTM"),
-        ("NeurIPS", "ECRTM"),
-        ("PubMed", "BERTopicTM"),
+        ("AG_News", "BERTopicTM"),
+        ("Yahoo_Answers", "ECRTM"),
+        ("AG_News", "FASTopic"),
         ("Yahoo_Answers", "NSTM"),
-        ("20Newsgroups", "TNTM"),
-        ("UN", "BERTopicTM"),
-        ("DBpedia", "BERTopicTM"),
-        ("AG_News", "CTM"),
-        ("Yahoo_Answers", "FASTopic"),
-        ("DBpedia", "FASTopic"),
-        ("AG_News", "SawETM"),
-        ("WikiText", "FASTopic"),
+        ("AG_News", "TNTM"),
+        ("AG_News", "CTMNeg"),
     }
+    # A run may disable skipping entirely (e.g. the FASTopic-200 variant, whose
+    # trials are ~5x faster so nothing is too slow) via STREAM_NO_SKIP_HPO=1.
+    if os.environ.get("STREAM_NO_SKIP_HPO", "").strip().lower() in {"1", "true", "yes", "on"}:
+        SKIP_HPO = set()
 
     datasets = args.datasets.split(",")
     print(f"[ENTRY] datasets: {datasets}", flush=True)
@@ -180,6 +166,29 @@ def main():
     else:
         models_to_run = ALL_MODELS
     print(f"[ENTRY] models_to_run: {[m for m,_ in models_to_run]}", flush=True)
+
+    # HPO objective. Default is each model's native criterion (val_loss for
+    # neural, AIC/recon for classical) -- the native-objective run, unchanged.
+    # STREAM_HPO_CRITERION=cv switches the objective to C_V coherence via a custom
+    # metric, so this same entry point serves the C_V-objective run without
+    # touching the native code path.
+    hpo_criterion = os.environ.get("STREAM_HPO_CRITERION", "native").strip().lower()
+    use_cv = hpo_criterion in {"cv", "cv_coherence", "c_v"}
+    if use_cv:
+        from stream_topic.metrics import CV
+
+        class CVMetricWrapper:
+            """Adapt CV to the .score(topics) interface run_hpo's custom criterion expects."""
+
+            def __init__(self, raw_dataset, n_words=10):
+                self._cv = CV(raw_dataset, n_words=n_words)
+
+            def score(self, topics):
+                return self._cv.score(topics)
+
+        print("[ENTRY] HPO objective: C_V coherence (custom)", flush=True)
+    else:
+        print("[ENTRY] HPO objective: native", flush=True)
 
     all_results = []
 
@@ -200,6 +209,10 @@ def main():
         raw_dataset = TMDataset()
         raw_dataset.fetch_dataset(dataset_name)
         print(f"[ENTRY] raw_dataset done", flush=True)
+
+        # One CV instance per dataset (caches its gensim Dictionary on the dataset);
+        # reused across every model's HPO. None on the native path.
+        cv_metric = CVMetricWrapper(raw_dataset) if use_cv else None
 
         for model_name, model_cls in models_to_run:
             print(f"[ENTRY] --- MODEL: {model_name} ---", flush=True)
@@ -223,16 +236,30 @@ def main():
                 best_hparams, hpo_result = None, None
             else:
                 print(f"[ENTRY] running HPO...", flush=True)
-                best_hparams, hpo_result = run_hpo(
-                    dataset_name,
-                    model_name,
-                    model_cls,
-                    dataset,
-                    raw_dataset,
-                    n_topics,
-                    version=args.version,
-                    hpo_timeout=args.hpo_timeout,
-                )
+                if use_cv:
+                    best_hparams, hpo_result = run_hpo(
+                        dataset_name,
+                        model_name,
+                        model_cls,
+                        dataset,
+                        raw_dataset,
+                        n_topics,
+                        version=args.version,
+                        hpo_timeout=args.hpo_timeout,
+                        criterion="custom",
+                        custom_metric=cv_metric,
+                    )
+                else:
+                    best_hparams, hpo_result = run_hpo(
+                        dataset_name,
+                        model_name,
+                        model_cls,
+                        dataset,
+                        raw_dataset,
+                        n_topics,
+                        version=args.version,
+                        hpo_timeout=args.hpo_timeout,
+                    )
                 print(f"[ENTRY] HPO done", flush=True)
 
             # 5-seed evaluation
@@ -251,7 +278,7 @@ def main():
                 )
                 if hpo_result is not None:
                     result["hpo_time"] = hpo_result["hpo_time"]
-                    result["hpo_criterion"] = "native"
+                    result["hpo_criterion"] = "cv_coherence" if use_cv else "native"
                 all_results.append(result)
                 print(f"[ENTRY] run_single seed={seed} done", flush=True)
 

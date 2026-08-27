@@ -31,7 +31,7 @@ K-factor, update order, or initialization), so the ranking depends only on aggre
 outcomes.
 
 <div align="center">
-  <img src="./assets/topicarena_cd_overall.png" width="900"/>
+  <img src="./assets/cd_overall.png" width="900"/>
 </div>
 
 The critical difference diagram above (Nemenyi test, α = 0.05, N = 18 datasets)
@@ -55,11 +55,13 @@ conclusions:
 - **Human-validated LLM judge.** The LLM-as-a-judge is validated against the
   canonical human study of topic interpretability
   ([Chang et al., 2009, *Reading Tea Leaves*](http://www.umiacs.umd.edu/~jbg/docs/nips2009-rtl.pdf)).
-  On 4,168 human word-intrusion trials, the LLM (Claude Opus 4.6) **reproduces the
-  human model ranking exactly** (LDA > pLSI > CTM), tracks human difficulty as the
-  topic count grows, and agrees with the human majority on 83% of topics — evidence
-  that it measures the same construct humans do, not merely correlating with
-  automated metrics.
+  On 4,168 human word-intrusion trials, our **five-judge panel** (Claude Opus 5,
+  Claude Sonnet 4.6, Qwen3-235B, Gemma-3 27B, GLM-5) **reproduces the human model
+  ranking exactly** (LDA > pLSI > CTM), tracks human difficulty as the topic count
+  grows, and its majority agrees with the human majority on 85% of topics (91% of
+  the 92.5% inter-annotator ceiling; per-cell Pearson *r* = 0.96) — evidence that it
+  measures the same construct humans do, not merely correlating with automated
+  metrics.
 
 - **Order-independent aggregation (Bradley–Terry).** Model rankings are aggregated
   with a Bradley–Terry model rather than Elo. The two agree closely (Kendall
@@ -74,6 +76,40 @@ conclusions:
   three topic counts bracketing its default *K* (≈ ½K, 1.5K, 2K, 5 seeds). Model
   rankings are stable across *K* — median Kendall τ = 0.75 across the 18 datasets
   (τ > 0.5 on 17 of 18) — confirming they are not an artifact of the chosen *K*.
+
+- **Hyperparameter budget and objective.** Beyond default settings, every
+  model–dataset is tuned for 5 hours under both its *native* objective and the *Cᵥ
+  coherence* objective. The ranking is broadly stable across all three regimes
+  (Kendall τ = 0.85 default vs. native-HPO, τ = 0.70 vs. *Cᵥ*-HPO): a larger budget
+  does not reorder the field, TNTM stays on top, and the simple baselines stay
+  competitive — so "strong baselines" is not an artifact of under-tuning.
+
+<div align="center">
+  <img src="./assets/bt_default_vs_v8.png" width="900"/>
+</div>
+
+  *Bradley–Terry ratings, default vs. 5-hour Cᵥ-objective HPO (all 11 metrics,
+  5-judge panel). Tuning directly toward coherence perturbs the middle of the field
+  (most visibly lifting BERTopic) but leaves the extremes intact.*
+
+- **Encoder robustness (embedding-model swap).** For the three embedding-dependent
+  models (KMeans-UMAP, BERTopic, CTM) we re-ran the default benchmark under
+  progressively larger sentence-transformers encoders — from the 22M-parameter
+  `all-MiniLM-L6-v2` baseline up to the 1.24B-parameter `gtr-t5-xl` (56× larger),
+  holding the evaluation encoder fixed. Scaling the training encoder barely moves
+  any metric (all per-model spreads ≤ 0.05, and the embedding-based metrics are the
+  *most* stable), and the larger encoders do **not** systematically win. In the full
+  16-model leaderboard only CTM — the one model that ingests the document embedding
+  directly — climbs (~2 ranks); the clustering baselines and the overall order are
+  unchanged. Encoder choice affects *reproducibility* (fix and report it), not the
+  ranking.
+
+  | Encoder | Params | KMeans-UMAP *Cᵥ* | BERTopic *Cᵥ* | CTM *Cᵥ* |
+  |---|---:|---:|---:|---:|
+  | all-MiniLM-L6-v2 | 22M | 0.620 | 0.530 | 0.564 |
+  | mxbai-embed-large-v1 | 335M | 0.612 | 0.519 | 0.572 |
+  | all-roberta-large-v1 | 355M | 0.605 | 0.514 | 0.562 |
+  | gtr-t5-xl | 1.24B | 0.623 | 0.517 | 0.562 |
 
 
 ## What's in the benchmark

@@ -221,6 +221,12 @@ checkpoints/
 result/
 
 # --- Benchmark harness (scripts/) ---
+# LLM-judge + rebuttal/analysis scripts carry environment-specific AWS identifiers
+# (account IDs, Bedrock role ARN, S3 bucket, named profiles) hardcoded as defaults.
+# Keep them OUT of the repo until refactored to read creds from config/env (like
+# scripts/benchmark/), so nothing credential-related is ever pushed.
+scripts/llm_judge/
+scripts/rebuttal/
 # The benchmark source is published for reproducibility, but its run artifacts,
 # cached model weights, and local secrets are not.
 scripts/**/.env
@@ -236,4 +242,9 @@ scripts/**/*.pkl
 # README assets (images referenced by the top-level README)
 !assets/topicarena_elo.png
 !assets/topicarena_cd_overall.png
+!assets/cd_overall.png
+!assets/cd_llm_rating_mean.png
+!assets/bt_default_vs_v7.png
+!assets/bt_default_vs_v8.png
+!assets/topicarena_rankings_4panel.png
 scripts/.DS_Store
